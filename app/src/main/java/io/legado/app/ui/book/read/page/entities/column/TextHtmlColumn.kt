@@ -27,6 +27,9 @@ data class TextHtmlColumn(
     val linkUrl: String?
 ) : TextBaseColumn {
 
+    // Reflow must not inherit the previous line's added justification space.
+    val nativeAdvance: Float = end - start
+
     override val positionLength: Int
         get() = if (charData == HR_PLACE_STR) HR_PLACE_CHAR.length else charData.length
 

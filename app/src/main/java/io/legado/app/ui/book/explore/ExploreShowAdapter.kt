@@ -42,7 +42,7 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
         binding.run {
             tvName.text = item.name
             tvAuthor.text = context.getString(R.string.author_show, item.author)
-            ivInBookshelf.isVisible = callBack.isInBookshelf(item)
+            upIndicator(binding, item)
             if (item.latestChapterTitle.isNullOrEmpty()) {
                 tvLasted.gone()
             } else {
@@ -68,11 +68,19 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
         binding.run {
             bundle.keySet().forEach {
                 when (it) {
-                    "isInBookshelf" -> ivInBookshelf.isVisible =
-                        callBack.isInBookshelf(item)
+                    "isInBookshelf", "hasReadRecord" -> upIndicator(binding, item)
                 }
             }
         }
+    }
+
+    /**
+     * 在书架中显示绿点,不在书架但有阅读记录显示橙点
+     */
+    private fun upIndicator(binding: ItemSearchBinding, item: SearchBook) {
+        val isInBookshelf = callBack.isInBookshelf(item)
+        binding.ivInBookshelf.isVisible = isInBookshelf
+        binding.ivReadRecord.isVisible = !isInBookshelf && callBack.hasReadRecord(item)
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemSearchBinding) {
@@ -88,6 +96,11 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
          * 是否已经加入书架
          */
         fun isInBookshelf(book: SearchBook): Boolean
+
+        /**
+         * 是否有阅读记录
+         */
+        fun hasReadRecord(book: SearchBook): Boolean
 
         fun showBookInfo(book: SearchBook)
     }

@@ -12,6 +12,8 @@ on:
       - 'gradle/libs.versions.toml'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BottomWebViewDialog.kt'
       - 'app/src/main/java/io/legado/app/help/webView/WebViewPool.kt'
+      - 'app/src/main/java/io/legado/app/help/http/BackstageWebView.kt'
+      - 'app/src/androidTest/java/io/legado/app/help/http/BackstageWebViewLifecycleTest.kt'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BookMemoDialog.kt'
       - 'app/src/main/java/io/legado/app/ui/code/**'
       - 'app/src/androidTest/java/io/legado/app/ui/code/**'
@@ -147,7 +149,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: gradle/actions/setup-gradle@v6.3.0
+      - uses: gradle/actions/setup-gradle@v6.4.0
 
       - name: Build instrumented test APKs
         run: |

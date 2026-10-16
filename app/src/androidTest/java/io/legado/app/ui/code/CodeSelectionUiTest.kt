@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.ClipData
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Rect
 import android.os.SystemClock
 import android.os.Parcel
@@ -22,6 +23,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
 import android.widget.MultiAutoCompleteTextView
 import androidx.core.view.ViewCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.children
@@ -49,6 +51,7 @@ import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.withTagKey
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -56,6 +59,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import com.google.gson.JsonObject
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.event.HandleStateChangeEvent
 import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
@@ -67,11 +71,15 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.ui.association.FileAssociationActivity
 import io.legado.app.ui.association.ImportBookSourceDialog
 import io.legado.app.ui.association.ImportBookSourceViewModel
 import io.legado.app.ui.association.ImportRssSourceDialog
 import io.legado.app.ui.association.ImportRssSourceViewModel
+import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.book.source.edit.BookSourceEditAdapter
+import io.legado.app.ui.book.source.edit.BookSourceEditViewModel
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
 import io.legado.app.ui.widget.code.KeywordTokenizer
@@ -80,6 +88,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.equalTo
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -527,6 +536,161 @@ class CodeSelectionUiTest {
                 scenario?.close()
                 scenario = null
             }
+        }
+    }
+
+    @Test fun oversizedJsLibOpensFromItsSourceFieldAndSavesWithoutLosingText() {
+        val url = "https://large-jslib-${UUID.randomUUID()}.invalid"
+        // SQLite's UTF-16 binding consumes a leading BOM before the editor ever sees it.
+        val prefix = "// \uFEFF\nconst message = '中文 🌍';\n/*\n"
+        val suffix = "\n*/\n"
+        val line = "jsLib 中文 🌍 payload\n"
+        val script = (prefix + line.repeat((272_508 - prefix.length - suffix.length) / line.length))
+            .padEnd(272_508 - suffix.length, 'x') + suffix
+        val insertion = script.indexOf("payload")
+        val marker = "已修改 🌍 "
+        val edited = script.substring(0, insertion) + marker + script.substring(insertion)
+        val savedHelpVersion = if (LocalConfig.contains("ruleHelpVersion")) LocalConfig.getInt("ruleHelpVersion", 0) else null
+        var host: ActivityScenario<BookSourceEditActivity>? = null
+        var editorActivity: CodeEditActivity? = null
+        var inputPath: String? = null
+        try {
+            assertEquals(272_508, script.length)
+            LocalConfig.ruleHelpVersionIsLast
+            appDb.bookSourceDao.insert(BookSource(bookSourceUrl = url, bookSourceName = "Large jsLib", jsLib = script))
+            assertEquals(script, appDb.bookSourceDao.getBookSource(url)?.jsLib)
+            val sourceScenario = ActivityScenario.launch<BookSourceEditActivity>(
+                Intent(context, BookSourceEditActivity::class.java).putExtra("sourceUrl", url)
+            ).also { host = it }
+            var fieldPosition = -1
+            await {
+                var ready = false
+                sourceScenario.onActivity { activity ->
+                    val adapter = activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as BookSourceEditAdapter
+                    fieldPosition = adapter.editEntities.indexOfFirst { it.key == "jsLib" }
+                    ready = fieldPosition >= 0 && activity.window.decorView.hasWindowFocus()
+                }
+                ready
+            }
+            sourceScenario.onActivity { it.findViewById<RecyclerView>(R.id.recycler_view).scrollToPosition(fieldPosition) }
+            await {
+                var ready = false
+                sourceScenario.onActivity {
+                    ready = it.findViewById<RecyclerView>(R.id.recycler_view)
+                        .findViewHolderForAdapterPosition(fieldPosition)?.itemView?.isShown == true
+                }
+                ready
+            }
+            onView(allOf(withId(R.id.editText), withTagKey(R.id.tag, equalTo("jsLib")))).perform(click())
+            var webView: WebView? = null
+            var editorState = "Editor activity has not resumed"
+            await(message = { editorState }) {
+                var ready = false
+                instrumentation.runOnMainSync {
+                    editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
+                        .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
+                    editorActivity?.let { activity ->
+                        inputPath = activity.intent.getStringExtra("textFile")
+                        webView = activity.findViewById<ViewGroup>(R.id.editorContainer).children.filterIsInstance<WebView>().singleOrNull()
+                        val model = ViewModelProvider(activity)[CodeEditViewModel::class.java]
+                        val save = activity.findViewById<View>(R.id.menu_save)
+                        editorState = "WebView shown=${webView?.isShown}, size=${webView?.width}x${webView?.height}, " +
+                            "save enabled=${save?.isEnabled}, writable=${model.writable}, " +
+                            "initial=${model.initialText.length}/${model.initialText == script}, " +
+                            "draft=${model.editorDraft?.text?.length}/${model.editorDraft?.text == script}"
+                        ready = webView?.isShown == true && webView!!.width > 0 && webView!!.height > 0 &&
+                            save?.isEnabled == true && model.editorDraft?.text == script
+                    }
+                }
+                ready
+            }
+            instrumentation.runOnMainSync {
+                assertFalse(editorActivity!!.intent.hasExtra("text"))
+                assertTrue(editorActivity!!.intent.getBooleanExtra("useTextFile", false))
+                assertFalse(editorActivity!!.findViewById<CodeEditor>(R.id.editText).isShown)
+            }
+            assertNotNull("Large jsLib must enter the editor through a transfer file", inputPath)
+            assertEquals(script, CodeTextTransfer.read(context, inputPath!!))
+            val displayed = AtomicReference<String>()
+            instrumentation.runOnMainSync {
+                webView!!.evaluateJavascript(
+                    "JSON.stringify({text:editor.value,foreground:getComputedStyle(editor).color," +
+                        "background:getComputedStyle(editor).backgroundColor})", displayed::set,
+                )
+            }
+            await { displayed.get() != null }
+            val page = GSON.fromJson(GSON.fromJson(displayed.get(), String::class.java), JsonObject::class.java)
+            assertEquals(script, page["text"].asString)
+            val colors = listOf("foreground", "background").map { key ->
+                val css = page[key].asString
+                assertTrue("Expected an opaque editor color: $css", css.startsWith("rgb("))
+                val rgb = Regex("\\d+").findAll(css).map { it.value.toInt() }.toList()
+                Color.rgb(rgb[0], rgb[1], rgb[2])
+            }
+            assertTrue("Editor colors lack contrast: ${page["foreground"]} on ${page["background"]}",
+                ColorUtils.calculateContrast(colors[0], colors[1]) >= 4.5)
+            instrumentation.runOnMainSync {
+                webView!!.evaluateJavascript(
+                    "editor.setRangeText(${GSON.toJson(marker)}, $insertion, $insertion, 'end');" +
+                        "editor.dispatchEvent(new Event('input'));", null,
+                )
+            }
+            await {
+                var ready = false
+                instrumentation.runOnMainSync {
+                    ready = ViewModelProvider(editorActivity!!)[CodeEditViewModel::class.java].editorDraft?.let {
+                        it.text == edited && it.cursorPosition == insertion + marker.length && it.dirty
+                    } == true
+                }
+                ready
+            }
+            onView(withId(R.id.menu_save)).perform(click())
+            await {
+                var ready = false
+                sourceScenario.onActivity { activity ->
+                    val adapter = activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as BookSourceEditAdapter
+                    ready = activity.window.decorView.hasWindowFocus() &&
+                        adapter.editEntities.single { it.key == "jsLib" }.value == edited
+                }
+                ready
+            }
+            assertFalse("The source editor must delete the consumed input file", File(inputPath!!).exists())
+            onView(withId(R.id.menu_save)).perform(click())
+            await { appDb.bookSourceDao.getBookSource(url)?.jsLib == edited }
+            assertEquals(edited, appDb.bookSourceDao.getBookSource(url)?.jsLib)
+        } catch (failure: Throwable) {
+            runCatching {
+                instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
+                    try {
+                        File(context.getExternalFilesDir("ui-regression"), "oversized-jslib-failure.png")
+                            .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    } finally { bitmap.recycle() }
+                }
+            }.onFailure(failure::addSuppressed)
+            throw failure
+        } finally {
+            instrumentation.runOnMainSync {
+                editorActivity?.takeUnless { it.isFinishing || it.isDestroyed }?.let {
+                    ViewModelProvider(it)[CodeEditViewModel::class.java].writable = false
+                    it.finish()
+                }
+                val monitor = ActivityLifecycleMonitorRegistry.getInstance()
+                listOf(Stage.CREATED, Stage.STARTED, Stage.RESUMED, Stage.PAUSED, Stage.STOPPED)
+                    .flatMap(monitor::getActivitiesInStage).filterIsInstance<BookSourceEditActivity>()
+                    .filter { it.intent.getStringExtra("sourceUrl") == url && !it.isFinishing && !it.isDestroyed }
+                    .forEach { activity ->
+                        val adapter = activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as? BookSourceEditAdapter
+                        adapter?.editEntities?.find { it.key == "jsLib" }?.let {
+                            ViewModelProvider(activity)[BookSourceEditViewModel::class.java].bookSource?.jsLib = it.value
+                        }
+                    }
+            }
+            host?.close()
+            CodeTextTransfer.delete(context, inputPath)
+            appDb.bookSourceDao.delete(url)
+            LocalConfig.edit().apply {
+                if (savedHelpVersion == null) remove("ruleHelpVersion") else putInt("ruleHelpVersion", savedHelpVersion)
+            }.commit()
         }
     }
 
@@ -1193,6 +1357,8 @@ class CodeSelectionUiTest {
     @Suppress("DEPRECATION")
     private fun shareAndAssert(expected: String) {
         val chooser = AtomicReference<Intent?>()
+        var shareButton: View? = null
+        var touchTrace = ""
         val monitor = object : Instrumentation.ActivityMonitor() {
             override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
                 if (intent.action != Intent.ACTION_CHOOSER) return null
@@ -1207,15 +1373,45 @@ class CodeSelectionUiTest {
             if (native) {
                 clickNativeAction(R.string.share)
             } else {
+                // A visible PopupWindow view can precede its committed surface/input window.
+                // Wait on the popup itself after switching back from Android's floating toolbar.
+                val committed = CountDownLatch(1)
+                withEditor { editor ->
+                    val root = actions(editor).view.rootView
+                    assertTrue(root.isHardwareAccelerated)
+                    root.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
+                    root.postInvalidateOnAnimation()
+                }
+                assertTrue("Share popup frame was not committed", committed.await(5, TimeUnit.SECONDS))
+                instrumentation.uiAutomation.waitForIdle(500, 5_000)
+                withEditor { editor ->
+                    assertEquals(expected, selection(editor))
+                    shareButton = actions(editor).view.findViewById(R.id.code_share_selection)
+                    shareButton!!.setOnTouchListener { view, event ->
+                        val location = IntArray(2)
+                        view.getLocationOnScreen(location)
+                        touchTrace += "${MotionEvent.actionToString(event.action)} " +
+                            "screen=${event.rawX},${event.rawY} button=${location.toList()} " +
+                            "size=${view.width}x${view.height} selected=${selection(editor)}; "
+                        false
+                    }
+                }
                 onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup()).perform(click())
             }
-            await { chooser.get() != null }
+            await(message = {
+                var state = ""
+                withEditor { state = "selected=${selection(it)} showing=${actions(it).isShowing} " +
+                    "enabled=${actions(it).isEnabled}; touches=$touchTrace" }
+                runCatching { screenshot("code-selection-share-timeout") }
+                "Share did not launch a chooser: $state"
+            }) { chooser.get() != null }
             val send = chooser.get()!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
             assertEquals(Intent.ACTION_SEND, send.action)
             assertEquals("text/plain", send.type)
             assertEquals(expected, send.getStringExtra(Intent.EXTRA_TEXT))
             assertNotEquals(source, send.getStringExtra(Intent.EXTRA_TEXT))
         } finally {
+            instrumentation.runOnMainSync { shareButton?.setOnTouchListener(null) }
             instrumentation.removeMonitor(monitor)
         }
     }

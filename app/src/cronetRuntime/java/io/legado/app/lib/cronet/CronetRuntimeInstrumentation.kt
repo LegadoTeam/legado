@@ -235,8 +235,10 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                 "nativeFile=${native.canonicalPath}\n" +
                 File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
             RssImageRuntimeRegression.verify(this)
+            val rssVideo = RssVideoRuntimeRegression.verify(this)
             return "$version; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
                 "webDav=authenticated,encoded-paths,cronet-first,on-off-on; " +
+                "rssVideo=$rssVideo; " +
                 "firstInstallFailures=$firstInstallFailures; " +
                 "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +
                 "nativeBytes=${native.length()}; nativeMtime=${native.lastModified()}; nativeFile=$native"
