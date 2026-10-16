@@ -195,9 +195,12 @@ class ExploreRefreshUiTest {
 
     @Test fun discoveryInputRemainsVisibleAboveTheActualKeyboard() {
         var originalHeight = 0
+        var originalNavigationBottom = 0
         scenario!!.onActivity { activity ->
             val list = activity.list
             originalHeight = list.height
+            val navigation = activity.findViewById<View>(R.id.bottom_navigation_view)
+            originalNavigationBottom = navigation.screenY() + navigation.height
             val input = checkNotNull(activity.searchInput())
             val rectangle = Rect(0, 0, input.width, input.height)
             list.offsetDescendantRectToMyCoords(input, rectangle)
@@ -216,6 +219,12 @@ class ExploreRefreshUiTest {
             val keyboard = checkNotNull(ViewCompat.getRootWindowInsets(decor)).getInsets(WindowInsetsCompat.Type.ime()).bottom
             val keyboardTop = decor.screenY() + decor.height - keyboard
             assertTrue("IME must have a measurable height", keyboard > 0)
+            assertEquals("Discovery viewport must meet the keyboard without a blank strip",
+                keyboardTop, activity.list.screenY() + activity.list.height)
+            val navigation = activity.findViewById<View>(R.id.bottom_navigation_view)
+            assertEquals("Bottom navigation must stay at the window bottom",
+                originalNavigationBottom, navigation.screenY() + navigation.height)
+            assertTrue("Bottom navigation must remain behind the keyboard", navigation.screenY() >= keyboardTop)
             assertEquals("reader", input.text.toString())
             assertTrue("Focused input bottom ${input.screenY() + input.height} is hidden below keyboard top $keyboardTop",
                 input.screenY() + input.height <= keyboardTop)
@@ -229,6 +238,8 @@ class ExploreRefreshUiTest {
         screenshot("explore-input-keyboard-dismissed")
         scenario!!.onActivity { activity ->
             assertEquals("Discovery viewport recovers after hiding IME", originalHeight, activity.list.height)
+            val navigation = activity.findViewById<View>(R.id.bottom_navigation_view)
+            assertEquals(originalNavigationBottom, navigation.screenY() + navigation.height)
             assertEquals("reader", checkNotNull(activity.searchInput()).text.toString())
         }
     }
