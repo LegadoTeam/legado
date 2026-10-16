@@ -66,6 +66,14 @@ class ExploreCategoriesTest {
         assertTrue(source("ui/book/explore/ExploreShowViewModel.kt").contains("fun showPage(page: Int)"))
     }
 
+    @Test
+    fun `categories wait for the initial explore request`() {
+        val model = source("ui/book/explore/ExploreShowViewModel.kt")
+        assertTrue(model.contains("categoriesPending = true"))
+        assertTrue(model.indexOf("finishExplore()") < model.indexOf("fun getLoadedBooks()"))
+        assertTrue(model.indexOf("if (paginationState.isLoading)") < model.indexOf("categoriesPending = true"))
+    }
+
     private fun source(path: String): String = sequenceOf(
         File("src/main/java/io/legado/app/$path"),
         File("app/src/main/java/io/legado/app/$path"),

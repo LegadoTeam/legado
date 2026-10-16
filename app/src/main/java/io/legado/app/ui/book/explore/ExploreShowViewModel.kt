@@ -60,6 +60,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     private var bookSource: BookSource? = null
     private var initialized = false
     private var categoriesLoading = false
+    private var categoriesPending = false
     private var firstLoadedPage = 1
     private val paginationState = ExplorePaginationState()
     private val booksLock = Any()
@@ -131,6 +132,10 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
 
     fun loadCategories() {
         val source = bookSource ?: return
+        if (paginationState.isLoading) {
+            categoriesPending = true
+            return
+        }
         if (categoriesLoading || categoriesData.value != null) return
         categoriesLoading = true
         execute { source.exploreKinds() }.onSuccess { kinds ->
@@ -236,7 +241,13 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
                 if (!paginationState.fail(request)) return@onError
                 it.printOnDebug()
                 errorLiveData.value = it.stackTraceStr
-            }
+            }.onFinally { finishExplore() }
+    }
+
+    private fun finishExplore() {
+        if (!categoriesPending) return
+        categoriesPending = false
+        if (AppConfig.showExploreCategories) loadCategories()
     }
 
     fun getLoadedBooks(): List<SearchBook> {
