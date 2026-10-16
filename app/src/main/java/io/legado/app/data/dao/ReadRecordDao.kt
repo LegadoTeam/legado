@@ -71,26 +71,31 @@ interface ReadRecordDao {
     fun insertRecords(vararg readRecord: ReadRecord)
 
     @Query("""select * from readRecord where bookName = :bookName and author = :author
+        and (author != '' or coalesce(resolvedAuthor, '') = :resolvedAuthor)
         and metadataEditedAt > 0 order by metadataEditedAt desc limit 1""")
-    fun latestMetadata(bookName: String, author: String): ReadRecord?
+    fun latestMetadata(bookName: String, author: String, resolvedAuthor: String): ReadRecord?
 
     @Transaction
     fun insert(vararg readRecord: ReadRecord) {
-        readRecord.groupBy { it.bookName to it.author }.forEach { (identity, records) ->
-            val stored = latestMetadata(identity.first, identity.second)
+        // Different devices can have assigned the same old blank-author key to different authors.
+        readRecord.groupBy {
+            Triple(it.bookName, it.author, if (it.author.isEmpty()) it.resolvedAuthor.orEmpty() else "")
+        }.forEach { (identity, records) ->
+            val stored = latestMetadata(identity.first, identity.second, identity.third)
             val incoming = records.maxByOrNull { it.metadataEditedAt }
             val metadata = if ((stored?.metadataEditedAt ?: 0) >= (incoming?.metadataEditedAt ?: 0)) stored else incoming
             insertRecords(*records.map { it.withDisplayMetadata(metadata) }.toTypedArray())
             if (metadata != null && metadata.metadataEditedAt > 0) {
-                updatePhysicalMetadata(identity.first, identity.second, metadata.displayBookName,
+                updatePhysicalMetadata(identity.first, identity.second, identity.third, metadata.displayBookName,
                     metadata.displayAuthor, metadata.metadataEditedAt)
             }
         }
     }
 
     @Query("""update readRecord set displayBookName = :name, displayAuthor = :displayAuthor, metadataEditedAt = :editedAt
-        where bookName = :bookName and author = :author and metadataEditedAt <= :editedAt""")
-    fun updatePhysicalMetadata(bookName: String, author: String, name: String, displayAuthor: String, editedAt: Long)
+        where bookName = :bookName and author = :author
+        and (author != '' or coalesce(resolvedAuthor, '') = :resolvedAuthor) and metadataEditedAt <= :editedAt""")
+    fun updatePhysicalMetadata(bookName: String, author: String, resolvedAuthor: String, name: String, displayAuthor: String, editedAt: Long)
 
     @Update
     fun update(vararg record: ReadRecord)

@@ -45,7 +45,7 @@ class BookInfoEditViewModel(application: Application) : BaseViewModel(applicatio
                 ReadBook.loadHighlights(book)
             }
             if (ReadManga.book?.bookUrl == book.bookUrl) ReadManga.book = book
-            if (AudioPlay.book?.bookUrl == book.bookUrl) AudioPlay.book = book
+            if (AudioPlay.book?.bookUrl == book.bookUrl) AudioPlay.replaceBook(book)
             this@BookInfoEditViewModel.book = book
         }.onSuccess {
             saved.value = true
