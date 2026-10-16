@@ -104,11 +104,14 @@ class SourceNavigationUiTest {
                 // Rule WebViews call both bridges on a separate Java thread; storage remains usable.
                 rule.setContent("<p>Background</p>", pageUrl)
                 source.header = "@js:java.openUrl('https://navigation.invalid/header'); '{\"X-Navigation\":\"ok\"}'"
-                for (blocked in listOf(true, false)) {
-                    AppConfig.blockSourceNavigation = blocked
-                    Log.i("SourceNavigationTest", "webjs start blocked=$blocked")
-                    webViewDiagnostics.watch("webjs-$blocked")
-                    val response = try { rule.getString("""@webjs:
+                repeat(20) { round ->
+                    for (blocked in listOf(true, false)) {
+                        AppConfig.blockSourceNavigation = blocked
+                        Log.i("SourceNavigationTest", "webjs start round=$round blocked=$blocked")
+                        WebViewDiagnostics.record("test") { "webjs start round=$round blocked=$blocked" }
+                        webViewDiagnostics.watch("webjs-$round-$blocked")
+                        try {
+                            val response = rule.getString("""@webjs:
                         console.info('navigation webjs: started');
                         java.openUrl('https://navigation.invalid/java');
                         source.openUrl('https://navigation.invalid/source');
@@ -118,18 +121,21 @@ class SourceNavigationUiTest {
                         source.put('navigationTest', 'stored');
                         console.info('navigation webjs: stored');
                         source.get('navigationTest') + ':' + document.querySelector('p').textContent + ':' + source.get('navigationLogin');
-                    """.trimIndent()) } catch (error: Throwable) {
-                        WebViewDiagnostics.record("test") { "webjs failed blocked=$blocked starts=${starts.size}" }
-                        WebViewDiagnostics.dump("source-navigation-webjs-$blocked-failure")
-                        throw error
-                    } finally {
-                        webViewDiagnostics.stopWatching()
+                            """.trimIndent())
+                            Log.i("SourceNavigationTest", "webjs completed round=$round blocked=$blocked response=$response")
+                            WebViewDiagnostics.record("test") { "webjs completed round=$round blocked=$blocked starts=${starts.size}" }
+                            assertEquals("stored:Background:ok", response)
+                            assertEquals(if (blocked) 0 else 4, starts.size)
+                            starts.forEach { assertEquals(SourceType.book, it.getIntExtra("sourceType", -1)) }
+                            starts.clear()
+                        } catch (error: Throwable) {
+                            WebViewDiagnostics.record("test") { "webjs failed round=$round blocked=$blocked starts=${starts.size}" }
+                            WebViewDiagnostics.dump("source-navigation-webjs-$round-$blocked-failure")
+                            throw error
+                        } finally {
+                            webViewDiagnostics.stopWatching()
+                        }
                     }
-                    Log.i("SourceNavigationTest", "webjs completed blocked=$blocked response=$response")
-                    assertEquals("stored:Background:ok", response)
-                    assertEquals(if (blocked) 0 else 4, starts.size)
-                    starts.forEach { assertEquals(SourceType.book, it.getIntExtra("sourceType", -1)) }
-                    starts.clear()
                 }
                 source.header = null
                 AppConfig.blockSourceNavigation = true
