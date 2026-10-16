@@ -11,6 +11,7 @@ import io.legado.app.data.appDb
 import io.legado.app.help.CacheManager
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
+import io.legado.app.help.webView.WebViewDiagnosticsRule
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.utils.runOnUI
 import kotlinx.coroutines.CompletableDeferred
@@ -30,6 +31,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
@@ -39,6 +41,9 @@ import kotlin.coroutines.resume
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 29)
 class BackstageWebViewLifecycleTest {
+    @get:Rule
+    val webViewDiagnostics = WebViewDiagnosticsRule()
+
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
