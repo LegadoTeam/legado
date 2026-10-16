@@ -46,6 +46,7 @@ class WebViewDiagnosticsRule(private val watchFromStart: Boolean = true) : TestW
     override fun finished(description: Description) {
         stopWatching()
         WebViewDiagnostics.record("test") { "finished $testName" }
+        WebViewDiagnostics.dump("$testName-finished", threads = false)
         WebViewDiagnostics.enabled = wasEnabled
     }
 }

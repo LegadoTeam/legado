@@ -6,6 +6,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.webkit.WebView
 import io.legado.app.BuildConfig
+import io.legado.app.help.LifecycleHelp
 import splitties.init.appCtx
 import java.io.File
 import java.util.ArrayDeque
@@ -59,6 +60,10 @@ object WebViewDiagnostics {
         Handler(Looper.getMainLooper()).post {
             if (!enabled || !isCurrent()) return@post
             record("observer") { "main snapshot entered delay=${SystemClock.uptimeMillis() - postedAt}ms label=$label" }
+            record("observer") {
+                val activity = LifecycleHelp.getTopActivity()
+                "resumedActivity=${activity?.javaClass?.simpleName} focus=${activity?.hasWindowFocus()}"
+            }
             runCatching { WebViewPool.diagnosticSnapshot() }
                 .onFailure { record("observer") { "main snapshot error=${it.javaClass.simpleName}" } }
             record("observer") { "main snapshot returned label=$label" }
