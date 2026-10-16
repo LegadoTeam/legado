@@ -194,7 +194,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
                 if (!paginationState.fail(request)) return@onError
                 it.printOnDebug()
                 errorTopLiveData.value = it.stackTraceStr
-            }
+            }.onFinally { finishExplore() }
     }
 
     fun skipPage(page: Int) {

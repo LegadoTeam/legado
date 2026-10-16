@@ -72,6 +72,7 @@ class ExploreCategoriesTest {
         assertTrue(model.contains("categoriesPending = true"))
         assertTrue(model.indexOf("finishExplore()") < model.indexOf("fun getLoadedBooks()"))
         assertTrue(model.indexOf("if (paginationState.isLoading)") < model.indexOf("categoriesPending = true"))
+        assertEquals(2, model.split(".onFinally { finishExplore() }").size - 1)
     }
 
     private fun source(path: String): String = sequenceOf(
