@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.ClipData
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Rect
 import android.os.SystemClock
 import android.os.Parcel
@@ -22,6 +23,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
 import android.widget.MultiAutoCompleteTextView
 import androidx.core.view.ViewCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.children
@@ -57,6 +59,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import com.google.gson.JsonObject
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.event.HandleStateChangeEvent
 import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
@@ -609,8 +612,23 @@ class CodeSelectionUiTest {
             assertNotNull("Large jsLib must enter the editor through a transfer file", inputPath)
             assertEquals(script, CodeTextTransfer.read(context, inputPath!!))
             val displayed = AtomicReference<String>()
-            instrumentation.runOnMainSync { webView!!.evaluateJavascript("editor.value", displayed::set) }
-            await { displayed.get()?.let { GSON.fromJson(it, String::class.java) == script } == true }
+            instrumentation.runOnMainSync {
+                webView!!.evaluateJavascript(
+                    "JSON.stringify({text:editor.value,foreground:getComputedStyle(editor).color," +
+                        "background:getComputedStyle(editor).backgroundColor})", displayed::set,
+                )
+            }
+            await { displayed.get() != null }
+            val page = GSON.fromJson(GSON.fromJson(displayed.get(), String::class.java), JsonObject::class.java)
+            assertEquals(script, page["text"].asString)
+            val colors = listOf("foreground", "background").map { key ->
+                val css = page[key].asString
+                assertTrue("Expected an opaque editor color: $css", css.startsWith("rgb("))
+                val rgb = Regex("\\d+").findAll(css).map { it.value.toInt() }.toList()
+                Color.rgb(rgb[0], rgb[1], rgb[2])
+            }
+            assertTrue("Editor colors lack contrast: ${page["foreground"]} on ${page["background"]}",
+                ColorUtils.calculateContrast(colors[0], colors[1]) >= 4.5)
             instrumentation.runOnMainSync {
                 webView!!.evaluateJavascript(
                     "editor.setRangeText(${GSON.toJson(marker)}, $insertion, $insertion, 'end');" +
