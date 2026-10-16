@@ -578,7 +578,8 @@ class CodeSelectionUiTest {
             }
             onView(allOf(withId(R.id.editText), withTagKey(R.id.tag, equalTo("jsLib")))).perform(click())
             var webView: WebView? = null
-            await {
+            var editorState = "Editor activity has not resumed"
+            await(message = { editorState }) {
                 var ready = false
                 instrumentation.runOnMainSync {
                     editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
@@ -586,9 +587,14 @@ class CodeSelectionUiTest {
                     editorActivity?.let { activity ->
                         inputPath = activity.intent.getStringExtra("textFile")
                         webView = activity.findViewById<ViewGroup>(R.id.editorContainer).children.filterIsInstance<WebView>().singleOrNull()
+                        val model = ViewModelProvider(activity)[CodeEditViewModel::class.java]
+                        val save = activity.findViewById<View>(R.id.menu_save)
+                        editorState = "WebView shown=${webView?.isShown}, size=${webView?.width}x${webView?.height}, " +
+                            "save enabled=${save?.isEnabled}, writable=${model.writable}, " +
+                            "initial=${model.initialText.length}/${model.initialText == script}, " +
+                            "draft=${model.editorDraft?.text?.length}/${model.editorDraft?.text == script}"
                         ready = webView?.isShown == true && webView!!.width > 0 && webView!!.height > 0 &&
-                            activity.findViewById<View>(R.id.menu_save)?.isEnabled == true &&
-                            ViewModelProvider(activity)[CodeEditViewModel::class.java].editorDraft?.text == script
+                            save?.isEnabled == true && model.editorDraft?.text == script
                     }
                 }
                 ready
@@ -632,6 +638,14 @@ class CodeSelectionUiTest {
             onView(withId(R.id.menu_save)).perform(click())
             await { appDb.bookSourceDao.getBookSource(url)?.jsLib == edited }
             assertEquals(edited, appDb.bookSourceDao.getBookSource(url)?.jsLib)
+        } catch (failure: Throwable) {
+            instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
+                try {
+                    File(context.getExternalFilesDir("ui-regression"), "oversized-jslib-failure.png")
+                        .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                } finally { bitmap.recycle() }
+            }
+            throw failure
         } finally {
             instrumentation.runOnMainSync {
                 editorActivity?.takeUnless { it.isFinishing || it.isDestroyed }?.let {
