@@ -40,6 +40,18 @@ interface BookSourceDao {
     fun flowSearch(searchKey: String): Flow<List<BookSourcePart>>
 
     @Query(
+        """select bp.*
+        from book_sources b join book_sources_part bp on b.bookSourceUrl = bp.bookSourceUrl
+        where b.bookSourceName like '%' || :searchKey || '%'
+        or b.bookSourceGroup like '%' || :searchKey || '%'
+        or b.bookSourceUrl like '%' || :searchKey || '%'
+        or b.bookSourceComment like '%' || :searchKey || '%'
+        or bp.checkDetail like '%' || :searchKey || '%'
+        order by b.customOrder asc"""
+    )
+    fun flowSearchWithCheckDetail(searchKey: String): Flow<List<BookSourcePart>>
+
+    @Query(
         """select * from book_sources 
         where bookSourceName like '%' || :searchKey || '%'
         or bookSourceGroup like '%' || :searchKey || '%'
@@ -316,14 +328,18 @@ interface BookSourceDao {
     fun updateRespondTime(url: String, respondTime: Long)
 
     @Transaction
-    fun completeCheck(selected: BookSourcePart, passed: Boolean, detail: String, respondTime: Long): Boolean {
-        val updated = finishCheck(selected.bookSourceUrl, selected.checkRevision,
-            if (passed) BookSourceCheckState.PASSED else BookSourceCheckState.FAILED,
+    fun completeCheck(selected: BookSourcePart, status: String, detail: String, respondTime: Long): Boolean {
+        val updated = finishCheck(selected.bookSourceUrl, selected.checkRevision, status,
             detail, System.currentTimeMillis())
         if (updated == 0) return false
         updateRespondTime(selected.bookSourceUrl, respondTime)
         return true
     }
+
+    fun completeCheck(selected: BookSourcePart, passed: Boolean, detail: String, respondTime: Long): Boolean =
+        completeCheck(selected,
+            if (passed) BookSourceCheckState.PASSED else BookSourceCheckState.FAILED,
+            detail, respondTime)
 
     @Delete
     fun delete(vararg bookSource: BookSource)

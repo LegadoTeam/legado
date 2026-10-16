@@ -242,10 +242,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun initView() = binding.run {
-        root.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
+        root.setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
             val keyboardHeight = windowInsets.imeHeight
-            view.bottomPadding = keyboardHeight
-            if (keyboardHeight > 0) view.doOnLayout {
+            viewPagerMain.bottomPadding = keyboardHeight
+            if (keyboardHeight > 0) viewPagerMain.doOnLayout {
                 currentFocus?.takeIf { it.onCheckIsTextEditor() }?.let { input ->
                     input.requestRectangleOnScreen(Rect(0, 0, input.width, input.height), true)
                 }

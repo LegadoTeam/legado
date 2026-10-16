@@ -398,8 +398,10 @@
     <string name="highlight_fill_half">Half height</string>
     <string name="highlight_fill_baseline">Baseline</string>
     <string name="highlight_fill_pill">Pill</string>
-    <string name="highlight_pill_padding">Pill margin (%)</string>
-    <string name="highlight_pill_padding_value">Margin %1$d%%</string>
+    <string name="highlight_pill_padding">Curvature (%)</string>
+    <string name="highlight_pill_padding_value">Curvature %1$d%%</string>
+    <string name="highlight_horizontal_padding">Horizontal margin</string>
+    <string name="highlight_reserve_text_space">Affect text spacing</string>
     <string name="highlight_rule">Highlight rules</string>
     <string name="highlight_rule_add">New highlight rule</string>
     <string name="highlight_rule_edit_title">Edit highlight rule</string>
@@ -1134,7 +1136,7 @@
     <string name="custom_group_summary">Turn off Replace Group / Turn on Add Group</string>
     <string name="pref_media_button_per_next">Media Buttons • Previous | Next</string>
     <string name="pref_media_button_per_next_summary">Previous Paragraph|Next Paragraph/Previous Chapter|Next Chapter</string>
-    <string name="read_aloud_by_page_summary">Turning pages in time, with a pause when the page is turned</string>
+    <string name="read_aloud_by_page_summary">Split speech at pages for engines without word progress; words across pages may be split</string>
     <string name="check_source_show_debug_message">Check book source shows debug message</string>
     <string name="check_source_show_debug_message_summary">Show network status and timestamp during source checking</string>
     <string name="need_login">need login</string>
