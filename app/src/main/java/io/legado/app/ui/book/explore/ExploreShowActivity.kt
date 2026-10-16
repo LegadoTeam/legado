@@ -45,6 +45,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private val categoryTabs = arrayListOf<Pair<ExploreCategory, TabLayout.Tab>>()
     private var renderedCategories: List<ExploreCategory>? = null
     private var menuCategories: MenuItem? = null
+    private var menuReadRecord: MenuItem? = null
     private var menuAddLoadedBooks: MenuItem? = null
     private var menuPage: MenuItem? = null
 
@@ -56,6 +57,18 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             setOnMenuItemClickListener {
                 AppConfig.showExploreCategories = !AppConfig.showExploreCategories
                 updateCategories()
+                true
+            }
+        }
+        menuReadRecord = menu.add(Menu.NONE, R.id.menu_show_read_record, Menu.NONE,
+            R.string.show_search_read_record).apply {
+            isCheckable = true
+            isChecked = AppConfig.showSearchReadRecord
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+            setOnMenuItemClickListener {
+                AppConfig.showSearchReadRecord = !AppConfig.showSearchReadRecord
+                it.isChecked = AppConfig.showSearchReadRecord
+                viewModel.upAdapterLiveData.postValue("hasReadRecord")
                 true
             }
         }
@@ -127,6 +140,8 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     override fun onResume() {
         super.onResume()
         updateCategories()
+        menuReadRecord?.isChecked = AppConfig.showSearchReadRecord
+        viewModel.upAdapterLiveData.postValue("hasReadRecord")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -303,6 +318,10 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
 
     override fun isInBookshelf(book: SearchBook): Boolean {
         return viewModel.isInBookShelf(book)
+    }
+
+    override fun hasReadRecord(book: SearchBook): Boolean {
+        return viewModel.hasReadRecord(book)
     }
 
     override fun showBookInfo(book: SearchBook) {

@@ -15,6 +15,36 @@ import org.junit.Test
 class HighlightStyleTest {
 
     @Test
+    fun `horizontal padding is independent optional and zero overrides the base`() {
+        val legacy = HighlightStyle(fill = 1, fillShape = FillShape.PILL, pillPaddingScale = 1.5f)
+        val padded = legacy.copy(horizontalPadding = 12f)
+        assertFalse(padded.reserveTextSpace)
+        assertTrue(padded.needsPerColumnDraw)
+        assertFalse(HighlightStyle(horizontalPadding = 0f).isEmpty)
+        assertEquals(1.5f, padded.resolvedPillPaddingScale, 0f)
+        assertEquals(12f, padded.copy(pillPaddingScale = 0.5f).resolvedHorizontalPadding)
+        assertEquals(padded.copy(horizontalPadding = 0f),
+            HighlightStyle.merge(padded, HighlightStyle(horizontalPadding = 0f)))
+        assertEquals(padded, HighlightStyle.merge(padded, HighlightStyle()))
+        assertEquals(legacy, padded.copy(horizontalPadding = null))
+        assertEquals(HighlightStyle(), HighlightStyle(horizontalPadding = Float.NaN).normalized())
+        assertEquals(HighlightStyle(), HighlightStyle(horizontalPadding = Float.POSITIVE_INFINITY).normalized())
+        assertEquals(0f, HighlightStyle(horizontalPadding = -1f).normalized().horizontalPadding)
+        assertEquals(64f, HighlightStyle(horizontalPadding = 100f).normalized().horizontalPadding)
+    }
+
+    @Test
+    fun `text spacing reservation is opt in and follows the padding channel`() {
+        val base = HighlightStyle(horizontalPadding = 12f)
+        assertFalse(base.reserveTextSpace)
+        assertTrue(HighlightStyle.merge(base, HighlightStyle(horizontalPadding = 12f,
+            reserveTextSpace = true)).reserveTextSpace)
+        assertFalse(HighlightStyle.merge(base.copy(reserveTextSpace = true),
+            HighlightStyle(horizontalPadding = 12f)).reserveTextSpace)
+        assertTrue(HighlightStyle.merge(base.copy(reserveTextSpace = true), HighlightStyle()).reserveTextSpace)
+    }
+
+    @Test
     fun `font metrics are optional normalized channels and zero spacing overrides the base`() {
         val legacy = HighlightStyle(fontPath = "font.ttf")
         assertFalse(legacy.changesTextMetrics)
@@ -142,6 +172,7 @@ class HighlightStyleTest {
             fontPath = "content://fonts/reader.ttf",
             fontSize = 36f,
             letterSpacing = -0.15f,
+            reserveTextSpace = true,
             underline = Underline(Kind.DASHED, 0xFF00FF00.toInt()),
             strike = Deco(0xFF0000FF.toInt())
         )
@@ -159,6 +190,27 @@ class HighlightStyleTest {
 
         assertEquals(FillShape.PILL, shaped.resolvedFillShape)
         assertEquals(FillShape.RECTANGLE, legacy.resolvedFillShape)
+    }
+
+    @Test
+    fun `text overlays preserve a padded background but geometry changes split it`() {
+        val base = HighlightStyle(fill = 1, fillShape = FillShape.PILL, horizontalPadding = 12f)
+        val merged = HighlightStyle.merge(base, HighlightStyle(textColor = 2, bold = true,
+            italic = true, underline = Underline(Kind.WAVY), fontPath = "font.ttf"))
+
+        assertTrue(base.hasSameFillGeometry(merged))
+        assertEquals(2, merged.textColor)
+        assertTrue(merged.bold && merged.italic)
+        assertEquals(Underline(Kind.WAVY), merged.underline)
+        assertFalse(base.hasSameFillGeometry(base.copy(fill = 2)))
+        assertFalse(base.hasSameFillGeometry(base.copy(fillShape = FillShape.RECTANGLE)))
+        assertFalse(base.hasSameFillGeometry(base.copy(horizontalPadding = 24f)))
+        assertFalse(base.hasSameFillGeometry(base.copy(horizontalPadding = null)))
+        assertFalse(base.hasSameFillGeometry(base.copy(pillPaddingScale = 0.5f)))
+        assertTrue(base.hasSameFillGeometry(base.copy(pillPaddingScale = 1f)))
+        val rectangle = base.copy(fillShape = null)
+        assertTrue(rectangle.hasSameFillGeometry(rectangle.copy(fillShape = FillShape.RECTANGLE,
+            pillPaddingScale = 0.5f)))
     }
 
     @Test

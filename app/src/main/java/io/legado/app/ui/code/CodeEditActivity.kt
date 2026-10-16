@@ -46,7 +46,7 @@ import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.lib.theme.primaryTextColor
+import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.code.config.ChangeThemeDialog
 import io.legado.app.ui.code.config.SettingsDialog
@@ -132,7 +132,7 @@ class CodeEditActivity :
             }
             val text = viewModel.editorDraft?.text ?: viewModel.initialText
             viewModel.editorDraft?.let { viewModel.cursorPosition = it.cursorPosition }
-            useSafeEditor = EditSafety.isCombiningHeavy(text)
+            useSafeEditor = EditSafety.requiresSafeEditor(text)
             if (useSafeEditor) {
                 setupSafeEditor(text)
             } else {
@@ -345,7 +345,7 @@ class CodeEditActivity :
             Base64.NO_WRAP
         )
         val background = ColorUtils.intToString(backgroundColor)
-        val foreground = ColorUtils.intToString(primaryTextColor)
+        val foreground = ColorUtils.intToString(getPrimaryTextColor(ColorUtils.isColorLight(backgroundColor)))
         val readOnly = if (viewModel.writable) "" else " readonly"
         val writable = viewModel.writable
         val wrap = if (AppConfig.editAutoWrap) "soft" else "off"

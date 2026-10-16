@@ -140,6 +140,31 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
+    fun `large source fields use file transport for full editor`() {
+        listOf(ACTIVITY_PATH, RSS_ACTIVITY_PATH).forEach { path ->
+            val source = File(repositoryRoot, path).readText()
+
+            assertTrue(
+                "$path must opt into file transport",
+                source.contains("putExtra(\"useTextFile\", true)")
+            )
+            assertTrue(
+                "$path must write large input to a cache file",
+                source.contains("CodeTextTransfer.write(this, it)")
+            )
+            assertTrue("$path must read a file result", source.contains("getStringExtra(\"textFile\")"))
+            assertTrue(
+                "$path must delete temporary files",
+                source.contains("CodeTextTransfer.delete(this, path)")
+            )
+            assertFalse(
+                "$path must not pass the source value inline",
+                source.contains("putExtra(\"text\", editEntity.value.orEmpty())")
+            )
+        }
+    }
+
+    @Test
     fun `source editor keeps the caret visible after selection and layout changes`() {
         val source = File(repositoryRoot, ACTIVITY_PATH).readText()
         val initView = source.section("private fun initView()", "private fun initOptionPanel()")
