@@ -297,7 +297,8 @@ data class HighlightSpacing(
                     // A physical pixel between the cap and image keeps their antialiased
                     // coverage disjoint even when measured advances end on fractional pixels.
                     val layoutPadding = paragraph.subList(i, end).maxOf { it.layoutPadding }
-                    val padding = layoutPadding.takeIf { it > 0f }?.plus(1f) ?: 0f
+                    val padding = if (explicit) layoutPadding + 1f
+                    else layoutPadding.takeIf { it > 0f }?.plus(1f) ?: 0f
                     edgePadding = maxOf(edgePadding, padding)
                     if (padding == 0f) {
                         i = end

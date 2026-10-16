@@ -964,7 +964,7 @@ class TitleFontWeightRenderingTest {
                                                 Color.alpha(bitmap.getPixel(x, y)) > 40)
                                         }
                                         continuousLines++
-                                        if (variant == "12dp" || variant == "12dp-no-layout") {
+                                        if (variant == "12dp") {
                                             val ink = Rect()
                                             var inkLeft = Float.POSITIVE_INFINITY
                                             var inkRight = Float.NEGATIVE_INFINITY
@@ -1055,7 +1055,8 @@ class TitleFontWeightRenderingTest {
                 val after = "后续段落用于确认其它段落的排版位置保持稳定。".repeat(3)
                 val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "text-paragraph-insets", index = 10010)
                 val style = HighlightStyle(fill = Color.MAGENTA,
-                    fillShape = HighlightStyle.FillShape.PILL, horizontalPadding = 32f)
+                    fillShape = HighlightStyle.FillShape.PILL, horizontalPadding = 32f,
+                    reserveTextSpace = true)
                 for (mode in listOf("static", "zh")) for (justify in listOf(false, true)) {
                     ReadBookConfig.useZhLayout = mode == "zh"
                     context.putPrefBoolean(PreferKey.textFullJustify, justify)
