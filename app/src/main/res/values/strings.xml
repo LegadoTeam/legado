@@ -401,6 +401,7 @@
     <string name="highlight_pill_padding">Curvature (%)</string>
     <string name="highlight_pill_padding_value">Curvature %1$d%%</string>
     <string name="highlight_horizontal_padding">Horizontal margin</string>
+    <string name="highlight_reserve_text_space">Affect text spacing</string>
     <string name="highlight_rule">Highlight rules</string>
     <string name="highlight_rule_add">New highlight rule</string>
     <string name="highlight_rule_edit_title">Edit highlight rule</string>

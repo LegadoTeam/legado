@@ -105,6 +105,13 @@
             android:textColor="@color/primaryText"
             android:textSize="15sp" />
 
+        <io.legado.app.lib.theme.view.ThemeCheckBox
+            android:id="@+id/cb_highlight_reserve_text_space"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:text="@string/highlight_reserve_text_space" />
+
         <TextView
             android:id="@+id/tv_highlight_letter_spacing"
             android:layout_width="match_parent"

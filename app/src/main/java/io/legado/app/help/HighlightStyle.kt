@@ -19,7 +19,9 @@ data class HighlightStyle(
     val fontSize: Float? = null,
     val letterSpacing: Float? = null,
     // Requested ink-to-edge distance in dp; null keeps the legacy shape and layout.
-    val horizontalPadding: Float? = null
+    val horizontalPadding: Float? = null,
+    // Keep the optional padding out of text layout unless explicitly requested.
+    val reserveTextSpace: Boolean = false
 ) {
     data class Underline(
         val kind: Kind = Kind.SOLID,
@@ -158,7 +160,12 @@ data class HighlightStyle(
                 fontPath = other.resolvedFontPath.ifEmpty { current.resolvedFontPath },
                 fontSize = other.resolvedFontSize ?: current.resolvedFontSize,
                 letterSpacing = other.resolvedLetterSpacing ?: current.resolvedLetterSpacing,
-                horizontalPadding = other.resolvedHorizontalPadding ?: current.resolvedHorizontalPadding
+                horizontalPadding = other.resolvedHorizontalPadding ?: current.resolvedHorizontalPadding,
+                reserveTextSpace = if (other.resolvedHorizontalPadding != null) {
+                    other.reserveTextSpace
+                } else {
+                    current.reserveTextSpace
+                }
             )
         }
     }

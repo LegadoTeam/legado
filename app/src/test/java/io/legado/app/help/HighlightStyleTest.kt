@@ -18,6 +18,7 @@ class HighlightStyleTest {
     fun `horizontal padding is independent optional and zero overrides the base`() {
         val legacy = HighlightStyle(fill = 1, fillShape = FillShape.PILL, pillPaddingScale = 1.5f)
         val padded = legacy.copy(horizontalPadding = 12f)
+        assertFalse(padded.reserveTextSpace)
         assertTrue(padded.needsPerColumnDraw)
         assertFalse(HighlightStyle(horizontalPadding = 0f).isEmpty)
         assertEquals(1.5f, padded.resolvedPillPaddingScale, 0f)
@@ -30,6 +31,17 @@ class HighlightStyleTest {
         assertEquals(HighlightStyle(), HighlightStyle(horizontalPadding = Float.POSITIVE_INFINITY).normalized())
         assertEquals(0f, HighlightStyle(horizontalPadding = -1f).normalized().horizontalPadding)
         assertEquals(64f, HighlightStyle(horizontalPadding = 100f).normalized().horizontalPadding)
+    }
+
+    @Test
+    fun `text spacing reservation is opt in and follows the padding channel`() {
+        val base = HighlightStyle(horizontalPadding = 12f)
+        assertFalse(base.reserveTextSpace)
+        assertTrue(HighlightStyle.merge(base, HighlightStyle(horizontalPadding = 12f,
+            reserveTextSpace = true)).reserveTextSpace)
+        assertFalse(HighlightStyle.merge(base.copy(reserveTextSpace = true),
+            HighlightStyle(horizontalPadding = 12f)).reserveTextSpace)
+        assertTrue(HighlightStyle.merge(base.copy(reserveTextSpace = true), HighlightStyle()).reserveTextSpace)
     }
 
     @Test
@@ -160,6 +172,7 @@ class HighlightStyleTest {
             fontPath = "content://fonts/reader.ttf",
             fontSize = 36f,
             letterSpacing = -0.15f,
+            reserveTextSpace = true,
             underline = Underline(Kind.DASHED, 0xFF00FF00.toInt()),
             strike = Deco(0xFF0000FF.toInt())
         )
