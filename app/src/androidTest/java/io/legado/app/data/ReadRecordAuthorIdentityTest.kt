@@ -863,6 +863,22 @@ class ReadRecordAuthorIdentityTest {
 
     @Test
     fun savingBookMetadataDuringAudioPlaybackKeepsBothIntervalsAndTheLatestPosition() {
+        assertAudioMetadataSave(existingHistory = true, synchronizeMetadata = true)
+    }
+
+    @Test
+    fun savingBookMetadataDuringFirstAudioIntervalSynchronizesItsNewHistory() {
+        assertAudioMetadataSave(existingHistory = false, synchronizeMetadata = true)
+    }
+
+    @Test
+    fun savingBookMetadataWithoutSyncKeepsBothAudioIdentities() {
+        for (existingHistory in listOf(false, true)) {
+            assertAudioMetadataSave(existingHistory, synchronizeMetadata = false)
+        }
+    }
+
+    private fun assertAudioMetadataSave(existingHistory: Boolean, synchronizeMetadata: Boolean) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val dao = appDb.readRecordDao
         globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
@@ -886,8 +902,8 @@ class ReadRecordAuthorIdentityTest {
         try {
             dao.clear()
             val initial = ReadRecord(deviceId = AppConst.androidId, bookName = oldBook.name, author = oldBook.author,
-                readTime = 100, lastRead = 1)
-            dao.insert(initial)
+                readTime = if (existingHistory) 100 else 0, lastRead = 1)
+            if (existingHistory) dao.insert(initial)
             appDb.bookDao.insert(oldBook)
             AppConfig.enableReadRecord = true
             fields[0].set(timer, initial.copy())
@@ -901,16 +917,16 @@ class ReadRecordAuthorIdentityTest {
             fields[2].set(timer, android.os.SystemClock.elapsedRealtime() - 1000)
             instrumentation.runOnMainSync {
                 model.saved.observeForever(observer)
-                model.saveBook(oldBook, renamed, synchronizeMetadata = true)
+                model.saveBook(oldBook, renamed, synchronizeMetadata)
             }
             assertTrue("Book metadata save must finish", completed.await(10, TimeUnit.SECONDS))
-            globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
             val firstInterval = checkNotNull(dao.getRecord(AppConst.androidId, oldBook.name, oldBook.author))
-            assertTrue("The active old interval must be settled at the edit", firstInterval.readTime >= 1100)
+            assertTrue("The active old interval must be settled before save completes",
+                firstInterval.readTime >= initial.readTime + 1000)
             assertEquals(3, firstInterval.lastChapterIndex)
             assertEquals(300, firstInterval.lastChapterPos)
-            assertEquals(renamed.name, firstInterval.displayBookName)
-            assertEquals(renamed.author, firstInterval.displayAuthor)
+            assertEquals(if (synchronizeMetadata) renamed.name else oldBook.name, firstInterval.displayBookName)
+            assertEquals(if (synchronizeMetadata) renamed.author else oldBook.author, firstInterval.displayAuthor)
             android.os.SystemClock.sleep(20)
             AudioPlay.book!!.durChapterTitle = "After edit"
             AudioPlay.durChapterIndex = 9
@@ -921,8 +937,12 @@ class ReadRecordAuthorIdentityTest {
             globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
             val secondInterval = checkNotNull(dao.getRecord(AppConst.androidId, renamed.name, renamed.author))
             assertTrue("Playback must keep counting after the edit", secondInterval.readTime >= 500)
-            val shown = dao.allShow.single()
-            assertEquals(firstInterval.readTime + secondInterval.readTime, shown.readTime)
+            val history = dao.allShow
+            assertEquals(if (synchronizeMetadata) 1 else 2, history.size)
+            assertEquals(firstInterval.readTime + secondInterval.readTime, history.sumOf { it.readTime })
+            val shown = history.single { it.bookName == renamed.name && it.author == renamed.author }
+            assertEquals(if (synchronizeMetadata) firstInterval.readTime + secondInterval.readTime else secondInterval.readTime,
+                shown.readTime)
             assertEquals("After edit", shown.lastChapterTitle)
             assertEquals(9, shown.lastChapterIndex)
             assertEquals(900, shown.lastChapterPos)

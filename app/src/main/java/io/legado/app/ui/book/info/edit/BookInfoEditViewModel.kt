@@ -11,6 +11,10 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
 import io.legado.app.model.AudioPlay
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.globalExecutor
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.withContext
 
 class BookInfoEditViewModel(application: Application) : BaseViewModel(application) {
     var book: Book? = null
@@ -31,10 +35,11 @@ class BookInfoEditViewModel(application: Application) : BaseViewModel(applicatio
         if (saving) return
         saving = true
         execute {
+            val metadataChanged = oldBook.name != book.name || oldBook.author != book.author
             appDb.runInTransaction {
                 appDb.bookDao.update(book)
                 appDb.bookHighlightDao.updateBookMetadata(book.bookUrl, book.name, book.author)
-                if (synchronizeMetadata && (oldBook.name != book.name || oldBook.author != book.author)) {
+                if (synchronizeMetadata && metadataChanged) {
                     appDb.bookmarkDao.renameBook(oldBook.name, oldBook.author, book.name, book.author)
                     appDb.readRecordDao.renameBook(oldBook.name, oldBook.author, book.name, book.author)
                 }
@@ -46,6 +51,15 @@ class BookInfoEditViewModel(application: Application) : BaseViewModel(applicatio
             }
             if (ReadManga.book?.bookUrl == book.bookUrl) ReadManga.book = book
             if (AudioPlay.book?.bookUrl == book.bookUrl) AudioPlay.replaceBook(book)
+            if (metadataChanged) {
+                // The first active interval may only be queued by replaceBook above.
+                // Finish its metadata after queued writes, even if the editor is closed.
+                withContext(NonCancellable + globalExecutor.asCoroutineDispatcher()) {
+                    if (synchronizeMetadata) {
+                        appDb.readRecordDao.renameBook(oldBook.name, oldBook.author, book.name, book.author)
+                    }
+                }
+            }
             this@BookInfoEditViewModel.book = book
         }.onSuccess {
             saved.value = true
