@@ -538,7 +538,8 @@ class CodeSelectionUiTest {
 
     @Test fun oversizedJsLibOpensFromItsSourceFieldAndSavesWithoutLosingText() {
         val url = "https://large-jslib-${UUID.randomUUID()}.invalid"
-        val prefix = "\uFEFFconst message = '中文 🌍';\n/*\n"
+        // SQLite's UTF-16 binding consumes a leading BOM before the editor ever sees it.
+        val prefix = "// \uFEFF\nconst message = '中文 🌍';\n/*\n"
         val suffix = "\n*/\n"
         val line = "jsLib 中文 🌍 payload\n"
         val script = (prefix + line.repeat((272_508 - prefix.length - suffix.length) / line.length))
@@ -554,6 +555,7 @@ class CodeSelectionUiTest {
             assertEquals(272_508, script.length)
             LocalConfig.ruleHelpVersionIsLast
             appDb.bookSourceDao.insert(BookSource(bookSourceUrl = url, bookSourceName = "Large jsLib", jsLib = script))
+            assertEquals(script, appDb.bookSourceDao.getBookSource(url)?.jsLib)
             val sourceScenario = ActivityScenario.launch<BookSourceEditActivity>(
                 Intent(context, BookSourceEditActivity::class.java).putExtra("sourceUrl", url)
             ).also { host = it }
@@ -639,12 +641,14 @@ class CodeSelectionUiTest {
             await { appDb.bookSourceDao.getBookSource(url)?.jsLib == edited }
             assertEquals(edited, appDb.bookSourceDao.getBookSource(url)?.jsLib)
         } catch (failure: Throwable) {
-            instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
-                try {
-                    File(context.getExternalFilesDir("ui-regression"), "oversized-jslib-failure.png")
-                        .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                } finally { bitmap.recycle() }
-            }
+            runCatching {
+                instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
+                    try {
+                        File(context.getExternalFilesDir("ui-regression"), "oversized-jslib-failure.png")
+                            .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    } finally { bitmap.recycle() }
+                }
+            }.onFailure(failure::addSuppressed)
             throw failure
         } finally {
             instrumentation.runOnMainSync {
