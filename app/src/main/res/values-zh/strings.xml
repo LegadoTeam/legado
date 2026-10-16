@@ -395,8 +395,10 @@
     <string name="highlight_fill_half">半高</string>
     <string name="highlight_fill_baseline">底衬</string>
     <string name="highlight_fill_pill">胶囊</string>
-    <string name="highlight_pill_padding">胶囊弧度边距（%）</string>
-    <string name="highlight_pill_padding_value">边距 %1$d%%</string>
+    <string name="highlight_pill_padding">弧度（%）</string>
+    <string name="highlight_pill_padding_value">弧度 %1$d%%</string>
+    <string name="highlight_horizontal_padding">左右边距</string>
+    <string name="highlight_reserve_text_space">影响文字间距</string>
     <string name="highlight_rule">高亮规则</string>
     <string name="highlight_rule_add">新建高亮规则</string>
     <string name="highlight_rule_edit_title">编辑高亮规则</string>
@@ -1129,7 +1131,7 @@
     <string name="custom_group_summary">关闭替换分组/开启添加分组</string>
     <string name="pref_media_button_per_next">媒体按钮•上一首|下一首</string>
     <string name="pref_media_button_per_next_summary">上一段|下一段/上一章|下一章</string>
-    <string name="read_aloud_by_page_summary">及时翻页，翻页时会停顿一下</string>
+    <string name="read_aloud_by_page_summary">按页面分段，适用于没有逐字进度的引擎；可能拆开跨页词语</string>
     <string name="check_source_show_debug_message">校验显示详细信息</string>
     <string name="check_source_show_debug_message_summary">书源校验时显示网络请求步骤和时间</string>
     <string name="need_login">需要登录</string>

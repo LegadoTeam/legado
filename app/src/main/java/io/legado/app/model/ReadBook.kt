@@ -452,7 +452,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 chapter.highlightRuleMatchesVersion != highlightRulesVersion)
         ) return false
         if (chapter.highlightSpacing.isEmpty && ranges.none {
-                it.style.changesTextMetrics ||
+                it.style.changesTextMetrics || it.style.resolvedHorizontalPadding != null ||
                     it.style.fill != 0 && it.style.resolvedFillShape == HighlightStyle.FillShape.PILL
             }) return true
         // Always measure from the original advances; measuring the replacement compounds padding.
@@ -616,10 +616,27 @@ object ReadBook : CoroutineScope by MainScope() {
         callBack?.upContent(resetPageOffset = false)
     }
 
-    fun updateHighlight(highlight: BookHighlight) {
-        appDb.bookHighlightDao.update(highlight)
-        if (!highlight.isForBook(book)) return
-        highlights = highlights.map { if (it.time == highlight.time) highlight else it }
+    fun updateHighlightStyle(highlight: BookHighlight, style: HighlightStyle) {
+        highlight.applyStyle(style)
+        val chapter = listOfNotNull(prevTextChapter, curTextChapter, nextTextChapter)
+            .firstOrNull { highlight.isForChapter(book, it.chapter) }
+        val anchors = chapter?.takeIf { it.layoutTitleLength >= 0 }?.let {
+            anchoredHighlightsOfChapter(it, it.layoutTitleLength)
+        }.orEmpty()
+        val anchor = anchors.firstOrNull { it.first.time == highlight.time }?.second
+        // Older versions could stack records on the same range; keep their notes and identities.
+        val matching = if (anchor == null) listOf(highlight) else {
+            anchors.filter { it.second == anchor }.map { it.first }
+        }
+        matching.forEach { it.applyStyle(style) }
+        updateHighlight(*matching.toTypedArray())
+    }
+
+    fun updateHighlight(vararg updatedHighlights: BookHighlight) {
+        appDb.bookHighlightDao.update(*updatedHighlights)
+        val updated = updatedHighlights.filter { it.isForBook(book) }.associateBy { it.time }
+        if (updated.isEmpty()) return
+        highlights = highlights.map { updated[it.time] ?: it }
         highlightsVersion++
         invalidateHighlightSpacing()
         callBack?.upContent(resetPageOffset = false)
@@ -2127,11 +2144,11 @@ object ReadBook : CoroutineScope by MainScope() {
     /**
      * 取消注册回调
      */
-    fun unregister(cb: CallBack) {
-        if (callBack === cb) {
-            callBack = null
-        }
+    fun unregister(cb: CallBack): Boolean {
+        if (callBack !== cb) return false
+        callBack = null
         releaseAndCancel()
+        return true
     }
 
     private fun releaseAndCancel() {

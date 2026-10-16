@@ -27,13 +27,24 @@ import java.util.concurrent.atomic.AtomicLong
 internal fun pendingSpeechPageMoves(currentPageIndex: Int, targetPageIndex: Int): Int =
     (targetPageIndex - currentPageIndex).coerceAtLeast(0)
 
+/** Keep a paragraph intact unless the engine's UTF-16 input limit requires a split. */
+internal fun speechChunkEnd(text: String, start: Int, limit: Int): Int {
+    var end = minOf(text.length, start + limit)
+    if (end == text.length) return end
+    val boundary = text.lastIndexOfAny(charArrayOf('。', '！', '？', '.', '!', '?', '；', ';', ' '), end - 1)
+    if (boundary >= start) return boundary + 1
+    if (Character.isHighSurrogate(text[end - 1]) && Character.isLowSurrogate(text[end])) end--
+    return end
+}
+
 /**
  * 本地朗读
  */
-class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener {
+class TTSReadAloudService : BaseReadAloudService() {
 
     private var textToSpeech: TextToSpeech? = null
     private var ttsInitFinish = false
+    private var ttsInitGeneration = 0L
     private val ttsUtteranceListener = TTSUtteranceListener()
     private var speakJob: Coroutine<*>? = null
     private val playbackSessionId = AtomicLong()
@@ -57,18 +68,24 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
     @Synchronized
     private fun initTts() {
         ttsInitFinish = false
+        val generation = ++ttsInitGeneration
+        val listener = TextToSpeech.OnInitListener { status ->
+            // Construction and shutdown can finish before their asynchronous init callback.
+            callbackHandler.post { onTtsInitialized(generation, status) }
+        }
         val engine = GSON.fromJsonObject<SelectItem<String>>(ReadAloud.ttsEngine).getOrNull()?.value
         LogUtils.d(TAG, "initTts engine:$engine")
         textToSpeech = if (engine.isNullOrBlank()) {
-            TextToSpeech(this, this)
+            TextToSpeech(this, listener)
         } else {
-            TextToSpeech(this, this, engine)
+            TextToSpeech(this, listener, engine)
         }
         upSpeechRate()
     }
 
     @Synchronized
     fun clearTTS() {
+        ttsInitGeneration++
         playbackSessionId.incrementAndGet()
         textToSpeech?.runCatching {
             stop()
@@ -78,7 +95,9 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         ttsInitFinish = false
     }
 
-    override fun onInit(status: Int) {
+    @Synchronized
+    private fun onTtsInitialized(generation: Long, status: Int) {
+        if (generation != ttsInitGeneration) return
         if (status == TextToSpeech.SUCCESS) {
             textToSpeech?.let {
                 it.setOnUtteranceProgressListener(ttsUtteranceListener)
@@ -107,7 +126,6 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         val startParagraphPos = paragraphStartPos
         val speechChapter = textChapter ?: return
         val paragraphs = speechChapter.getParagraphs(readAloudByPage)
-        val pageStarts = speechChapter.pages.map { it.chapterPosition }
         val queuedContent = contentList
         speakJob = execute {
             LogUtils.d(TAG, "朗读列表大小 ${contentList.size}")
@@ -125,10 +143,14 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                 if (text.matches(AppPattern.notReadAloudRegex)) continue
                 var chunkStart = paragraph.chapterPosition + firstOffset
                 val textEnd = chunkStart + text.length
-                // Queue page boundaries ahead of playback: engines without range callbacks still
-                // report the next page's real start, without an application pause or queue flush.
-                val boundaries = pageStarts.filter { it > chunkStart && it < textEnd } + textEnd
-                for (chunkEnd in boundaries) {
+                // A visual page break is not a speech boundary: splitting here changes word
+                // pronunciation. Follow actual range callbacks; range-less engines only report
+                // paragraph/chunk starts. Explicit readAloudByPage is already in contentList.
+                while (chunkStart < textEnd) {
+                    val chunkEnd = paragraph.chapterPosition + speechChunkEnd(
+                        paragraphText, chunkStart - paragraph.chapterPosition,
+                        TextToSpeech.getMaxSpeechInputLength()
+                    )
                     val chunk = paragraphText.substring(
                         chunkStart - paragraph.chapterPosition, chunkEnd - paragraph.chapterPosition
                     )

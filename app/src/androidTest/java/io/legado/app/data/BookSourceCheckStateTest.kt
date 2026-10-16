@@ -36,16 +36,18 @@ class BookSourceCheckStateTest {
 
     @Test fun completedAndInterruptedEntriesSurviveDatabaseReopen() {
         val dao = open().bookSourceDao
-        val sources = (0..2).map { BookSource(bookSourceUrl = "https://check/$it", bookSourceName = "Source $it") }
+        val sources = (0..3).map { BookSource(bookSourceUrl = "https://check/$it", bookSourceName = "Source $it") }
         dao.insert(*sources.toTypedArray())
         val queue = dao.beginCheck(dao.allPart)
         assertTrue(dao.completeCheck(queue[0], true, "", 12))
         assertTrue(dao.completeCheck(queue[1], false, "搜索失效", 45))
+        assertTrue(dao.completeCheck(queue[2], BookSourceCheckState.UNCHECKABLE, "源地址不是http链接", 0))
         database!!.close()
         val reopened = open().bookSourceDao
-        assertEquals(listOf("PASSED", "FAILED", "NEEDS_CHECK"), queue.map { reopened.getCheckState(it.bookSourceUrl)!!.status })
+        assertEquals(listOf("PASSED", "FAILED", "UNCHECKABLE", "NEEDS_CHECK"), queue.map { reopened.getCheckState(it.bookSourceUrl)!!.status })
         assertEquals("搜索失效", reopened.getCheckState(queue[1].bookSourceUrl)!!.detail)
-        assertEquals(0L, reopened.getCheckState(queue[2].bookSourceUrl)!!.checkedAt)
+        assertEquals("源地址不是http链接", reopened.getCheckState(queue[2].bookSourceUrl)!!.detail)
+        assertEquals(0L, reopened.getCheckState(queue[3].bookSourceUrl)!!.checkedAt)
     }
 
     @Test fun editedDeletedImportedAndRestartedChecksRejectOldResults() {

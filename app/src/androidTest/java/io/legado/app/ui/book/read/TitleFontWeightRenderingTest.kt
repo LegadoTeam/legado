@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
@@ -843,6 +844,691 @@ class TitleFontWeightRenderingTest {
                 AppConfig.adaptSpecialStyle = savedAdapt
                 ImageProvider.remove(image.absolutePath)
             }
+            image.delete()
+        }
+    }
+
+    @Test
+    fun paddedCapsulesStayContinuousAcrossOverlappingTextStyles() {
+        launchReader()
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages.flatMap { it.lines }
+            .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.textSize = 26
+                ReadBookConfig.paddingLeft = 16
+                ReadBookConfig.paddingRight = 16
+                ReadBookConfig.letterSpacing = 0f
+                AppConfig.adaptSpecialStyle = true
+                context.putPrefBoolean(PreferKey.textFullJustify, true)
+                val dialogue = "“快点，洗脸刷牙，然后穿上衣服，我们九点就要出发了。”"
+                for (mode in listOf("static", "zh", "html")) {
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    ChapterProvider.upStyle()
+                    val content = "前${dialogue}后"
+                    val contents = if (mode == "html") listOf("<usehtml><p>$content</p></usehtml>")
+                        else listOf(ReadBookConfig.paragraphIndent + content)
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "capsule-overlays", index = 10009)
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                        "Capsule overlays", BookContent(false, contents, null), fixture.index + 1, saveChapterData = false))
+                    val original = canonical(base)
+                    val start = original.indexOf(dialogue)
+                    val end = start + dialogue.length
+                    val innerStart = original.indexOf("洗脸刷牙")
+                    val innerEnd = innerStart + "洗脸刷牙".length
+                    assertTrue(start >= 0 && innerStart > start && innerEnd < end)
+                    for (variant in listOf("default", "12dp", "12dp-no-layout", "different-fill", "different-padding")) {
+                        val split = variant.startsWith("different")
+                        val noLayoutPadding = variant == "12dp-no-layout"
+                        val style = HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL,
+                            pillPaddingScale = 0.5f, horizontalPadding = 12f.takeUnless { variant == "default" },
+                            reserveTextSpace = !noLayoutPadding && variant != "default",
+                            textColor = Color.BLACK)
+                        fun overlay(text: String, overlayStyle: HighlightStyle): HighlightMatcher.Range {
+                            val offset = original.indexOf(text)
+                            assertTrue(offset >= start)
+                            return HighlightMatcher.Range(offset, offset + text.length, overlayStyle)
+                        }
+                        val ranges = mutableListOf(HighlightMatcher.Range(start, end, style),
+                            overlay("“", HighlightStyle(italic = true)),
+                            overlay("。”", HighlightStyle(bold = true)),
+                            overlay("快点", HighlightStyle(textColor = Color.BLUE)),
+                            overlay("洗脸刷牙", HighlightStyle(bold = true)),
+                            overlay("穿上衣服", HighlightStyle(italic = true)),
+                            overlay("九点", HighlightStyle(underline = HighlightStyle.Underline(color = Color.GREEN))))
+                        when (variant) {
+                            "different-fill" -> ranges += overlay("洗脸刷牙", style.copy(fill = Color.CYAN))
+                            "different-padding" -> ranges += overlay("洗脸刷牙", HighlightStyle(horizontalPadding = 24f,
+                                reserveTextSpace = true))
+                        }
+                        val label = "$mode $variant"
+                        val spacing = HighlightSpacing.resolve(base, ranges)
+                        if (variant == "12dp-no-layout") {
+                            assertTrue("Default padding does not add text spans: $label", spacing.columns.isEmpty())
+                        } else if (variant != "default") {
+                            val before = spacing.columns.filterValues { it.before > 0f }.keys
+                            val after = spacing.columns.filterValues { it.after > 0f }.keys
+                            assertEquals("Only real background starts reserve padding: $label",
+                                if (split) setOf(start, innerStart, innerEnd) else setOf(start), before)
+                            assertEquals("Text overlays cannot add interior padding: $label",
+                                if (split) setOf(innerStart - 1, innerEnd - 1, end - 1) else setOf(end - 1), after)
+                        }
+                        val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                        assertEquals("Reflow preserves all text: $label", original, canonical(chapter))
+                        var continuousLines = 0
+                        var distinctBoundaries = 0
+                        var blueTextPixels = 0
+                        var greenUnderlinePixels = 0
+                        var cyanFillPixels = 0
+                        for (page in chapter.pages) {
+                            val width = ChapterProvider.viewWidth
+                            val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                            val view = ContentTextView(activity, null).apply { layout(0, 0, width, height); setContent(page) }
+                            assertEquals("No view background may hide holes in a capsule", null, view.background)
+                            val resolved = HighlightMatcher.resolve(chapter.getReadLength(page.index), page.lines.map { line ->
+                                HighlightMatcher.LineSpec(line.charSize, line.columns.map { it.positionLength },
+                                    line.isParagraphEnd, line.isTitle,
+                                    line.columns.map { (it as? TextBaseColumn)?.isParagraphIndent == true })
+                            }, ranges)
+                            page.lines.forEachIndexed { row, line -> line.columns.forEachIndexed { col, column ->
+                                if (column is TextBaseColumn) column.highlightStyle = resolved[row][col]
+                            } }
+                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                view.draw(Canvas(bitmap))
+                                assertEquals("The real page canvas retains transparent margins", 0, Color.alpha(bitmap.getPixel(0, 0)))
+                                if (page.index == 0) File(context.getExternalFilesDir("ui-regression"),
+                                    "highlight-capsule-overlays-$mode-$variant.png").outputStream().use {
+                                    assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                                }
+                                for (line in page.lines) {
+                                    val selected = line.columns.filterIsInstance<TextBaseColumn>()
+                                        .filter { it.highlightStyle?.fill?.let { fill -> fill != 0 } == true }
+                                    if (selected.isEmpty()) continue
+                                    val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
+                                        line.textPaint.textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                                    if (!split && selected.size > 2) {
+                                        // An interior end cap leaves holes near the shoulder even if its middle touches.
+                                        val y = (line.lineTop + band.top + (band.bottom - band.top) * 0.15f).toInt()
+                                        for (x in ceil(selected.first().end).toInt()..floor(selected.last().start).toInt()) {
+                                            assertTrue("Background is continuous inside one dialogue: $label ($x,$y)",
+                                                Color.alpha(bitmap.getPixel(x, y)) > 40)
+                                        }
+                                        continuousLines++
+                                        if (variant == "12dp") {
+                                            val ink = Rect()
+                                            var inkLeft = Float.POSITIVE_INFINITY
+                                            var inkRight = Float.NEGATIVE_INFINITY
+                                            for (column in selected) {
+                                                val paint = HighlightDraw.obtainTextPaint(line.textPaint, column.highlightStyle!!, 0, column.charData)
+                                                try {
+                                                    paint.getTextBounds(column.charData, 0, column.charData.length, ink)
+                                                    val origin = column.start + ((column as? TextColumn)?.drawOffset ?: 0f)
+                                                    inkLeft = minOf(inkLeft, origin + ink.left)
+                                                    inkRight = maxOf(inkRight, origin + ink.right)
+                                                } finally { HighlightDraw.recycleTextPaint(paint) }
+                                            }
+                                            val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                                            val edges = (0 until width).filter { x ->
+                                                val pixel = bitmap.getPixel(x, middle)
+                                                Color.alpha(pixel) > 40 && Color.red(pixel) > 180 && Color.blue(pixel) > 180 && Color.green(pixel) < 100
+                                            }
+                                            assertTrue("Both real end caps remain visible: $label", edges.size >= 2)
+                                            assertEquals("Actual first-glyph left padding: $label", 12f.dpToPx(), inkLeft - edges.first(), 1.5f)
+                                            assertEquals("Actual last-glyph right padding: $label", 12f.dpToPx(), edges.last() - inkRight, 1.5f)
+                                        }
+                                    }
+                                    if (split) for ((previous, next) in selected.zipWithNext()) {
+                                        val previousStyle = previous.highlightStyle!!
+                                        val nextStyle = next.highlightStyle!!
+                                        if (previousStyle.fill == nextStyle.fill &&
+                                            previousStyle.resolvedHorizontalPadding == nextStyle.resolvedHorizontalPadding) continue
+                                        val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                                        assertTrue("Distinct backgrounds/padding keep separate caps: $label",
+                                            (ceil(previous.end).toInt()..floor(next.start).toInt()).any { x ->
+                                                Color.alpha(bitmap.getPixel(x, middle)) < 10
+                                            })
+                                        distinctBoundaries++
+                                    }
+                                    for (y in ceil(line.lineTop).toInt() until ceil(line.renderBottom()).toInt().coerceAtMost(height))
+                                        for (x in 0 until width) {
+                                            val pixel = bitmap.getPixel(x, y)
+                                            if (Color.alpha(pixel) > 100 && Color.blue(pixel) > 180 && Color.red(pixel) < 60 && Color.green(pixel) < 60) blueTextPixels++
+                                            if (Color.alpha(pixel) > 100 && Color.green(pixel) > 180 && Color.red(pixel) < 60 && Color.blue(pixel) < 60) greenUnderlinePixels++
+                                            if (Color.alpha(pixel) > 40 && Color.blue(pixel) > 180 && Color.green(pixel) > 180 && Color.red(pixel) < 60) cyanFillPixels++
+                                        }
+                                }
+                            } finally { bitmap.recycle(); page.recycleRecorders() }
+                        }
+                        if (!split) assertTrue("Real wrapped lines were checked: $label", continuousLines >= 2)
+                        if (split) assertTrue("A real internal cap boundary was checked: $label", distinctBoundaries > 0)
+                        assertTrue("The inner text-color rule still draws blue glyphs: $label", blueTextPixels > 10)
+                        assertTrue("The inner underline rule still draws a green line: $label", greenUnderlinePixels > 10)
+                        if (variant == "different-fill") assertTrue("A different background is not merged away: $label", cyanFillPixels > 10)
+                    }
+                    base.pages.forEach(TextPage::recycleRecorders)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.useZhLayout = savedZh
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ChapterProvider.upStyle()
+            }
+        }
+    }
+
+    @Test
+    fun plainTextPillInsetsDoNotAddToParagraphIndent() {
+        launchReader()
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedIndent = ReadBookConfig.paragraphIndent
+        val savedLeft = ReadBookConfig.paddingLeft
+        val savedRight = ReadBookConfig.paddingRight
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        try {
+            scenario!!.onActivity {
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.textSize = 20
+                ReadBookConfig.paragraphIndent = ChapterProvider.indentChar.repeat(2)
+                ReadBookConfig.paddingLeft = 16
+                ReadBookConfig.paddingRight = 16
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.clearReviewProviders()
+                val control = "未高亮段落用于对照，保留相同的段首缩进和换行。".repeat(3)
+                val highlighted = "中间内容带有高亮样式，首行不应重复计算段首缩进。".repeat(5)
+                val after = "后续段落用于确认其它段落的排版位置保持稳定。".repeat(3)
+                val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "text-paragraph-insets", index = 10010)
+                val style = HighlightStyle(fill = Color.MAGENTA,
+                    fillShape = HighlightStyle.FillShape.PILL, horizontalPadding = 32f,
+                    reserveTextSpace = true)
+                for (mode in listOf("static", "zh")) for (justify in listOf(false, true)) {
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    context.putPrefBoolean(PreferKey.textFullJustify, justify)
+                    ChapterProvider.upStyle()
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val contents = listOf(
+                        ReadBookConfig.paragraphIndent + control,
+                        ReadBookConfig.paragraphIndent + highlighted,
+                        ReadBookConfig.paragraphIndent + after,
+                    )
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                        "Paragraphs", BookContent(false, contents, null), fixture.index + 1, saveChapterData = false))
+                    val original = HighlightTextBuilder.build(base.pages.flatMap { it.lines }
+                        .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+                    val start = original.indexOf("高亮样式")
+                    assertTrue("The highlighted range must exist: $mode justify=$justify", start >= 0)
+                    val spacing = HighlightSpacing.resolve(base,
+                        listOf(HighlightMatcher.Range(start, start + "高亮样式".length, style)))
+                    assertTrue("The test must exercise a paragraph edge inset: $mode justify=$justify",
+                        spacing.edgePadding(start, start + "高亮样式".length) > ChapterProvider.paddingLeft)
+                    val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                    val baseParagraphs = base.pages.flatMap { it.lines }.groupBy { it.paragraphNum }
+                    val highlightedParagraph = baseParagraphs.values.single { lines ->
+                        lines.joinToString("") { it.text }.contains(highlighted)
+                    }
+                    val paragraphNum = highlightedParagraph.first().paragraphNum
+                    val actualParagraph = chapter.pages.flatMap { it.lines }.filter { it.paragraphNum == paragraphNum }
+                    val baseFirst = highlightedParagraph.first { line ->
+                        line.columns.any { (it as? TextBaseColumn)?.isParagraphIndent == true }
+                    }
+                    val actualFirst = actualParagraph.first { line ->
+                        line.columns.any { (it as? TextBaseColumn)?.isParagraphIndent == true }
+                    }
+                    fun bodyStart(line: TextLine) = line.columns
+                        .filterIsInstance<TextBaseColumn>()
+                        .first { !it.isParagraphIndent }
+                        .start
+                    assertEquals("Plain text highlight must keep the original paragraph indent: $mode justify=$justify",
+                        bodyStart(baseFirst), bodyStart(actualFirst), 0.02f)
+                    base.pages.forEach(TextPage::recycleRecorders)
+                    chapter.pages.forEach(TextPage::recycleRecorders)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ReadBookConfig.useZhLayout = savedZh
+                ReadBookConfig.paragraphIndent = savedIndent
+                ReadBookConfig.paddingLeft = savedLeft
+                ReadBookConfig.paddingRight = savedRight
+                ChapterProvider.clearReviewProviders()
+                ChapterProvider.upStyle()
+            }
+        }
+    }
+
+    @Test
+    fun htmlPillInsetsDoNotReflowUnhighlightedParagraphsInTheSameBlock() {
+        launchReader()
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        val image = File(context.cacheDir, "highlight-paragraph-control.png")
+        val imageSrc = "${image.absolutePath},{\"style\":\"text\"}"
+        val cachedImage = BookHelp.getImage(book!!, imageSrc)
+        Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888).let { bitmap ->
+            try {
+                bitmap.eraseColor(Color.BLUE)
+                image.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            } finally { bitmap.recycle() }
+        }
+        BookHelp.writeImage(book!!, imageSrc, image.readBytes())
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages.flatMap { it.lines }
+            .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+        fun assertUnchangedParagraphs(base: TextChapter, actual: TextChapter, paragraphs: Set<Int>, label: String) {
+            val original = base.pages.flatMap { it.lines }.filter { it.paragraphNum in paragraphs }
+            val changed = actual.pages.flatMap { it.lines }.filter { it.paragraphNum in paragraphs }
+            assertTrue("The control paragraph must contain actual text: $label", original.isNotEmpty())
+            assertEquals("Unhighlighted paragraph keeps its line breaks: $label",
+                original.map { it.chapterPosition to it.text }, changed.map { it.chapterPosition to it.text })
+            original.zip(changed).forEach { (before, after) ->
+                assertEquals("Unhighlighted paragraph keeps its origin: $label", before.startX, after.startX, 0.02f)
+                assertEquals("Existing HTML spans keep line height: $label", before.height, after.height, 0.02f)
+                assertEquals("Existing HTML spans keep the baseline: $label",
+                    before.lineBase - before.lineTop, after.lineBase - after.lineTop, 0.02f)
+                assertEquals(before.columns.size, after.columns.size)
+                before.columns.zip(after.columns).forEach { (old, current) ->
+                    assertEquals("Column type stays intact: $label", old.javaClass, current.javaClass)
+                    assertEquals("Unhighlighted glyph/image start: $label", old.start, current.start, 0.02f)
+                    assertEquals("Unhighlighted glyph/image end: $label", old.end, current.end, 0.02f)
+                }
+            }
+        }
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.textSize = 20
+                ReadBookConfig.letterSpacing = 0.12f
+                context.putPrefBoolean(PreferKey.textFullJustify, false)
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.clearReviewProviders()
+                val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "html-paragraph-insets", index = 10009)
+                for ((direction, words) in listOf("ltr" to "甲乙 abc שלום 丙丁 ", "rtl" to "שלום 12 abc עולם ")) {
+                    val control = words.repeat(3)
+                    val highlighted = words.repeat(14)
+                    val after = words.repeat(5)
+                    val html = "<usehtml><blockquote><p><b>$control</b><img src='$imageSrc'>尾</p>" +
+                        "<p>$highlighted</p></blockquote><p>$after</p></usehtml>"
+                    for ((left, right) in listOf(0 to 32, 32 to 0)) {
+                        ReadBookConfig.paddingLeft = left
+                        ReadBookConfig.paddingRight = right
+                        ChapterProvider.upStyle()
+                        val scope = CoroutineScope(Dispatchers.Default)
+                        val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                            "Paragraphs", BookContent(false, listOf(html), null), fixture.index + 1, saveChapterData = false))
+                        val original = canonical(base)
+                        val start = original.indexOf(highlighted)
+                        val end = start + highlighted.length
+                        val afterStart = original.indexOf(after, end)
+                        assertTrue("All three HTML paragraphs must be present", start > 0 && afterStart >= end)
+                        val paragraphs = base.pages.flatMap { it.lines }.groupBy { it.paragraphNum }
+                        val highlightedParagraph = paragraphs.values.single { lines -> lines.joinToString("") { it.text }.contains(highlighted) }
+                        val paragraphNumber = highlightedParagraph.first().paragraphNum
+                        val originalImages = base.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<ImageColumn>()
+                        assertEquals("The control contains a real inline image", 1, originalImages.size)
+                        val label = "$direction margins=$left/$right"
+                        val style = HighlightStyle(fill = Color.rgb(32, 144, 80),
+                            fillShape = HighlightStyle.FillShape.PILL)
+                        val ranges = listOf(HighlightMatcher.Range(start, end, style))
+                        val spacing = HighlightSpacing.resolve(base, ranges)
+                        val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                        assertEquals("Reflow preserves canonical anchors: $label", original, canonical(chapter))
+                        assertUnchangedParagraphs(base, chapter, paragraphs.keys - paragraphNumber, label)
+                        val highlightedLines = chapter.pages.flatMap { it.lines }
+                            .filter { it.paragraphNum == paragraphNumber }
+                        assertTrue("The highlighted paragraph must exercise wrapping: $label", highlightedLines.size > 1)
+                        val inset = ceil(spacing.edgePadding(highlightedParagraph.first().chapterPosition,
+                            highlightedParagraph.last().let { it.chapterPosition + it.charSize })).toInt()
+                        val leftEdge = maxOf(ChapterProvider.paddingLeft, inset).toFloat()
+                        val rightEdge = ChapterProvider.viewWidth - maxOf(ChapterProvider.paddingRight, inset)
+                        val oldFirst = highlightedParagraph.first().columns.first()
+                        val expectedShift = if (direction == "ltr") (inset - ChapterProvider.paddingLeft).coerceAtLeast(0)
+                            else -(inset - ChapterProvider.paddingRight).coerceAtLeast(0)
+                        assertEquals("Keep the existing blockquote inset in the paragraph direction: $label",
+                            oldFirst.start + expectedShift, highlightedLines.first().columns.first().start, 0.02f)
+                        highlightedLines.flatMap { it.columns }.forEach { column ->
+                            val low = minOf(column.start, column.end)
+                            val high = maxOf(column.start, column.end)
+                            assertTrue("The capsule still has left/right page clearance: $label " +
+                                "actual=$low/$high expected=$leftEdge/$rightEdge type=${column.javaClass.simpleName}",
+                                low >= leftEdge - 1f && high <= rightEdge + 1f)
+                        }
+                        val restored = awaitLayout(checkNotNull(chapter.layoutWithHighlightSpacing(scope, HighlightSpacing())))
+                        assertUnchangedParagraphs(base, restored, paragraphs.keys, "restored $label")
+                        if (left == 0 && right == 32) {
+                            val page = chapter.pages.first()
+                            val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                            val view = ContentTextView(activity, null).apply { layout(0, 0, ChapterProvider.viewWidth, height); setContent(page) }
+                            page.lines.forEach { line ->
+                                line.columns.filterIsInstance<TextBaseColumn>().forEach { column ->
+                                    column.highlightStyle = style.takeIf { line.paragraphNum == paragraphNumber }
+                                }
+                                line.invalidate()
+                            }
+                            Bitmap.createBitmap(ChapterProvider.viewWidth, height, Bitmap.Config.ARGB_8888).let { bitmap ->
+                                try {
+                                    view.draw(Canvas(bitmap))
+                                    File(context.getExternalFilesDir("ui-regression"),
+                                        "highlight-html-paragraph-$direction.png").outputStream().use {
+                                        assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                                    }
+                                } finally { bitmap.recycle() }
+                            }
+                        }
+                        restored.pages.forEach(TextPage::recycleRecorders)
+                        chapter.pages.forEach(TextPage::recycleRecorders)
+                        base.pages.forEach(TextPage::recycleRecorders)
+                    }
+                }
+            }
+        } finally {
+            image.delete()
+            cachedImage.delete()
+            instrumentation.runOnMainSync {
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ChapterProvider.clearReviewProviders()
+                ChapterProvider.upStyle()
+            }
+        }
+    }
+
+    @Test
+    fun independentHorizontalPaddingReservesRealEdgesAcrossReaderLayouts() {
+        launchReader()
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        val savedOptimize = AppConfig.optimizeRender
+        val savedHanging = ReadBookConfig.hangingPunctuation
+        val image = File(context.cacheDir, "highlight-horizontal-padding.png")
+        val imageSrc = "${image.absolutePath},{\"style\":\"text\"}"
+        val cachedImage = BookHelp.getImage(book!!, imageSrc)
+        Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888).let { bitmap ->
+            try {
+                bitmap.eraseColor(Color.BLUE)
+                image.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            } finally { bitmap.recycle() }
+        }
+        BookHelp.writeImage(book!!, imageSrc, image.readBytes())
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages.flatMap { it.lines }
+            .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.paddingLeft = 0
+                ReadBookConfig.paddingRight = 0
+                ReadBookConfig.paragraphIndent = ChapterProvider.indentChar.repeat(2)
+                ReadBookConfig.textSize = 20
+                context.putPrefBoolean(PreferKey.hangingPunctuation, true)
+                AppConfig.adaptSpecialStyle = true
+                AppConfig.optimizeRender = true
+                ReadBookConfig.letterSpacing = 0.2f
+                val short = "甲乙👩‍💻"
+                val long = "“" + "真实左右空白不能挤压字形或覆盖旁边图标".repeat(3)
+                val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "horizontal-padding", index = 10008)
+                ChapterProvider.setReviewProviders({ index, id ->
+                    if (index == fixture.index && id == 2) 88 else 0
+                }, null, fixture.index)
+                val styles = listOf(
+                    HighlightStyle(fill = Color.MAGENTA),
+                    HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 0.5f),
+                    HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 1.25f),
+                    HighlightStyle(box = HighlightStyle.Deco(Color.MAGENTA)))
+                var nativeHtmlImageWidths: List<Float>? = null
+                for (mode in listOf("static", "zh", "html")) for (justify in listOf(false, true)) {
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    context.putPrefBoolean(PreferKey.textFullJustify, justify)
+                    ChapterProvider.upStyle()
+                    val decoded = ImageProvider.getImage(book!!, imageSrc, 24, 24)
+                    assertEquals("Real fixture image must decode, not an error icon", Color.BLUE, decoded.getPixel(12, 12))
+                    val img = if (mode == "html") "<img src='$imageSrc'>" else """<img src="$imageSrc">"""
+                    val paragraphs = listOf("前$short${img}后", if (mode == "html") "前${img}$long" else long)
+                    val contents = if (mode == "html") listOf("<usehtml>" + paragraphs.joinToString("") { "<p>$it</p>" } + "</usehtml>")
+                        else paragraphs.map { ReadBookConfig.paragraphIndent + it }
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                        "Padding", BookContent(false, contents, null), fixture.index + 1, saveChapterData = false))
+                    val original = canonical(base)
+                    if (mode == "html") {
+                        val imageWidths = base.pages.flatMap { it.lines }.flatMap { it.columns }
+                            .filterIsInstance<ImageColumn>().map { it.end - it.start }
+                        assertEquals("Both real inline image fixtures must be present", 2, imageWidths.size)
+                        assertTrue("The long HTML image must exercise a wrapped line", base.pages.flatMap { it.lines }
+                            .any { !it.isParagraphEnd && it.columns.any { column -> column is ImageColumn } })
+                        if (!justify) nativeHtmlImageWidths = imageWidths else {
+                            assertEquals("Justified HTML keeps each inline image", nativeHtmlImageWidths!!.size, imageWidths.size)
+                            nativeHtmlImageWidths!!.zip(imageWidths).forEach { (expected, actual) ->
+                                assertEquals("Justification must not stretch inline images", expected, actual, 0.01f)
+                            }
+                        }
+                    }
+                    val fixedMarginCurves = mutableListOf<Int>()
+                    for ((styleIndex, originalStyle) in styles.withIndex()) {
+                        val measuredGaps = mutableListOf<Float>()
+                        val measuredCurves = mutableListOf<Int>()
+                        for (gap in listOf(0f, 4f, 24f)) {
+                            val style = originalStyle.copy(horizontalPadding = gap,
+                                reserveTextSpace = true,
+                                fontSize = 30f.takeUnless { styleIndex == 0 },
+                                letterSpacing = (-0.1f).takeIf { styleIndex == 3 }, textColor = 1)
+                            val ranges = listOf(short, long).map { text ->
+                                val start = original.indexOf(text)
+                                assertTrue("Fixture anchor must exist: $mode $text", start >= 0)
+                                HighlightMatcher.Range(start, start + text.length, style)
+                            }
+                            val spacing = HighlightSpacing.resolve(base, ranges)
+                            val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                            val label = "$mode justify=$justify style=$styleIndex gap=$gap"
+                            assertEquals(label, original, canonical(chapter))
+                            if (styleIndex == 0) {
+                                assertFalse("Padding alone must inherit font metrics: $label", spacing.hasTextMetrics)
+                                assertEquals("Only four boundary cells need padding spans: $label", 4, spacing.columns.size)
+                                assertTrue("Every boundary uses the full native run width: $label",
+                                    spacing.columns.values.all { it.contentWidth != null })
+                                if (!justify) {
+                                    val native = base.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                                    val padded = chapter.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                                    native.zip(padded).forEach { (before, after) ->
+                                        assertEquals("Same native glyph with inherited spacing: $label", before.charData, after.charData)
+                                        assertEquals("Padding alone keeps native advances: $label ${before.charData}",
+                                            before.end - before.start, after.end - after.start, 0.02f)
+                                    }
+                                }
+                            }
+                            val originalIcons = base.pages.flatMap { it.lines }.flatMap { it.columns }
+                                .filter { it is ImageColumn || it is ReviewColumn }.map { it.end - it.start }
+                            val actualIcons = chapter.pages.flatMap { it.lines }.flatMap { it.columns }
+                                .filter { it is ImageColumn || it is ReviewColumn }.map { it.end - it.start }
+                            assertEquals("Keep each real icon: $label", originalIcons.size, actualIcons.size)
+                            originalIcons.zip(actualIcons).forEach { (expected, actual) ->
+                                assertEquals("Padding must not shrink images/review icons: $label", expected, actual, 0.01f)
+                            }
+                            val repeated = awaitLayout(checkNotNull(chapter.layoutWithHighlightSpacing(scope, spacing)))
+                            assertEquals("Repeated reflow must not add padding: $label",
+                                chapter.pages.flatMap { it.lines }.flatMap { it.columns }.map { it.start to it.end },
+                                repeated.pages.flatMap { it.lines }.flatMap { it.columns }.map { it.start to it.end })
+                            repeated.pages.forEach(TextPage::recycleRecorders)
+                            assertEquals("Boundary emoji remains one glyph: $label", 1,
+                                chapter.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                                    .count { it.charData == "👩‍💻" })
+                            var checkedShort = false
+                            var checkedReview = false
+                            var checkedWrap = false
+                            for (page in chapter.pages) {
+                                val width = ChapterProvider.viewWidth
+                                val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                                val view = ContentTextView(activity, null).apply { layout(0, 0, width, height); setContent(page) }
+                                val resolved = HighlightMatcher.resolve(chapter.getReadLength(page.index), page.lines.map { line ->
+                                    HighlightMatcher.LineSpec(line.charSize, line.columns.map { it.positionLength },
+                                        line.isParagraphEnd, line.isTitle,
+                                        line.columns.map { (it as? TextBaseColumn)?.isParagraphIndent == true })
+                                }, ranges)
+                                page.lines.forEachIndexed { row, line -> line.columns.forEachIndexed { col, column ->
+                                    if (column is TextBaseColumn) column.highlightStyle = resolved[row][col]
+                                } }
+                                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                try {
+                                    view.draw(Canvas(bitmap))
+                                    fun colored(x: Int, y: Int): Boolean {
+                                        val pixel = bitmap.getPixel(x, y)
+                                        return Color.alpha(pixel) > 30 && Color.red(pixel) > 180 &&
+                                            Color.blue(pixel) > 180 && Color.green(pixel) < 100
+                                    }
+                                    for (line in page.lines) {
+                                        val selected = line.columns.filterIsInstance<TextBaseColumn>().filter { it.highlightStyle == style }
+                                        if (selected.isEmpty()) continue
+                                        val first = selected.first()
+                                        val last = selected.last()
+                                        val size = HighlightDraw.textSize(line.textPaint.textSize, style)
+                                        val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop, size,
+                                            line.height, style.resolvedFillShape, 1f.dpToPx())
+                                        val cap = if (style.fill != 0 && style.resolvedFillShape == HighlightStyle.FillShape.PILL)
+                                            (band.bottom - band.top) / 2f * style.resolvedPillPaddingScale else 0f
+                                        var inkLeft = Float.POSITIVE_INFINITY
+                                        var inkRight = Float.NEGATIVE_INFINITY
+                                        var left = Float.POSITIVE_INFINITY
+                                        var right = Float.NEGATIVE_INFINITY
+                                        for (column in selected) {
+                                            val paint = HighlightDraw.obtainTextPaint(line.textPaint, style, 0, column.charData)
+                                            try {
+                                                val ink = Rect()
+                                                paint.getTextBounds(column.charData, 0, column.charData.length, ink)
+                                                val origin = column.start + ((column as? TextColumn)?.drawOffset ?: 0f) +
+                                                    if (Build.VERSION.SDK_INT >= 35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                                                val minimum = if (cap > 0f) HighlightGeometry.pillClearance(cap,
+                                                    line.lineBase - line.lineTop + ink.top, line.lineBase - line.lineTop + ink.bottom,
+                                                    band.top, band.bottom, 1f.dpToPx()) else if (style.box != null) 1f.dpToPx() else 0f
+                                                inkLeft = minOf(inkLeft, origin + ink.left)
+                                                inkRight = maxOf(inkRight, origin + ink.right)
+                                                left = minOf(left, origin + ink.left - maxOf(gap.dpToPx(), minimum))
+                                                right = maxOf(right, origin + ink.right + maxOf(gap.dpToPx(), minimum))
+                                            } finally { HighlightDraw.recycleTextPaint(paint) }
+                                        }
+                                        val capWidthDeficit = (cap * 2f - (right - left)).coerceAtLeast(0f) / 2f
+                                        left -= capWidthDeficit
+                                        right += capWidthDeficit
+                                        assertTrue("Full left boundary stays on the page: $label $left", left >= -0.01f)
+                                        assertTrue("Full right boundary stays on the page: $label $right", right <= width + 0.01f)
+                                        val firstIndex = line.columns.indexOf(first)
+                                        val lastIndex = line.columns.indexOf(last)
+                                        line.columns.getOrNull(firstIndex - 1)?.let { neighbor ->
+                                            assertTrue("Left neighbour keeps its space: $label", left >= neighbor.end - 0.01f)
+                                        }
+                                        line.columns.getOrNull(lastIndex + 1)?.let { neighbor ->
+                                            assertTrue("Right neighbour keeps its space: $label", right <= neighbor.start + 0.01f)
+                                            if (neighbor is ReviewColumn) checkedReview = true
+                                        }
+                                        if (!line.isParagraphEnd) checkedWrap = true
+                                        val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                                        val edgePixels = (floor(left).toInt().coerceAtLeast(0)..ceil(right).toInt().coerceAtMost(width - 1))
+                                            .filter { colored(it, middle) }
+                                        assertTrue("Actual boundary pixels must be present: $label", edgePixels.size >= 2)
+                                        assertEquals("Drawn left edge: $label", left, edgePixels.first().toFloat(), 1.5f)
+                                        assertEquals("Drawn right edge: $label", right, edgePixels.last().toFloat(), 1.5f)
+                                        if (gap == 24f) {
+                                            assertEquals("Actual requested left blank distance: $label", gap.dpToPx(), inkLeft - edgePixels.first(), 1.5f)
+                                            assertEquals("Actual requested right blank distance: $label", gap.dpToPx(), edgePixels.last() - inkRight, 1.5f)
+                                        }
+                                        if (first.charData == "甲") {
+                                            checkedShort = true
+                                            measuredGaps += inkLeft - edgePixels.first()
+                                            if (cap > 0f && gap == 0f) assertTrue("Explicit margin can reduce legacy clearance without changing curvature: $label",
+                                                measuredGaps.last() < inkLeft - first.start + cap - 1f)
+                                        }
+                                        selected.firstOrNull { it.charData == "👩‍💻" }?.let { emoji ->
+                                            val glyph = Bitmap.createBitmap(width, ceil(line.height).toInt(), Bitmap.Config.ARGB_8888)
+                                            val expected = Bitmap.createBitmap(width, glyph.height, Bitmap.Config.ARGB_8888)
+                                            val glyphStyle = style.copy(textColor = Color.BLACK)
+                                            val paint = HighlightDraw.obtainTextPaint(line.textPaint, glyphStyle, Color.BLACK, emoji.charData)
+                                            try {
+                                                emoji.highlightStyle = glyphStyle
+                                                emoji.draw(view, Canvas(glyph))
+                                                val offset = if (Build.VERSION.SDK_INT >= 35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                                                Canvas(expected).drawText(emoji.charData, emoji.start + offset, line.lineBase - line.lineTop, paint)
+                                                assertTrue("Padded boundary emoji must draw as a complete native glyph: $label", glyph.sameAs(expected))
+                                            } finally {
+                                                emoji.highlightStyle = style
+                                                HighlightDraw.recycleTextPaint(paint)
+                                                glyph.recycle(); expected.recycle()
+                                            }
+                                        }
+                                        if (cap > 0f) {
+                                            val shoulder = (line.lineTop + band.top + (band.bottom - band.top) * 0.05f).toInt()
+                                            val shoulderPixels = edgePixels.first()..edgePixels.last()
+                                            val edge = shoulderPixels.first { colored(it, shoulder) }
+                                            val curve = edge - edgePixels.first()
+                                            assertTrue("Real pill curve remains visible: $label curve=$curve", curve >= 2)
+                                            val rightEdge = shoulderPixels.last { colored(it, shoulder) }
+                                            assertTrue("Real right curve remains visible: $label", edgePixels.last() - rightEdge >= 2)
+                                            if (first.charData == "甲") measuredCurves += curve
+                                        }
+                                        for (icon in line.columns.filter { it is ImageColumn }) {
+                                            var bluePixels = 0
+                                            for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt())
+                                                for (x in ceil(icon.start).toInt() until floor(icon.end).toInt()) {
+                                                    assertFalse("Padding must not paint the image slot: $label", colored(x, y))
+                                                    if (bitmap.getPixel(x, y) == Color.BLUE) bluePixels++
+                                                }
+                                            assertTrue("The actual image pixels remain visible: $label", bluePixels > 20)
+                                        }
+                                    }
+                                    if (page.index == 0) File(context.getExternalFilesDir("ui-regression"),
+                                        "highlight-horizontal-$mode-$justify-$styleIndex-${gap.toInt()}.png").outputStream().use {
+                                        assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                                    }
+                                } finally { bitmap.recycle(); page.recycleRecorders() }
+                            }
+                            assertTrue("Short run and actual image neighbors were checked: $label", checkedShort)
+                            assertTrue("Wrapped run was checked: $label", checkedWrap)
+                            assertTrue("Native review neighbor was checked: $label", checkedReview)
+                        }
+                        assertTrue("Large margin adds real blank space: $mode $justify $styleIndex", measuredGaps.last() > measuredGaps.first() + 2f)
+                        if (measuredCurves.isNotEmpty()) {
+                            measuredCurves.forEach { assertEquals("Margin must not retune curvature: $mode $justify",
+                                measuredCurves.first().toFloat(), it.toFloat(), 1.5f) }
+                            fixedMarginCurves += measuredCurves.last()
+                        }
+                    }
+                    assertTrue("Fixed margin still permits visibly different curvatures: $mode $justify",
+                        fixedMarginCurves[1] > fixedMarginCurves[0] + 2)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.useZhLayout = savedZh
+                AppConfig.adaptSpecialStyle = savedAdapt
+                AppConfig.optimizeRender = savedOptimize
+                context.putPrefBoolean(PreferKey.hangingPunctuation, savedHanging)
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ChapterProvider.clearReviewProviders()
+                ImageProvider.remove(cachedImage.absolutePath)
+            }
+            cachedImage.delete()
             image.delete()
         }
     }
