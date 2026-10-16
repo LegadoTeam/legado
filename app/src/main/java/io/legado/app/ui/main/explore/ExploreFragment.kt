@@ -134,6 +134,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun initRecyclerView() {
         binding.rvFind.setEdgeEffectColor(primaryColor)
         binding.rvFind.layoutManager = linearLayoutManager
+        // Category height changes immediately; moving the following rows would overlap it.
+        binding.rvFind.itemAnimator = null
         binding.rvFind.adapter = adapter
         binding.fastScroller.attachRecyclerView(binding.rvFind)
         upFastScrollerBar()
