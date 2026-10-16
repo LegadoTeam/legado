@@ -6,7 +6,7 @@ import {
   convertSourcesToMap,
 } from '@utils/souce'
 import type { BookSoure, RssSource, Source } from '@/source'
-import { sourceCheckContent, sourceCheckStatus, sourceCheckSnapshots } from '@/utils/sourceCheckState'
+import { sourceCheckContent, sourceCheckDetailMatches, sourceCheckStatus, sourceCheckSnapshots } from '@/utils/sourceCheckState'
 import type { SourceCheckState, SourceCheckSnapshot } from '@/utils/sourceCheckState'
 
 const isBookSource = /bookSource/i.test(location.href)
@@ -72,6 +72,10 @@ export const useSourceStore = defineStore('source', {
     checkStatus(source: Source) {
       const url = getSourceUniqueKey(source)
       return sourceCheckStatus(source, this.checkSnapshots[url], this.checkStates[url])
+    },
+    checkDetailMatches(source: Source, searchKey: string) {
+      const url = getSourceUniqueKey(source)
+      return sourceCheckDetailMatches(source, this.checkSnapshots[url], this.checkStates[url], searchKey)
     },
     startDebug() {
       this.currentTab = 'editDebug'

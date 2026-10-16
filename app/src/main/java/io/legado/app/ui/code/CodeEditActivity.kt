@@ -132,7 +132,7 @@ class CodeEditActivity :
             }
             val text = viewModel.editorDraft?.text ?: viewModel.initialText
             viewModel.editorDraft?.let { viewModel.cursorPosition = it.cursorPosition }
-            useSafeEditor = EditSafety.isCombiningHeavy(text)
+            useSafeEditor = EditSafety.requiresSafeEditor(text)
             if (useSafeEditor) {
                 setupSafeEditor(text)
             } else {
