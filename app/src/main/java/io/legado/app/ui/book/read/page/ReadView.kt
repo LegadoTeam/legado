@@ -148,6 +148,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
     val defaultAnimationSpeed = 300
     private var pressDown = false
     internal val isTouching: Boolean get() = pressDown
+    // 翻页动画正跟随手指拖动，抬起手指后才会完成或取消翻页
+    private val isPageDragging: Boolean get() = pressDown && pageDelegate?.isMoved == true
     private var isMove = false
     private val readPositionVersion = ReadPositionVersion()
 
@@ -564,7 +566,23 @@ class ReadView(context: Context, attrs: AttributeSet) :
         cancelNonPdfGestures()
     }
 
+    /**
+     * 内容刷新时取消手势
+     * 跨章翻页后相邻章节异步加载完成会刷新内容，此时可能正在拖动翻页，
+     * 保留拖动让抬起手指的事件照常交给翻页动画，否则页面会停在半页
+     */
+    fun cancelTouchGesturesOnContentUpdate() {
+        if (isPageDragging) return
+        cancelTouchGestures()
+    }
+
     internal fun cancelNonPdfGestures() {
+        // 之后的触摸事件都会被忽略，翻页拖动需立即复位，否则会停在半页且按键翻页失效
+        if (isPageDragging) {
+            pageDelegate?.isCancel = true
+            pageDelegate?.abortAnim()
+            invalidate()
+        }
         curPage.cancelHighlightTap()
         removeCallbacks(longPressRunnable)
         longPressed = false

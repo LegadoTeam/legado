@@ -1545,7 +1545,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         lifecycleScope.launch {
             val shouldResetPageOffset = resetPageOffset &&
                 (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
-            binding.readView.cancelTouchGestures()
+            binding.readView.cancelTouchGesturesOnContentUpdate()
             binding.readView.upContent(relativePosition, shouldResetPageOffset)
             scheduleAloudFollowCheck()
             observeBookmarks()
@@ -1575,7 +1575,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     ) = withContext(Main.immediate) {
         val shouldResetPageOffset = resetPageOffset &&
             (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
-        binding.readView.cancelTouchGestures()
+        binding.readView.cancelTouchGesturesOnContentUpdate()
         binding.readView.upContent(relativePosition, shouldResetPageOffset)
         scheduleAloudFollowCheck()
         observeBookmarks()
