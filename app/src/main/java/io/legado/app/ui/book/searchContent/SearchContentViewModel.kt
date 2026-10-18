@@ -13,10 +13,51 @@ import io.legado.app.utils.ChineseUtils
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
+/**
+ * 全文搜索范围。
+ *
+ * - [ALL] 全书, 与旧行为一致(默认)
+ * - [DOWN] 从当前阅读位置向下: 当前章从当前位置起, 之后的所有章节
+ * - [UP] 从当前阅读位置向上: 当前章到当前位置止(结果由近及远), 之前的章节倒序
+ *
+ * 锚点是"章节 + 章内字符偏移"两段式, 而不是只看章节:
+ * 无目录的单章大文本(几百上千页)只按章切分会退化成"向上无结果 / 向下即全书"。
+ */
+enum class ContentSearchScope {
+    ALL, DOWN, UP
+}
+
 class SearchContentViewModel(application: Application) : BaseViewModel(application) {
     companion object {
-        var replaceEnabled: Boolean = false
-        var regexReplace: Boolean = false
+        /*
+         * 三个搜索选项都记住上次选择 (AppConfig), 首次安装取默认值:
+         * 范围=全书、替换=关、正则=关 —— 与改动前的启动状态完全一致。
+         */
+
+        /** 替换净化 */
+        var replaceEnabled: Boolean
+            get() = AppConfig.contentSearchReplace
+            set(value) {
+                AppConfig.contentSearchReplace = value
+            }
+
+        /** 正则模式 */
+        var regexReplace: Boolean
+            get() = AppConfig.contentSearchRegex
+            set(value) {
+                AppConfig.contentSearchRegex = value
+            }
+
+        /**
+         * 搜索范围: 记住上次的选择 (AppConfig), 首次安装默认全书。
+         * 只把读写委托给配置, 调用方写法不变。
+         */
+        var searchScope: ContentSearchScope
+            get() = ContentSearchScope.values()
+                .getOrElse(AppConfig.contentSearchScope) { ContentSearchScope.ALL }
+            set(value) {
+                AppConfig.contentSearchScope = value.ordinal
+            }
     }
     var bookUrl: String = ""
     var book: Book? = null
