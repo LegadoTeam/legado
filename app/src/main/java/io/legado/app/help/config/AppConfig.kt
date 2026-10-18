@@ -235,6 +235,27 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.showSearchReadRecord, value)
         }
 
+    /** 全文搜索范围: 0 全书 / 1 向下 / 2 向上, 记住上次选择 */
+    var contentSearchScope: Int
+        get() = appCtx.getPrefInt(PreferKey.contentSearchScope, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.contentSearchScope, value)
+        }
+
+    /** 全文搜索: 是否启用替换净化, 记住上次选择(默认关, 与原行为一致) */
+    var contentSearchReplace: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.contentSearchReplace, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.contentSearchReplace, value)
+        }
+
+    /** 全文搜索: 是否启用正则模式, 记住上次选择(默认关, 与原行为一致) */
+    var contentSearchRegex: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.contentSearchRegex, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.contentSearchRegex, value)
+        }
+
     var bookshelfReadProgressMode: Int
         get() = BookshelfReadProgressMode.resolve(
             appCtx.defaultSharedPreferences.all[PreferKey.bookshelfReadProgressMode],
