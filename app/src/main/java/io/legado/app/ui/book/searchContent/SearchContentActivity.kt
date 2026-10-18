@@ -54,6 +54,7 @@ class SearchContentActivity :
         binding.titleBar.findViewById(R.id.search_view)
     }
     private var durChapterIndex = 0
+    private var durChapterPos = 0
     private var searchJob: Job? = null
     private var initJob: Job? = null
 
@@ -86,6 +87,10 @@ class SearchContentActivity :
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
         menu.findItem(R.id.menu_enable_replace)?.isChecked = SearchContentViewModel.replaceEnabled
         menu.findItem(R.id.menu_enable_regex)?.isChecked = SearchContentViewModel.regexReplace
+        // 搜索范围是单选组, 只勾当前项
+        menu.findItem(R.id.menu_content_scope_all)?.isChecked = SearchContentViewModel.searchScope == ContentSearchScope.ALL
+        menu.findItem(R.id.menu_content_scope_down)?.isChecked = SearchContentViewModel.searchScope == ContentSearchScope.DOWN
+        menu.findItem(R.id.menu_content_scope_up)?.isChecked = SearchContentViewModel.searchScope == ContentSearchScope.UP
         return super.onMenuOpened(featureId, menu)
     }
 
@@ -99,6 +104,18 @@ class SearchContentActivity :
                 SearchContentViewModel.regexReplace = !SearchContentViewModel.regexReplace
                 item.isChecked = SearchContentViewModel.regexReplace
             }
+            R.id.menu_content_scope_all, R.id.menu_content_scope_down, R.id.menu_content_scope_up -> {
+                SearchContentViewModel.searchScope = when (item.itemId) {
+                    R.id.menu_content_scope_down -> ContentSearchScope.DOWN
+                    R.id.menu_content_scope_up -> ContentSearchScope.UP
+                    else -> ContentSearchScope.ALL
+                }
+                item.isChecked = true
+                // 切换范围后按当前关键词重搜, 不必再敲一次回车
+                val query = viewModel.lastQuery
+                if (query.isNotBlank()) startContentSearch(query)
+            }
+
         }
         return super.onCompatOptionsItemSelected(item)
     }
@@ -164,6 +181,7 @@ class SearchContentActivity :
         viewModel.book?.let {
             initCacheFileNames(it)
             durChapterIndex = it.durChapterIndex
+            durChapterPos = it.durChapterPos
             intent.getStringExtra("searchWord")?.let { searchWord ->
                 searchView.setQuery(searchWord, submit)
             }
@@ -204,14 +222,46 @@ class SearchContentActivity :
         searchJob = lifecycleScope.launch(IO) {
             initJob?.join()
             kotlin.runCatching {
-                appDb.bookChapterDao.getChapterList(viewModel.bookUrl).forEach { bookChapter ->
+                val chapterList = appDb.bookChapterDao.getChapterList(viewModel.bookUrl)
+                val scope = SearchContentViewModel.searchScope
+                // 锚点所在章节在列表中的位置; 全局搜索或找不到时为 -1
+                val anchorPos = if (scope == ContentSearchScope.ALL) {
+                    -1
+                } else {
+                    chapterList.indexOfFirst { it.index == durChapterIndex }
+                }
+                // 按方向裁剪章节: 向下 = 当前章到书末; 向上 = 当前章到书首, 且倒序(由近及远)
+                val chapters = when {
+                    anchorPos < 0 -> chapterList
+                    scope == ContentSearchScope.DOWN -> chapterList.subList(anchorPos, chapterList.size)
+                    else -> chapterList.subList(0, anchorPos + 1).asReversed()
+                }
+                chapters.forEach { bookChapter ->
                     ensureActive()
-                    val searchResults = if (isLocalBook
+                    val found = if (isLocalBook
                         || viewModel.cacheChapterNames.contains(bookChapter.getFileName())
                     ) {
                         viewModel.searchChapter(query, bookChapter)
                     } else {
                         return@forEach
+                    }
+                    // 页级锚点: 当前章内以阅读位置的字符偏移为界(单章大文本靠它切分,
+                    // 只按章节切会退化成向上无结果、向下即全书); 向上还要倒序,
+                    // 让离当前页最近的命中排最前
+                    val searchResults = if (anchorPos >= 0 && bookChapter.index == durChapterIndex) {
+                        when (scope) {
+                            ContentSearchScope.DOWN ->
+                                found.filter { it.queryIndexInChapter >= durChapterPos }
+                            ContentSearchScope.UP ->
+                                found.filter { it.queryIndexInChapter <= durChapterPos }
+                                    .asReversed()
+                            ContentSearchScope.ALL -> found
+                        }.also {
+                            // searchChapter 内部按整章累加计数, 过滤掉的部分要扣回来
+                            viewModel.searchResultCounts -= found.size - it.size
+                        }
+                    } else {
+                        found
                     }
                     ensureActive()
                     if (searchResults.isNotEmpty()) {
