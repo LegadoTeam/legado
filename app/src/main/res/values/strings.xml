@@ -1842,4 +1842,7 @@
     <string name="reimport_book_source">Reimport this book’s source</string>
     <string name="customize_my">Customize My page</string>
     <string name="my_more_items">Move selected items to More</string>
+    <string name="content_search_scope_all">Whole book</string>
+    <string name="content_search_scope_down">From here down</string>
+    <string name="content_search_scope_up">From here up</string>
 </resources>
