@@ -1,9 +1,8 @@
 name: Update Cronet
 
 on:
-  schedule:
-    # 周一北京时间9点（UTC 1:00）
-    - cron: "0 1 * * 1"
+  # Keep 152 pinned while newer official natives require API 24 (the app supports 23).
+  # Deliberate upgrades remain available through workflow_dispatch and runtime review.
   workflow_dispatch:
 
 jobs:
@@ -25,7 +24,7 @@ jobs:
           distribution: 'temurin'
           java-version: 21
 
-      - uses: gradle/actions/setup-gradle@v6.3.0
+      - uses: gradle/actions/setup-gradle@v6.4.0
         if: ${{ env.cronet == 'ok' }}
 
       - name: Download and verify Cronet bundle

@@ -242,16 +242,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun initView() = binding.run {
-        root.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
-            val keyboardHeight = windowInsets.imeHeight
-            view.bottomPadding = keyboardHeight
-            if (keyboardHeight > 0) view.doOnLayout {
-                currentFocus?.takeIf { it.onCheckIsTextEditor() }?.let { input ->
-                    input.requestRectangleOnScreen(Rect(0, 0, input.width, input.height), true)
-                }
-            }
-            windowInsets
-        }
         viewPagerMain.setEdgeEffectColor(primaryColor)
         viewPagerMain.offscreenPageLimit = 3
         viewPagerMain.adapter = adapter
@@ -264,6 +254,18 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         bottomNavigationView.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
             val height = windowInsets.navigationBarHeight
             view.bottomPadding = height
+            view.doOnLayout {
+                val location = IntArray(2)
+                view.getLocationInWindow(location)
+                val keyboardTop = window.decorView.height - windowInsets.imeHeight
+                // The pager already ends above the bottom navigation, even when IME covers it.
+                viewPagerMain.bottomPadding = (location[1] - keyboardTop).coerceAtLeast(0)
+                if (windowInsets.imeHeight > 0) viewPagerMain.doOnLayout {
+                    currentFocus?.takeIf { it.onCheckIsTextEditor() }?.let { input ->
+                        input.requestRectangleOnScreen(Rect(0, 0, input.width, input.height), true)
+                    }
+                }
+            }
             windowInsets.inset(0, 0, 0, height)
         }
     }

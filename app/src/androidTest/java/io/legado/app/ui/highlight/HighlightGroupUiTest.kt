@@ -147,18 +147,26 @@ class HighlightGroupUiTest {
         openStyle()
         edit(R.id.tv_highlight_font_size, 42)
         edit(R.id.tv_highlight_letter_spacing, 30)
+        edit(R.id.tv_highlight_horizontal_padding, 12)
         screenshot("highlight-font-metrics-settings")
         save()
-        await { dao.all.first().styleObj().let { it.fontSize == 42f && it.letterSpacing == -0.2f } }
+        await { dao.all.first().styleObj().let {
+            it.fontSize == 42f && it.letterSpacing == -0.2f && it.horizontalPadding == 12f && it.pillPaddingScale == 1.25f
+        } }
         scenario!!.recreate()
         awaitRules(dao.all)
         openStyle()
         onView(withId(R.id.tv_highlight_font_size)).inRoot(isDialog()).perform(scrollTo())
             .check(matches(withText(context.getString(R.string.text_size) + " · 42")))
+        onView(withId(R.id.tv_highlight_horizontal_padding)).inRoot(isDialog()).perform(scrollTo())
+            .check(matches(withText(context.getString(R.string.highlight_horizontal_padding) + " · 12 dp")))
         edit(R.id.tv_highlight_font_size, null)
         edit(R.id.tv_highlight_letter_spacing, null)
+        edit(R.id.tv_highlight_horizontal_padding, null)
         save()
-        await { dao.all.first().styleObj().let { it.fontSize == null && it.letterSpacing == null } }
+        await { dao.all.first().styleObj().let {
+            it.fontSize == null && it.letterSpacing == null && it.horizontalPadding == null && it.pillPaddingScale == 1.25f
+        } }
     }
 
     @Test fun pillMarginEditsPersistAndResetThroughTheActualStyleDialog() {

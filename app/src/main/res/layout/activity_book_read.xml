@@ -15,11 +15,15 @@
         android:layout_height="0dp"
         android:visibility="invisible" />
 
+    <!-- 内边距把 24x24dp 的光标触摸范围向选区外侧和下方扩大到 44x40dp,
+         与系统文本选择手柄一致 (Editor.SelectionHandleView, text_handle_min_size) -->
     <ImageView
         android:id="@+id/cursor_left"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:contentDescription="@string/select_start"
+        android:paddingLeft="20dp"
+        android:paddingBottom="16dp"
         android:src="@drawable/ic_cursor_left"
         android:visibility="invisible" />
 
@@ -28,6 +32,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:contentDescription="@string/select_end"
+        android:paddingRight="20dp"
+        android:paddingBottom="16dp"
         android:src="@drawable/ic_cursor_right"
         android:visibility="invisible" />
 

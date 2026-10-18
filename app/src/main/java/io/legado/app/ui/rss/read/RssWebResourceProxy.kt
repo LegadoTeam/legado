@@ -127,9 +127,26 @@ internal class RssProxyResponseInputStream(
 ) : FilterInputStream(body.byteStream()) {
 
     private var closed = false
+    private var initialRangeOffset = response.initialRangeOffset()
+
+    // WebView seeks the request Range before inspecting our 206 response headers. Cronet's
+    // body already starts there, so acknowledge that initial seek without discarding it twice.
+    override fun skip(byteCount: Long): Long {
+        if (byteCount <= 0) return 0
+        val alreadySkipped = minOf(byteCount, initialRangeOffset)
+        initialRangeOffset -= alreadySkipped
+        return alreadySkipped + if (byteCount > alreadySkipped) {
+            super.skip(byteCount - alreadySkipped)
+        } else 0
+    }
+
+    // available() describes buffered bytes, not the full resource size. WebView otherwise
+    // uses it to reject an absolute Range offset that exceeds the remaining partial body.
+    override fun available(): Int = if (response.code == 206) 0 else super.available()
 
     // WebView may query available() and read() again after EOF; it owns close().
     override fun read(): Int = try {
+        initialRangeOffset = 0
         super.read()
     } catch (error: Throwable) {
         close()
@@ -137,6 +154,7 @@ internal class RssProxyResponseInputStream(
     }
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int = try {
+        if (length > 0) initialRangeOffset = 0
         super.read(buffer, offset, length)
     } catch (error: Throwable) {
         close()
@@ -151,5 +169,27 @@ internal class RssProxyResponseInputStream(
         } finally {
             response.close()
         }
+    }
+
+    private fun Response.initialRangeOffset(): Long {
+        if (code != 206) return 0
+        val requested = REQUEST_RANGE.matchEntire(request.header("Range")?.trim().orEmpty())
+            ?: return 0
+        val returned = CONTENT_RANGE.matchEntire(header("Content-Range")?.trim().orEmpty())
+            ?: return 0
+        val start = returned.groupValues[1].toLongOrNull() ?: return 0
+        val end = returned.groupValues[2].toLongOrNull() ?: return 0
+        if (start > end || requested.groupValues[1].toLongOrNull() != start) return 0
+        val total = returned.groupValues[3]
+        if (total != "*" && (total.toLongOrNull()?.let { it > end } != true)) return 0
+        val requestedEnd = requested.groupValues[2]
+        if (requestedEnd.isNotEmpty()
+            && (requestedEnd.toLongOrNull()?.let { it >= end } != true)) return 0
+        return start
+    }
+
+    private companion object {
+        val REQUEST_RANGE = Regex("bytes=(\\d+)-(\\d*)", RegexOption.IGNORE_CASE)
+        val CONTENT_RANGE = Regex("bytes (\\d+)-(\\d+)/(\\d+|\\*)", RegexOption.IGNORE_CASE)
     }
 }
