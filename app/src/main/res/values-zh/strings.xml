@@ -1729,4 +1729,5 @@
     <string name="reimport_book_source">重新导入本书书源</string>
     <string name="customize_my">自定义我的页面</string>
     <string name="my_more_items">将选中的功能放入更多</string>
+    <string name="show_source_bookshelf_count">显示书籍数量</string>
 </resources>

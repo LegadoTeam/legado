@@ -1842,4 +1842,5 @@
     <string name="reimport_book_source">Reimport this book’s source</string>
     <string name="customize_my">Customize My page</string>
     <string name="my_more_items">Move selected items to More</string>
+    <string name="show_source_bookshelf_count">Show bookshelf count</string>
 </resources>

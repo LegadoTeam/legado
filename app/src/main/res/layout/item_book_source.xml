@@ -122,11 +122,13 @@
         android:layout_marginStart="32dp"
         android:textColor="@color/secondaryText"
         android:textSize="12sp"
+        android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/cb_book_source"
         app:layout_constraintBottom_toTopOf="@id/iv_debug_text"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        tools:text="书架：2 本" />
+        tools:text="书架：2 本"
+        tools:visibility="visible" />
 
     <TextView
         android:id="@+id/iv_debug_text"
