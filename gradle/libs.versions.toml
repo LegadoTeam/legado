@@ -65,7 +65,7 @@ htmlunitCoreJs = "5.3.0-legado.4"
 #noinspection GradleDependency,NewerVersionAvailable
 media3 = "1.10.1"
 #noinspection GradleDependency
-gsyvideoplayer = "13.2.1"
+gsyvideoplayer = "14.0.0"
 
 #noinspection GradleDependency
 webkit = "1.14.0"
