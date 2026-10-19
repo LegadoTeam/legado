@@ -68,6 +68,7 @@ class BookSourceCheckUiTest {
     private val savedHelp = LocalConfig.all["bookSourceHelpVersion"]
     private val preferences = context.defaultSharedPreferences
     private val savedShowStatus = preferences.all[PreferKey.showSourceCheckStatus] as? Boolean
+    private val savedShowBookshelfCount = preferences.all[PreferKey.showSourceBookshelfCount] as? Boolean
     private val savedBlockNavigation = preferences.all[PreferKey.blockSourceNavigation] as? Boolean
     private val savedIgnore = HashMap(BackupConfig.ignoreConfig)
     private val savedLastBackup = LocalConfig.lastBackup
@@ -78,6 +79,7 @@ class BookSourceCheckUiTest {
 
     @Before fun setup() {
         preferences.edit().remove(PreferKey.showSourceCheckStatus).commit()
+        preferences.edit().remove(PreferKey.showSourceBookshelfCount).commit()
         preferences.edit().remove(PreferKey.blockSourceNavigation).commit()
         LocalConfig.edit().putInt("bookSourceHelpVersion", 1).commit()
         appDb.bookSourceDao.insert(*sources.toTypedArray())
@@ -96,6 +98,8 @@ class BookSourceCheckUiTest {
         preferences.edit().apply {
             if (savedShowStatus == null) remove(PreferKey.showSourceCheckStatus)
             else putBoolean(PreferKey.showSourceCheckStatus, savedShowStatus)
+            if (savedShowBookshelfCount == null) remove(PreferKey.showSourceBookshelfCount)
+            else putBoolean(PreferKey.showSourceBookshelfCount, savedShowBookshelfCount)
             if (savedBlockNavigation == null) remove(PreferKey.blockSourceNavigation)
             else putBoolean(PreferKey.blockSourceNavigation, savedBlockNavigation)
         }.commit()
@@ -123,6 +127,11 @@ class BookSourceCheckUiTest {
         try {
             scenario!!.onActivity { it.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false) }
             awaitItems(sources.take(2).map { it.bookSourceUrl })
+            scenario!!.onActivity {
+                it.findViewById<TitleBar>(R.id.title_bar).menu
+                    .performIdentifierAction(R.id.menu_show_source_bookshelf_count, 0)
+            }
+            instrumentation.waitForIdleSync()
             awaitBookshelfCounts(0, 0)
             scenario!!.onActivity {
                 val list = it.findViewById<RecyclerView>(R.id.recycler_view)
@@ -205,12 +214,13 @@ class BookSourceCheckUiTest {
         }
         awaitItems(sources.take(2).map { it.bookSourceUrl })
         assertFalse(AppConfig.showSourceCheckStatus)
+        assertFalse(AppConfig.showSourceBookshelfCount)
         assertFalse(AppConfig.blockSourceNavigation)
         scenario!!.onActivity {
             val menu = it.findViewById<TitleBar>(R.id.title_bar).menu
             val ids = (0 until menu.size()).map { index -> menu.getItem(index).itemId }
             val navigation = ids.indexOf(R.id.menu_block_source_navigation)
-            assertEquals(ids.indexOf(R.id.menu_show_source_check_status) + 1, navigation)
+            assertEquals(ids.indexOf(R.id.menu_show_source_check_status) + 2, navigation)
             assertEquals(navigation + 1, ids.indexOf(R.id.menu_help))
             assertNotNull(menu.findItem(R.id.menu_block_source_navigation).icon)
         }
