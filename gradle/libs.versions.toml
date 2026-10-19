@@ -11,7 +11,7 @@ flexbox = "3.0.0"
 fragment = "1.8.9"
 documentfile = "1.1.0"
 
-libarchive = "1.1.6"
+libarchive = "1.1.7"
 lyricViewx = "1.3.2"
 soraEditor = "0.24.6"
 glide = "5.0.7"
