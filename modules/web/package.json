@@ -39,7 +39,7 @@
     "@vue/eslint-config-typescript": "^14.0.1",
     "@vue/tsconfig": "^0.5.1",
     "eslint": "^10.10.0",
-    "eslint-plugin-vue": "^10.10.0",
+    "eslint-plugin-vue": "^10.11.1",
     "npm-run-all2": "^8.0.4",
     "prettier": "^3.9.6",
     "sass-embedded": "^1.104.0",
