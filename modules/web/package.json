@@ -34,7 +34,7 @@
   "devDependencies": {
     "@tsconfig/node20": "^20.1.10",
     "@types/node": "^25.9.6",
-    "@vitejs/plugin-vue": "^6.0.8",
+    "@vitejs/plugin-vue": "^6.0.10",
     "@vue/eslint-config-prettier": "^10.0.0",
     "@vue/eslint-config-typescript": "^14.0.1",
     "@vue/tsconfig": "^0.5.1",
