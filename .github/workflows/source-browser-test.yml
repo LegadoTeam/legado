@@ -11,6 +11,8 @@ on:
       - 'gradle.properties'
       - 'gradle/libs.versions.toml'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BottomWebViewDialog.kt'
+      - 'app/src/main/java/io/legado/app/ui/browser/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/browser/**'
       - 'app/src/main/java/io/legado/app/help/webView/WebViewPool.kt'
       - 'app/src/main/java/io/legado/app/help/http/BackstageWebView.kt'
       - 'app/src/androidTest/java/io/legado/app/help/http/BackstageWebViewLifecycleTest.kt'

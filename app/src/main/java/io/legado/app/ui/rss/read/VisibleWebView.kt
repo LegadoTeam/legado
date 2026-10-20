@@ -9,6 +9,14 @@ class VisibleWebView(
     attrs: AttributeSet? = null
 ) : WebView(context, attrs) {
 
+    var hasBeenAttachedToWindow = false
+        private set
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        hasBeenAttachedToWindow = true
+    }
+
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(VISIBLE)
     }
