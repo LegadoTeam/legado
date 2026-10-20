@@ -7,6 +7,8 @@ import android.os.Parcelable
 import android.util.AttributeSet
 import android.util.SparseArray
 import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.SeekBar
 import androidx.appcompat.widget.TooltipCompat
@@ -27,6 +29,7 @@ class DetailSeekBar @JvmOverloads constructor(
     private var binding: ViewDetailSeekBarBinding =
         ViewDetailSeekBarBinding.inflate(LayoutInflater.from(context), this, true)
     private val isBottomBackground: Boolean
+    private val repeatOnLongPress: Boolean
 
     var valueFormat: ((progress: Int) -> String)? = null
     var onChanged: ((progress: Int) -> Unit)? = null
@@ -49,6 +52,11 @@ class DetailSeekBar @JvmOverloads constructor(
         val typedArray = context.obtainStyledAttributes(attrs, R.styleable.DetailSeekBar)
         isBottomBackground =
             typedArray.getBoolean(R.styleable.DetailSeekBar_isBottomBackground, false)
+        repeatOnLongPress =
+            typedArray.getBoolean(R.styleable.DetailSeekBar_repeatOnLongPress, false)
+        typedArray.getDimensionPixelSize(R.styleable.DetailSeekBar_adjustButtonSize, 0)
+            .takeIf { it > 0 }
+            ?.let(::setAdjustButtonSize)
         val title = typedArray.getText(R.styleable.DetailSeekBar_title)
         binding.tvSeekTitle.apply {
             text = title
@@ -64,15 +72,51 @@ class DetailSeekBar @JvmOverloads constructor(
             binding.ivSeekReduce.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
             binding.tvSeekValue.setTextColor(textColor)
         }
-        binding.ivSeekPlus.setOnClickListener {
-            binding.seekBar.progressAdd(1)
-            onChanged?.invoke(binding.seekBar.progress)
-        }
-        binding.ivSeekReduce.setOnClickListener {
-            binding.seekBar.progressAdd(-1)
-            onChanged?.invoke(binding.seekBar.progress)
-        }
+        bindAdjustButton(binding.ivSeekPlus, 1)
+        bindAdjustButton(binding.ivSeekReduce, -1)
         binding.seekBar.setOnSeekBarChangeListener(this)
+    }
+
+    private fun setAdjustButtonSize(size: Int) {
+        listOf(binding.ivSeekPlus, binding.ivSeekReduce).forEach { button ->
+            button.layoutParams = button.layoutParams.apply {
+                width = size
+                height = size
+            }
+        }
+    }
+
+    private fun bindAdjustButton(button: View, delta: Int) {
+        fun adjust() {
+            binding.seekBar.progressAdd(delta)
+            onChanged?.invoke(binding.seekBar.progress)
+        }
+
+        button.setOnClickListener { adjust() }
+        if (!repeatOnLongPress) return
+
+        var pressed = false
+        val repeat = object : Runnable {
+            override fun run() {
+                if (!pressed) return
+                adjust()
+                button.postDelayed(this, REPEAT_INTERVAL_MILLIS)
+            }
+        }
+        button.setOnLongClickListener {
+            button.postDelayed(repeat, REPEAT_INTERVAL_MILLIS)
+            true
+        }
+        button.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> pressed = true
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    pressed = false
+                    button.removeCallbacks(repeat)
+                }
+            }
+            false
+        }
     }
 
     override fun dispatchSaveInstanceState(container: SparseArray<Parcelable>) {
@@ -124,6 +168,7 @@ class DetailSeekBar @JvmOverloads constructor(
     }
 
     private companion object {
+        const val REPEAT_INTERVAL_MILLIS = 100L
         const val STATE_SUPER = "superState"
         const val STATE_PROGRESS = "progress"
     }

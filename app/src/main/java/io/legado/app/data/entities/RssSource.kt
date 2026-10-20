@@ -25,6 +25,9 @@ data class RssSource(
     var sourceComment: String? = null,
     // 是否启用
     var enabled: Boolean = true,
+    // 是否记录阅读历史
+    @ColumnInfo(defaultValue = "1")
+    var enableReadRecord: Boolean = true,
     // 自定义变量说明
     var variableComment: String? = null,
     // js库
@@ -143,6 +146,7 @@ data class RssSource(
                 && equal(sourceGroup, source.sourceGroup)
                 && enabledCookieJar == source.enabledCookieJar
                 && equal(sourceComment, source.sourceComment)
+                && enableReadRecord == source.enableReadRecord
                 && equal(concurrentRate, source.concurrentRate)
                 && equal(header, source.header)
                 && equal(loginUrl, source.loginUrl)
