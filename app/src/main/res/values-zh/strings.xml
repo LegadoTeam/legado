@@ -398,6 +398,7 @@
     <string name="highlight_pill_padding">弧度（%）</string>
     <string name="highlight_pill_padding_value">弧度 %1$d%%</string>
     <string name="highlight_horizontal_padding">左右边距</string>
+    <string name="highlight_reserve_text_space">影响文字间距</string>
     <string name="highlight_rule">高亮规则</string>
     <string name="highlight_rule_add">新建高亮规则</string>
     <string name="highlight_rule_edit_title">编辑高亮规则</string>
@@ -1728,4 +1729,5 @@
     <string name="reimport_book_source">重新导入本书书源</string>
     <string name="customize_my">自定义我的页面</string>
     <string name="my_more_items">将选中的功能放入更多</string>
+    <string name="show_source_bookshelf_count">显示书籍数量</string>
 </resources>

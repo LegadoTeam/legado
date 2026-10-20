@@ -481,14 +481,15 @@ data class TextLine(
         try {
             for (index in start until end) {
                 val column = columns[index] as TextBaseColumn
+                val columnStyle = checkNotNull(column.highlightStyle)
                 base.set(if (column is TextHtmlColumn) ChapterProvider.contentPaint else textPaint)
                 if (column is TextHtmlColumn) base.textSize = column.mTextSize
-                val paint = HighlightDraw.obtainTextPaint(base, style, 0, column.charData)
+                val paint = HighlightDraw.obtainTextPaint(base, columnStyle, 0, column.charData)
                 try {
                     paint.getTextBounds(column.charData, 0, column.charData.length, ink)
                     val minimum = if (band != null && radius > 0f) HighlightGeometry.pillClearance(radius,
                         baseline + ink.top, baseline + ink.bottom, band.top, band.bottom, 1f.dpToPx())
-                        else if (style.box != null) 1f.dpToPx() else 0f
+                        else if (columnStyle.box != null) 1f.dpToPx() else 0f
                     val clearance = maxOf(requested, minimum)
                     val origin = column.start + ((column as? TextColumn)?.drawOffset ?: 0f) +
                         if (atLeastApi35) paint.letterSpacing * paint.textSize * 0.5f else 0f
@@ -524,12 +525,7 @@ data class TextLine(
                 val nextStyle = next.highlightStyle ?: break
                 val nextTextSize = HighlightDraw.textSize((next as? TextHtmlColumn)?.mTextSize ?: baseTextSize, nextStyle)
                 if (
-                    nextStyle.fill == fill &&
-                    nextStyle.resolvedFillShape == shape &&
-                    (if (style.resolvedHorizontalPadding != null || nextStyle.resolvedHorizontalPadding != null)
-                        nextStyle == style else true) &&
-                    (shape != HighlightStyle.FillShape.PILL ||
-                        nextStyle.resolvedPillPaddingScale == style.resolvedPillPaddingScale) &&
+                    style.hasSameFillGeometry(nextStyle) &&
                     nextTextSize == textSize
                 ) {
                     endIndex++

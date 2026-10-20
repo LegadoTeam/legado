@@ -79,6 +79,8 @@
         <attr name="title" format="string" />
         <attr name="max" format="integer" />
         <attr name="isBottomBackground" />
+        <attr name="adjustButtonSize" format="dimension" />
+        <attr name="repeatOnLongPress" format="boolean" />
     </declare-styleable>
 
     <declare-styleable name="SmoothCheckBox">

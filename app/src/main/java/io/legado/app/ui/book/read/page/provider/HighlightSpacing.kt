@@ -163,6 +163,15 @@ data class HighlightSpacing(
                         clearance - offset - ink.left, clearance + offset + ink.right - advance)
                 } finally { HighlightDraw.recycleTextPaint(paint) }
             }
+            val layoutPadding get(): Float {
+                val style = checkNotNull(style)
+                return if (style.resolvedHorizontalPadding != null && !style.reserveTextSpace) {
+                    if (style.fill != 0 && style.resolvedFillShape == HighlightStyle.FillShape.PILL) {
+                        val fullBandHeight = textSize * 1.06f + 4f.dpToPx()
+                        fullBandHeight / 2f * style.resolvedPillPaddingScale
+                    } else 0f
+                } else padding
+            }
             val advance get(): Float {
                 metrics?.contentWidth?.let { return it }
                 nativeAdvance?.let { return it }
@@ -278,18 +287,23 @@ data class HighlightSpacing(
                     if (first.column !is TextBaseColumn || style == null ||
                         style.resolvedHorizontalPadding == null &&
                         (style.fill == 0 || style.resolvedFillShape != HighlightStyle.FillShape.PILL)) { i++; continue }
-                    val explicit = style.resolvedHorizontalPadding != null
+                    val explicit = style.resolvedHorizontalPadding != null && style.reserveTextSpace
                     var end = i + 1
                     while (end < paragraph.size && paragraph[end].column is TextBaseColumn &&
-                        paragraph[end].style?.let { if (explicit || it.resolvedHorizontalPadding != null) it == style
-                        else it.fill == style.fill &&
-                            it.resolvedFillShape == style.resolvedFillShape &&
-                            it.resolvedPillPaddingScale == style.resolvedPillPaddingScale } == true &&
+                        paragraph[end].style?.let {
+                            if (style.fill != 0) style.hasSameFillGeometry(it) else it == style
+                        } == true && paragraph[end].style?.reserveTextSpace == style.reserveTextSpace &&
                         paragraph[end].textSize == first.textSize) end++
                     // A physical pixel between the cap and image keeps their antialiased
                     // coverage disjoint even when measured advances end on fractional pixels.
-                    val padding = paragraph.subList(i, end).maxOf { it.padding } + 1f
+                    val layoutPadding = paragraph.subList(i, end).maxOf { it.layoutPadding }
+                    val padding = if (explicit) layoutPadding + 1f
+                    else layoutPadding.takeIf { it > 0f }?.plus(1f) ?: 0f
                     edgePadding = maxOf(edgePadding, padding)
+                    if (padding == 0f) {
+                        i = end
+                        continue
+                    }
                     if (explicit) {
                         // Reserve the shape's entire footprint at actual run boundaries. Only
                         // boundary Unicode cells get spans, so interior shaping/word breaks stay intact.
@@ -358,7 +372,11 @@ data class HighlightSpacing(
                     val tail = paragraph.last()
                     edges.add(ParagraphEdge(paragraph.first().position,
                         tail.position + tail.column.positionLength, edgePadding,
-                        paragraph.any { it.style?.resolvedHorizontalPadding != null }))
+                        paragraph.any { cell ->
+                            cell.style?.let { style ->
+                                style.resolvedHorizontalPadding != null && style.reserveTextSpace
+                            } == true
+                        }))
                 }
             }
             return HighlightSpacing(result, edges, htmlWidths)

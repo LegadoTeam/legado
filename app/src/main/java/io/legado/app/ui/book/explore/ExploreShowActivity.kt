@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.explore
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -45,17 +46,35 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private val categoryTabs = arrayListOf<Pair<ExploreCategory, TabLayout.Tab>>()
     private var renderedCategories: List<ExploreCategory>? = null
     private var menuCategories: MenuItem? = null
+    private var menuReadRecord: MenuItem? = null
     private var menuAddLoadedBooks: MenuItem? = null
     private var menuPage: MenuItem? = null
 
+    private val isDiscoveryEntry: Boolean
+        get() = intent.getBooleanExtra("showExploreCategories", false)
+
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
-        menuCategories = menu.add(Menu.NONE, R.id.menu_show_explore_categories, Menu.NONE,
-            R.string.show_explore_categories).apply {
+        if (isDiscoveryEntry) {
+            menuCategories = menu.add(Menu.NONE, R.id.menu_show_explore_categories, Menu.NONE,
+                R.string.show_explore_categories).apply {
+                isCheckable = true
+                setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                setOnMenuItemClickListener {
+                    AppConfig.showExploreCategories = !AppConfig.showExploreCategories
+                    updateCategories()
+                    true
+                }
+            }
+        }
+        menuReadRecord = menu.add(Menu.NONE, R.id.menu_show_read_record, Menu.NONE,
+            R.string.show_search_read_record).apply {
             isCheckable = true
+            isChecked = AppConfig.showSearchReadRecord
             setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
             setOnMenuItemClickListener {
-                AppConfig.showExploreCategories = !AppConfig.showExploreCategories
-                updateCategories()
+                AppConfig.showSearchReadRecord = !AppConfig.showSearchReadRecord
+                it.isChecked = AppConfig.showSearchReadRecord
+                viewModel.upAdapterLiveData.postValue("hasReadRecord")
                 true
             }
         }
@@ -127,6 +146,8 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     override fun onResume() {
         super.onResume()
         updateCategories()
+        menuReadRecord?.isChecked = AppConfig.showSearchReadRecord
+        viewModel.upAdapterLiveData.postValue("hasReadRecord")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -135,7 +156,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     }
 
     private fun updateCategories() {
-        val show = AppConfig.showExploreCategories
+        val show = isDiscoveryEntry && AppConfig.showExploreCategories
         menuCategories?.isChecked = show
         if (show) viewModel.loadCategories()
         val categories = viewModel.categoriesData.value.orEmpty().map {
@@ -173,6 +194,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 override fun onTabSelected(tab: TabLayout.Tab) {
                     val category = tab.tag as ExploreCategory
                     if (category != viewModel.categoryData.value) {
+                        clearCategorySelection()
                         isClearAll = false
                         binding.recyclerView.scrollToPosition(0)
                         viewModel.switchCategory(category)
@@ -190,13 +212,31 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     }
 
     private fun updateCategorySelection() {
+        clearCategorySelection()
         val selected = viewModel.categoryData.value
-        categoryTabs.forEach { (category, tab) ->
-            if (category == selected) {
-                tab.select()
-            } else if (tab.isSelected) {
-                tab.parent?.selectTab(null)
+        categoryTabs.firstOrNull { it.first == selected }?.second?.let { tab ->
+            tab.parent?.post {
+                if (viewModel.categoryData.value == selected) {
+                    clearCategorySelection()
+                    tab.parent?.setSelectedTabIndicatorColor(accentColor)
+                    tab.select()
+                }
             }
+        }
+    }
+
+    private fun clearCategorySelection() {
+        categoryTabs.mapNotNull { it.second.parent }.distinct().forEach { tabs ->
+            // selectTab(null) leaves the indicator drawn; tint it directly to keep it hidden.
+            tabs.getTabSelectedIndicator().setTint(Color.TRANSPARENT)
+            tabs.getChildAt(0)?.invalidate()
+            for (index in 0 until tabs.tabCount) {
+                tabs.getTabAt(index)?.view?.apply {
+                    isSelected = false
+                    isActivated = false
+                }
+            }
+            tabs.selectTab(null)
         }
     }
 
@@ -303,6 +343,10 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
 
     override fun isInBookshelf(book: SearchBook): Boolean {
         return viewModel.isInBookShelf(book)
+    }
+
+    override fun hasReadRecord(book: SearchBook): Boolean {
+        return viewModel.hasReadRecord(book)
     }
 
     override fun showBookInfo(book: SearchBook) {

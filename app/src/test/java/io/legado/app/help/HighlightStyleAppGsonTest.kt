@@ -30,6 +30,7 @@ class HighlightStyleAppGsonTest {
             fillShape = FillShape.MARKER,
             pillPaddingScale = 1.25f,
             horizontalPadding = 12f,
+            reserveTextSpace = true,
             textColor = 0xFFFF0000.toInt(),
             bold = true,
             underline = Underline(

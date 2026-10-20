@@ -122,9 +122,11 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     private var checkSourceUiSessionId: Long? = null
     private var groupSourcesByDomain = false
     private var showCheckStatus = AppConfig.showSourceCheckStatus
+    private var showBookshelfCount = AppConfig.showSourceBookshelfCount
     private var checkStatusFilter = 0
     private val checkStatuses = listOf("", BookSourceCheckState.NEEDS_CHECK,
-        BookSourceCheckState.PASSED, BookSourceCheckState.FAILED)
+        BookSourceCheckState.PASSED, BookSourceCheckState.FAILED,
+        BookSourceCheckState.UNCHECKABLE)
     private val hostMap = hashMapOf<String, String>()
     private val qrResult = registerForActivityResult(QrCodeResult()) {
         it ?: return@registerForActivityResult
@@ -175,12 +177,14 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.checkStatusFilter.visibility = if (showCheckStatus) View.VISIBLE else View.GONE
         adapter.showCheckStatus = showCheckStatus
+        adapter.showBookshelfCount = showBookshelfCount
         initRecyclerView()
         initSearchView()
         val savedSearch = savedInstanceState?.getString("sourceSearch")
         savedSearch?.let { searchView.setQuery(it, false) }
         checkStatusFilter = if (showCheckStatus) {
-            savedInstanceState?.getInt("checkStatusFilter")?.coerceIn(0, 3) ?: 0
+            savedInstanceState?.getInt("checkStatusFilter")
+                ?.coerceIn(0, checkStatuses.lastIndex) ?: 0
         } else 0
         binding.checkStatusFilter.setSelection(checkStatusFilter)
         binding.checkStatusFilter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -222,6 +226,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.menu_show_source_check_status).isChecked = showCheckStatus
+        menu.findItem(R.id.menu_show_source_bookshelf_count).isChecked = showBookshelfCount
         menu.findItem(R.id.menu_block_source_navigation).isChecked = AppConfig.blockSourceNavigation
         groupMenu = menu.findItem(R.id.menu_group).subMenu
         val sortSubMenu = menu.findItem(R.id.action_sort).subMenu!!
@@ -343,6 +348,12 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 })
                 upBookSource(searchView.query?.toString())
             }
+            R.id.menu_show_source_bookshelf_count -> {
+                showBookshelfCount = !showBookshelfCount
+                AppConfig.showSourceBookshelfCount = showBookshelfCount
+                item.isChecked = showBookshelfCount
+                adapter.showBookshelfCount = showBookshelfCount
+            }
         }
         if (item.groupId == R.id.source_group) {
             searchView.setQuery("group:${item.title}", true)
@@ -409,7 +420,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 }
 
                 else -> {
-                    appDb.bookSourceDao.flowSearch(searchKey)
+                    appDb.bookSourceDao.flowSearchWithCheckDetail(searchKey)
                 }
             }.map { sources ->
                 val state = if (showCheckStatus) checkStatuses[checkStatusFilter] else ""

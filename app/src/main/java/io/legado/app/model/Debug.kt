@@ -22,6 +22,7 @@ import java.util.*
 enum class CheckSourceStatus {
     PASSED,
     FAILED,
+    UNCHECKABLE,
     NOT_COMPLETED,
 }
 
@@ -296,7 +297,11 @@ object Debug {
         if (debugTimeMap[sourceUrl] != null && debugMessageMap[sourceUrl] != null) {
             val spendingTime = System.currentTimeMillis() - debugTimeMap[sourceUrl]!!
             debugTimeMap[sourceUrl] =
-                if (state == "校验成功") spendingTime else CheckSource.timeout + spendingTime
+                if (state == "校验成功" || state.startsWith("无法校验")) {
+                    spendingTime
+                } else {
+                    CheckSource.timeout + spendingTime
+                }
             val printTime = debugTimeFormat.format(Date(spendingTime))
             debugMessageMap[sourceUrl] = "$printTime $state"
         }

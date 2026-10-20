@@ -21,6 +21,9 @@ import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssSource
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.AppConfig
+import io.legado.app.constant.PreferKey
+import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.rss.source.manage.RssSourceActivity
@@ -38,6 +41,7 @@ import java.util.UUID
 class SourceDragOrderUiTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
+    private val preferences = context.defaultSharedPreferences
     private enum class Kind { BOOK, RSS, REPLACE }
 
     @Test fun filteredBookDragPreservesHiddenOrder() = verifyDrag(Kind.BOOK)
@@ -47,6 +51,8 @@ class SourceDragOrderUiTest {
     @Test fun heldBookDragWithDeletedTargetDoesNotMoveAnotherSource() = verifyDrag(Kind.BOOK, removeTarget = true)
 
     private fun verifyDrag(kind: Kind, descending: Boolean = false, removeTarget: Boolean = false) {
+        val savedShowBookshelfCount = preferences.all[PreferKey.showSourceBookshelfCount] as? Boolean
+        if (kind == Kind.BOOK) AppConfig.showSourceBookshelfCount = true
         val id = UUID.randomUUID().toString()
         val group = "Drag $id"
         val orders = listOf(100, 100, 400, 700, 900, 900)
@@ -182,6 +188,8 @@ class SourceDragOrderUiTest {
             LocalConfig.edit().apply {
                 if (help is Int) putInt("bookSourceHelpVersion", help) else remove("bookSourceHelpVersion")
             }.commit()
+            if (savedShowBookshelfCount == null) preferences.edit().remove(PreferKey.showSourceBookshelfCount).commit()
+            else preferences.edit().putBoolean(PreferKey.showSourceBookshelfCount, savedShowBookshelfCount).commit()
         }
     }
 

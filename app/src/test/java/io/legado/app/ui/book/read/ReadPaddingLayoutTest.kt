@@ -41,6 +41,17 @@ class ReadPaddingLayoutTest {
     }
 
     @Test
+    fun `padding sliders use spacious repeatable controls`() {
+        val document = readPaddingLayout()
+        (verticalPaddingIds + horizontalPaddingIds).forEach { id ->
+            val slider = document.findElementById(id)
+            assertEquals("48dp", slider.androidAttribute("layout_height"))
+            assertEquals("48dp", slider.appAttribute("adjustButtonSize"))
+            assertEquals("true", slider.appAttribute("repeatOnLongPress"))
+        }
+    }
+
+    @Test
     fun `region controls are equal and touch sized`() {
         val document = readPaddingLayout()
         regionButtonIds.forEach { id ->
