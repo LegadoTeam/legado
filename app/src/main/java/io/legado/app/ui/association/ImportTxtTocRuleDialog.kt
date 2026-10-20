@@ -151,7 +151,7 @@ class ImportTxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                 tvSourceState.setText(
                     when {
                         localSource == null -> R.string.import_status_new
-                        item != localSource -> R.string.import_status_update
+                        !item.hasSameImportContent(localSource) -> R.string.import_status_update
                         else -> R.string.import_status_exist
                     }
                 )

@@ -122,7 +122,7 @@ class ImportTxtTocRuleViewModel(app: Application) : BaseViewModel(app) {
             allSources.forEach {
                 val source = appDb.txtTocRuleDao.get(it.id)
                 checkSources.add(source)
-                selectStatus.add(source == null || it != source)
+                selectStatus.add(!it.hasSameImportContent(source))
             }
             successLiveData.postValue(allSources.size)
         }
