@@ -145,12 +145,34 @@ object WebViewPool {
     }
 
     @Synchronized
-    internal fun diagnosticSnapshot() {
+    internal fun diagnosticSnapshot(label: String, isCurrent: () -> Boolean) {
         if (!WebViewDiagnostics.enabled) return
         WebViewDiagnostics.record("pool") { "snapshot idle=${idlePool.size} inUse=${inUsePool.size}" }
         (inUsePool.values + idlePool).forEach { pooled ->
             WebViewDiagnostics.record(pooled.id) {
                 "snapshot borrowed=${pooled.id in inUsePool} generation=${pooled.recycleGeneration} ${WebViewDiagnostics.describe(pooled.realWebView)}"
+            }
+            if (pooled.id in inUsePool && isCurrent()) {
+                val generation = pooled.recycleGeneration
+                val started = android.os.SystemClock.uptimeMillis()
+                WebViewDiagnostics.record(pooled.id) { "DOM probe submitted generation=$generation label=$label" }
+                runCatching {
+                    pooled.realWebView.evaluateJavascript(
+                        "JSON.stringify({readyState:document.readyState,title:document.title,body:document.body&&document.body.textContent.slice(0,512)})"
+                    ) { result ->
+                        val sameLease = inUsePool[pooled.id] === pooled && pooled.recycleGeneration == generation
+                        WebViewDiagnostics.record(pooled.id) {
+                            "DOM probe callback elapsed=${android.os.SystemClock.uptimeMillis() - started}ms current=${isCurrent()} sameLease=$sameLease " +
+                                if (isCurrent() && sameLease) "result=$result" else "result=ignored"
+                        }
+                        Thread {
+                            WebViewDiagnostics.dump("$label-dom-${System.identityHashCode(pooled.realWebView)}", threads = false)
+                        }.apply { isDaemon = true; start() }
+                    }
+                    WebViewDiagnostics.record(pooled.id) { "DOM probe submission returned generation=$generation" }
+                }.onFailure {
+                    WebViewDiagnostics.record(pooled.id) { "DOM probe submission failed error=${it.javaClass.simpleName}" }
+                }
             }
         }
     }

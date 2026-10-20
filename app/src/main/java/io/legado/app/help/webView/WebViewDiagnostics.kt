@@ -59,7 +59,7 @@ object WebViewDiagnostics {
         Handler(Looper.getMainLooper()).post {
             if (!enabled || !isCurrent()) return@post
             record("observer") { "main snapshot entered delay=${SystemClock.uptimeMillis() - postedAt}ms label=$label" }
-            runCatching { WebViewPool.diagnosticSnapshot() }
+            runCatching { WebViewPool.diagnosticSnapshot(label, isCurrent) }
                 .onFailure { record("observer") { "main snapshot error=${it.javaClass.simpleName}" } }
             record("observer") { "main snapshot returned label=$label" }
             Thread { dump("$label-main", threads = false) }.apply { isDaemon = true; start() }
