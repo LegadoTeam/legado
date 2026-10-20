@@ -260,7 +260,7 @@ object ReadBookConfig {
         if (previous.isNotEmpty() && previous != configList) ResourceThemeGeneration.changed()
     }
 
-    fun initShareConfig() {
+    fun initShareConfig(normalizeUnderline: Boolean = true) {
         val previous = if (::shareConfig.isInitialized) shareConfig else null
         underlineConfigInitialized = false
         normalizedUnderlineConfigRefs = emptyList()
@@ -277,6 +277,14 @@ object ReadBookConfig {
         }
         shareConfig = c ?: configList.getOrNull(5) ?: Config()
         if (previous != null && previous != shareConfig) ResourceThemeGeneration.changed()
+        if (normalizeUnderline) normalizeUnderlineConfig()
+    }
+
+    /**
+     * Re-select the shared underline values after a backup has restored the
+     * reading style preference.
+     */
+    internal fun normalizeUnderlineConfigAfterRestore() {
         normalizeUnderlineConfig()
     }
 

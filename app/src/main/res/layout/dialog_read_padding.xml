@@ -103,33 +103,41 @@
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_top"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             app:isBottomBackground="true"
             app:max="400"
+            app:adjustButtonSize="48dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_top" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_bottom"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             app:isBottomBackground="true"
             app:max="400"
+            app:adjustButtonSize="48dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_bottom" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_left"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             app:isBottomBackground="true"
             app:max="100"
+            app:adjustButtonSize="48dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_left" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_right"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             app:isBottomBackground="true"
             app:max="100"
+            app:adjustButtonSize="48dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_right" />
 
         <io.legado.app.lib.theme.view.ThemeSwitch

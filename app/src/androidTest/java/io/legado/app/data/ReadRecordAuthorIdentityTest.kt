@@ -87,7 +87,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(111, database.openHelper.writableDatabase.version)
+                assertEquals(112, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))
@@ -110,7 +110,7 @@ class ReadRecordAuthorIdentityTest {
     }
 
     @Test
-    fun migrate109To111PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
+    fun migrate109To112PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
         val name = "read-record-index-migration-${UUID.randomUUID()}"
         val records = (0 until 6375).map { index ->
             ReadRecord(deviceId = "phone", bookName = "History $index", author = "Author $index",
@@ -165,7 +165,7 @@ class ReadRecordAuthorIdentityTest {
                 }, Executor { it.run() }).build()
             try {
                 val sqlite = database.openHelper.writableDatabase
-                assertEquals(111, sqlite.version)
+                assertEquals(112, sqlite.version)
                 assertEquals(records.toSet(), database.readRecordDao.all.toSet())
                 for (search in listOf(false, true)) {
                     val start = android.os.SystemClock.elapsedRealtime()

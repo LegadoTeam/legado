@@ -206,19 +206,28 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean = binding.run {
         when (item.itemId) {
-            R.id.menu_bookshelf ->
+            R.id.menu_bookshelf -> {
                 viewPagerMain.setCurrentItem(0, false)
+                true
+            }
 
-            R.id.menu_discovery ->
+            R.id.menu_discovery -> {
                 viewPagerMain.setCurrentItem(realPositions.indexOf(idExplore), false)
+                true
+            }
 
-            R.id.menu_rss ->
+            R.id.menu_rss -> {
                 viewPagerMain.setCurrentItem(realPositions.indexOf(idRss), false)
+                true
+            }
 
-            R.id.menu_my_config ->
+            R.id.menu_my_config -> {
                 viewPagerMain.setCurrentItem(realPositions.indexOf(idMy), false)
+                true
+            }
+
+            else -> false
         }
-        return false
     }
 
     override fun onNavigationItemReselected(item: MenuItem) {

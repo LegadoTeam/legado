@@ -42,11 +42,20 @@ class BookSourceAdapter(
     private val handler = buildMainHandler()
     var showSourceHost = false
     var showCheckStatus = false
+    var showBookshelfCount = false
+        set(value) {
+            if (field == value) return
+            field = value
+            notifyItemRangeChanged(0, itemCount, Bundle().apply {
+                putBoolean("bookshelfCountVisibility", true)
+            })
+        }
     private var bookshelfCounts = emptyMap<String, Int>()
 
     fun updateBookshelfCounts(counts: Map<String, Int>) {
         val previous = bookshelfCounts
         bookshelfCounts = counts
+        if (!showBookshelfCount) return
         getItems().forEachIndexed { index, source ->
             if (previous[source.bookSourceUrl] != counts[source.bookSourceUrl]) {
                 notifyItemChanged(index, Bundle().apply { putBoolean("bookshelfCount", true) })
@@ -138,6 +147,7 @@ class BookSourceAdapter(
                             "upExplore" -> upShowExplore(ivExplore, item)
                             "upJs" -> tvJsBadge.gone(!item.hasJs)
                             "bookshelfCount" -> upBookshelfCount(binding, item)
+                            "bookshelfCountVisibility" -> upBookshelfCount(binding, item)
                             "selected" -> cbBookSource.isChecked = selected.contains(item)
                             "checkSourceMessage" -> upCheckSourceMessage(binding, item)
                             "upSourceHost" -> upSourceHost(binding, holder.layoutPosition)
@@ -248,9 +258,12 @@ class BookSourceAdapter(
     }
 
     private fun upBookshelfCount(binding: ItemBookSourceBinding, item: BookSourcePart) {
-        binding.tvBookshelfCount.text = context.getString(
-            R.string.source_bookshelf_count, bookshelfCounts[item.bookSourceUrl] ?: 0
-        )
+        binding.tvBookshelfCount.gone(!showBookshelfCount)
+        if (showBookshelfCount) {
+            binding.tvBookshelfCount.text = context.getString(
+                R.string.source_bookshelf_count, bookshelfCounts[item.bookSourceUrl] ?: 0
+            )
+        }
     }
 
     private fun upCheckSourceMessage(

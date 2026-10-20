@@ -38,6 +38,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var showSourceCheckStatus: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showSourceCheckStatus, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.showSourceCheckStatus, value)
+    var showSourceBookshelfCount: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showSourceBookshelfCount, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.showSourceBookshelfCount, value)
     var blockSourceNavigation: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.blockSourceNavigation, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.blockSourceNavigation, value)
@@ -617,6 +620,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.enableReadRecord, value)
+        }
+
+    var enableRssReadRecord: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.enableRssReadRecord, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.enableRssReadRecord, value)
         }
 
     val autoChangeSource: Boolean
