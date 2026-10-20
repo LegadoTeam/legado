@@ -1734,4 +1734,5 @@
     <string name="content_search_scope_up">向上</string>
     <string name="show_source_bookshelf_count">显示书籍数量</string>
     <string name="content_search_anchor_unavailable">正文处理后无法可靠定位当前阅读位置。请返回阅读页重试，或切换为全局搜索。</string>
+    <string name="content_search_result_unavailable">无法在阅读正文中可靠定位此结果。请检查替换净化和标题设置后重新搜索。</string>
 </resources>

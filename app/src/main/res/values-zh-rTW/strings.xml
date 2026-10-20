@@ -1350,4 +1350,6 @@
     <string name="content_search_scope_all">全局</string>
     <string name="content_search_scope_down">向下</string>
     <string name="content_search_scope_up">向上</string>
+    <string name="content_search_anchor_unavailable">正文處理後無法可靠定位目前閱讀位置。請返回閱讀頁重試，或切換為全域搜尋。</string>
+    <string name="content_search_result_unavailable">無法在閱讀正文中可靠定位此結果。請檢查替換淨化和標題設定後重新搜尋。</string>
 </resources>
