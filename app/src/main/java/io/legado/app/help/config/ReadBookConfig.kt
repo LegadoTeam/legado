@@ -690,6 +690,12 @@ object ReadBookConfig {
             config.paddingTop = value
         }
 
+    var paddingTopBottomLinked: Boolean
+        get() = config.paddingTopBottomLinked
+        set(value) {
+            config.paddingTopBottomLinked = value
+        }
+
     var headerPaddingBottom: Int
         get() = config.headerPaddingBottom
         set(value) {
@@ -784,6 +790,7 @@ object ReadBookConfig {
             exportConfig.paddingLeft = shareConfig.paddingLeft
             exportConfig.paddingRight = shareConfig.paddingRight
             exportConfig.paddingTop = shareConfig.paddingTop
+            exportConfig.paddingTopBottomLinked = shareConfig.paddingTopBottomLinked
             exportConfig.headerPaddingBottom = shareConfig.headerPaddingBottom
             exportConfig.headerPaddingLeft = shareConfig.headerPaddingLeft
             exportConfig.headerPaddingRight = shareConfig.headerPaddingRight
@@ -952,6 +959,7 @@ object ReadBookConfig {
         var paddingLeft: Int = 16,
         var paddingRight: Int = 16,
         var paddingTop: Int = 6,
+        var paddingTopBottomLinked: Boolean = false,
         var headerPaddingBottom: Int = 0,
         var headerPaddingLeft: Int = 16,
         var headerPaddingRight: Int = 16,
@@ -1291,6 +1299,7 @@ object ReadBookConfig {
             "paddingLeft" to paddingLeft,
             "paddingRight" to paddingRight,
             "paddingTop" to paddingTop,
+            "paddingTopBottomLinked" to paddingTopBottomLinked,
             "headerPaddingBottom" to headerPaddingBottom,
             "headerPaddingLeft" to headerPaddingLeft,
             "headerPaddingRight" to headerPaddingRight,

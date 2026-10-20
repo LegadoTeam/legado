@@ -703,6 +703,7 @@
     <string name="restore_default">恢复默认</string>
     <string name="reset_region_padding_confirm">确定恢复%s的默认边距吗？</string>
     <string name="lock_left_right_padding">左右边距联动</string>
+    <string name="lock_top_bottom_padding">上下边距联动</string>
     <string name="set_download_per">自定义缓存路径需要存储权限</string>
     <string name="black">黑色</string>
     <string name="content_empty">文章内容为空</string>

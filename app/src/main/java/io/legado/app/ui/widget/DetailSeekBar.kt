@@ -94,8 +94,9 @@ class DetailSeekBar @JvmOverloads constructor(
                 width = size
                 height = size
             }
-            val padding = ((size - iconSize) / 2).coerceAtLeast(0)
-            button.setPadding(padding, padding, padding, padding)
+            val space = (size - iconSize).coerceAtLeast(0)
+            val start = space / 2
+            button.setPadding(start, start, space - start, space - start)
         }
     }
 

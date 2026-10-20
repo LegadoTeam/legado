@@ -9,6 +9,10 @@ import android.view.ViewConfiguration
 import android.widget.ImageView
 import android.widget.SeekBar
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -19,6 +23,8 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.lib.theme.view.ThemeSwitch
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.PaddingConfigDialog
@@ -43,6 +49,11 @@ class ReadPaddingControlsTest {
         val preferences = context.defaultSharedPreferences
         val savedMode = preferences.all[PreferKey.readPaddingLargeControls] as? Boolean
         val savedHelp = LocalConfig.all["readMenuHelpVersion"] as? Int
+        val savedConfigs = ReadBookConfig.configList.toList()
+        val savedShare = ReadBookConfig.shareConfig
+        val savedShared = ReadBookConfig.shareLayout
+        val savedStyle = ReadBookConfig.readStyleSelect
+        val savedComic = ReadBookConfig.isComic
         val file = File.createTempFile("padding-controls-", ".txt", context.cacheDir)
         file.writeText((1..80).joinToString("\n") { "阅读边距布局验证，第 $it 行。" })
         val book = Book(bookUrl = file.absolutePath, originName = file.name, name = file.name,
@@ -53,6 +64,14 @@ class ReadPaddingControlsTest {
         preferences.edit().remove(PreferKey.readPaddingLargeControls).commit()
         LocalConfig.edit().putInt("readMenuHelpVersion", 1).commit()
         try {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.configList.clear()
+                repeat(6) { ReadBookConfig.configList += ReadBookConfig.Config() }
+                ReadBookConfig.shareConfig = ReadBookConfig.Config()
+                ReadBookConfig.isComic = false
+                ReadBookConfig.readStyleSelect = 0
+                ReadBookConfig.shareLayout = false
+            }
             ActivityScenario.launch<ReadBookActivity>(Intent(context, ReadBookActivity::class.java)
                 .putExtra("bookUrl", book.bookUrl)).use { scenario ->
                 scenario.onActivity { activity ->
@@ -61,14 +80,15 @@ class ReadPaddingControlsTest {
                         .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
                 }
                 scenario.onActivity { PaddingConfigDialog().showNow(it.supportFragmentManager, "padding-test") }
-                awaitSize(scenario, 30)
+                awaitSize(scenario, 27)
+                verifyBodyLink(scenario)
                 var compactTrackWidth = 0
                 scenario.onActivity { activity ->
                     assertFalse(AppConfig.readPaddingLargeControls)
                     val root = panel(activity).requireView()
-                    compactTrackWidth = verifyControls(root, 30, 26, 40)
+                    compactTrackWidth = verifyControls(root, 27, 24, 40)
                     assertTrue("The slider must have more width than both adjust buttons",
-                        compactTrackWidth > 60.dpToPx())
+                        compactTrackWidth > 54.dpToPx())
                 }
                 val compactInterval = verifyRepeatsStop(scenario, MotionEvent.ACTION_UP)
                 scenario.onActivity {
@@ -78,21 +98,20 @@ class ReadPaddingControlsTest {
                 scenario.onActivity { activity ->
                     assertTrue(AppConfig.readPaddingLargeControls)
                     val root = panel(activity).requireView()
-                    assertEquals(2 * (48.dpToPx() - 30.dpToPx()),
+                    assertEquals(2 * (48.dpToPx() - 27.dpToPx()),
                         compactTrackWidth - verifyControls(root, 48, 48, 48))
                     assertTrue(root.findViewById<View>(R.id.btn_region_body).isSelected)
                 }
                 val largeInterval = verifyRepeatsStop(scenario, MotionEvent.ACTION_CANCEL)
-                assertTrue("Large controls repeat more slowly: $compactInterval / $largeInterval ms",
-                    largeInterval >= compactInterval + 25)
                 File(context.getExternalFilesDir("ui-regression"), "padding-repeat-timing.txt")
-                    .writeText("Median repeat intervals: compact=${compactInterval}ms large=${largeInterval}ms\n")
+                    .writeText("Configured interval: compact=150ms large=150ms\n" +
+                        "Median observed intervals: compact=${compactInterval}ms large=${largeInterval}ms\n")
                 verifyRepeatsStop(scenario, switchRegion = R.id.btn_region_footer)
-                awaitSize(scenario, 30)
+                awaitSize(scenario, 27)
                 screenshot(scenario, "padding-compact")
                 scenario.onActivity { activity ->
                     val root = panel(activity).requireView()
-                    verifyControls(root, 30, 26, 40)
+                    verifyControls(root, 27, 24, 40)
                     assertTrue(root.findViewById<View>(R.id.btn_region_body).performLongClick())
                     panel(activity).dismissNow()
                     PaddingConfigDialog().showNow(activity.supportFragmentManager, "padding-test")
@@ -102,6 +121,15 @@ class ReadPaddingControlsTest {
                 scenario.onActivity { verifyControls(panel(it).requireView(), 48, 48, 48) }
             }
         } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.configList.clear()
+                ReadBookConfig.configList.addAll(savedConfigs)
+                ReadBookConfig.shareConfig = savedShare
+                ReadBookConfig.shareLayout = savedShared
+                ReadBookConfig.readStyleSelect = savedStyle
+                ReadBookConfig.isComic = savedComic
+                ReadBookConfig.saveNow()
+            }
             preferences.edit().apply {
                 if (savedMode == null) remove(PreferKey.readPaddingLargeControls)
                 else putBoolean(PreferKey.readPaddingLargeControls, savedMode)
@@ -117,17 +145,17 @@ class ReadPaddingControlsTest {
         }
     }
 
-    private fun verifyControls(root: View, buttonSize: Int, iconSize: Int, tabHeight: Int): Int {
+    private fun verifyControls(root: View, buttonSize: Int, iconSize: Int, rowHeight: Int): Int {
         for (id in listOf(R.id.dsb_top, R.id.dsb_bottom, R.id.dsb_left, R.id.dsb_right)) {
             val slider = root.findViewById<DetailSeekBar>(id)
-            assertEquals(tabHeight.dpToPx(), slider.height)
-            assertEquals(if (buttonSize == 48) 150L else 100L, slider.repeatIntervalMillis)
+            assertEquals(rowHeight.dpToPx(), slider.height)
+            assertEquals(150L, slider.repeatIntervalMillis)
             for (buttonId in listOf(R.id.iv_seek_plus, R.id.iv_seek_reduce)) {
                 val button = slider.findViewById<ImageView>(buttonId)
                 assertEquals(buttonSize.dpToPx(), button.width)
                 assertEquals(buttonSize.dpToPx(), button.height)
-                assertEquals(iconSize.dpToPx().toFloat(),
-                    (button.width - button.paddingLeft - button.paddingRight).toFloat(), 1f)
+                assertEquals(iconSize.dpToPx(), button.width - button.paddingLeft - button.paddingRight)
+                assertEquals(iconSize.dpToPx(), button.height - button.paddingTop - button.paddingBottom)
                 assertTrue(button.isLongClickable)
             }
         }
@@ -135,13 +163,80 @@ class ReadPaddingControlsTest {
         val body = root.findViewById<View>(R.id.btn_region_body)
         val footer = root.findViewById<View>(R.id.btn_region_footer)
         val reset = root.findViewById<View>(R.id.iv_reset)
-        assertEquals(tabHeight.dpToPx(), header.height)
-        assertEquals(header.height, reset.height)
+        assertEquals((if (buttonSize == 48) 48 else 36).dpToPx(), header.height)
+        assertEquals((if (buttonSize == 48) 48 else 32).dpToPx(), reset.height)
+        listOf(R.id.sw_lock_lr, R.id.sw_lock_tb, R.id.sw_show_line).forEach { id ->
+            val control = root.findViewById<View>(id)
+            assertEquals(rowHeight.dpToPx(), control.layoutParams.height)
+            if (control.visibility == View.VISIBLE) assertEquals(rowHeight.dpToPx(), control.height)
+        }
         assertEquals(header.width.toFloat(), body.width.toFloat(), 1f)
         assertEquals(header.width.toFloat(), footer.width.toFloat(), 1f)
         assertTrue(header.right < body.left && body.right < footer.left)
-        assertEquals(header.top + header.height / 2, reset.top + reset.height / 2)
+        val headerPosition = IntArray(2).also { header.getLocationOnScreen(it) }
+        val resetPosition = IntArray(2).also { reset.getLocationOnScreen(it) }
+        assertEquals(headerPosition[1] + header.height / 2, resetPosition[1] + reset.height / 2)
         return root.findViewById<DetailSeekBar>(R.id.dsb_top).findViewById<SeekBar>(R.id.seek_bar).width
+    }
+
+    private fun verifyBodyLink(scenario: ActivityScenario<ReadBookActivity>) {
+        scenario.onActivity { activity ->
+            val root = panel(activity).requireView()
+            val top = root.findViewById<DetailSeekBar>(R.id.dsb_top)
+            val bottom = root.findViewById<DetailSeekBar>(R.id.dsb_bottom)
+            val link = root.findViewById<ThemeSwitch>(R.id.sw_lock_tb)
+            assertFalse(link.isChecked)
+            assertEquals(View.VISIBLE, link.visibility)
+            assertEquals(View.GONE, root.findViewById<View>(R.id.sw_show_line).visibility)
+            top.findViewById<View>(R.id.iv_seek_plus).performClick()
+            assertNotEquals(ReadBookConfig.paddingTop, ReadBookConfig.paddingBottom)
+            link.performClick()
+            assertTrue(ReadBookConfig.paddingTopBottomLinked)
+            assertEquals(top.progress, bottom.progress)
+            bottom.findViewById<View>(R.id.iv_seek_plus).performClick()
+            assertEquals(bottom.progress, ReadBookConfig.paddingTop)
+            assertEquals(ReadBookConfig.paddingTop, ReadBookConfig.paddingBottom)
+            top.findViewById<View>(R.id.iv_seek_reduce).performClick()
+            assertEquals(top.progress, bottom.progress)
+
+            // Keep the captured linkage while a BODY drag is pending, and flush it on region change.
+            top.onTrackingStart?.invoke()
+            assertFalse(link.isEnabled)
+            top.onDragging?.invoke(37)
+            top.progress = 37
+            top.onTrackingStop?.invoke()
+            assertTrue(link.isEnabled)
+            root.findViewById<View>(R.id.btn_region_header).performClick()
+            assertEquals(37, ReadBookConfig.paddingTop)
+            assertEquals(37, ReadBookConfig.paddingBottom)
+            assertEquals(View.GONE, link.visibility)
+            assertEquals(View.VISIBLE, root.findViewById<View>(R.id.sw_show_line).visibility)
+            val oldHeaderBottom = ReadBookConfig.headerPaddingBottom
+            top.findViewById<View>(R.id.iv_seek_plus).performClick()
+            assertEquals(oldHeaderBottom, ReadBookConfig.headerPaddingBottom)
+            root.findViewById<View>(R.id.btn_region_footer).performClick()
+            val oldFooterTop = ReadBookConfig.footerPaddingTop
+            bottom.findViewById<View>(R.id.iv_seek_plus).performClick()
+            assertEquals(oldFooterTop, ReadBookConfig.footerPaddingTop)
+
+            root.findViewById<View>(R.id.btn_region_body).performClick()
+            assertTrue(link.isChecked)
+            link.performClick()
+            bottom.findViewById<View>(R.id.iv_seek_plus).performClick()
+            assertFalse(ReadBookConfig.paddingTopBottomLinked)
+            assertNotEquals(ReadBookConfig.paddingTop, ReadBookConfig.paddingBottom)
+            link.performClick()
+            root.findViewById<View>(R.id.iv_reset).performClick()
+        }
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+        scenario.onActivity { activity ->
+            val root = panel(activity).requireView()
+            assertFalse(ReadBookConfig.paddingTopBottomLinked)
+            assertFalse(root.findViewById<ThemeSwitch>(R.id.sw_lock_tb).isChecked)
+            val defaults = ReadBookConfig.Config()
+            assertEquals(defaults.paddingTop, ReadBookConfig.paddingTop)
+            assertEquals(defaults.paddingBottom, ReadBookConfig.paddingBottom)
+        }
     }
 
     private fun verifyRepeatsStop(
