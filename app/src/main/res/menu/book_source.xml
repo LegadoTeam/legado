@@ -155,7 +155,7 @@
     <item
         android:id="@+id/menu_show_source_bookshelf_count"
         android:checkable="true"
-        android:icon="@drawable/ic_cfg_source"
+        android:icon="@drawable/ic_cfg_source_small"
         android:title="@string/show_source_bookshelf_count"
         app:showAsAction="never" />
 
