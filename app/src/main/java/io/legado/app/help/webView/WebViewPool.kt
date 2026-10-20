@@ -43,6 +43,7 @@ object WebViewPool {
     // 获取一个WebView
     @Synchronized
     fun acquire(context: Context): PooledWebView {
+        WebViewDiagnostics.record("pool") { "acquire entered idle=${idlePool.size} inUse=${inUsePool.size}" }
         val pooledWebView = if (idlePool.isNotEmpty()) {
             idlePool.pop() // 复用闲置实例
         } else {
@@ -60,12 +61,16 @@ object WebViewPool {
             isInUse = true
         }
         inUsePool[pooledWebView.id] = pooledWebView
+        WebViewDiagnostics.record(pooledWebView.id) {
+            "acquire returned generation=${pooledWebView.recycleGeneration} ${WebViewDiagnostics.describe(pooledWebView.realWebView)}"
+        }
         return pooledWebView
     }
 
     // 释放WebView回池
     @Synchronized
     fun release(pooledWebView: PooledWebView) {
+        WebViewDiagnostics.record(pooledWebView.id) { "release entered owned=${pooledWebView.id in inUsePool}" }
         if (inUsePool.remove(pooledWebView.id) == null) return
         val recycleGeneration = ++pooledWebView.recycleGeneration
         val recycleUrl = "$BLANK_HTML?legado-recycle=$recycleGeneration"
@@ -98,12 +103,17 @@ object WebViewPool {
             pooledWebView.upContext(appCtx)
             if (idlePool.size >= CACHED_WEB_VIEW_MAX_NUM - inUsePool.size) {
                 // 池子已满，直接销毁
+                WebViewDiagnostics.record(pooledWebView.id) { "pool full; destroy entered" }
                 pooledWebView.realWebView.destroy()
+                WebViewDiagnostics.record(pooledWebView.id) { "destroy returned" }
                 return
             }
             webViewClient = object: WebViewClient() {
                 @SuppressLint("SetJavaScriptEnabled")
                 override fun onPageFinished(view: WebView?, url: String?) {
+                    WebViewDiagnostics.record(pooledWebView.id) {
+                        "recycle callback generation=$recycleGeneration matchingUrl=${url == recycleUrl} isInUse=${pooledWebView.isInUse} borrowed=${pooledWebView.id in inUsePool}"
+                    }
                     if (url != recycleUrl) return
                     synchronized(this@WebViewPool) {
                         if (!pooledWebView.isInUse || pooledWebView.id in inUsePool) return
@@ -117,15 +127,31 @@ object WebViewPool {
                                 loadWithOverviewMode = false // 恢复默认
                                 textZoom = 100
                             }
+                            WebViewDiagnostics.record(pooledWebView.id) { "recycle onPause entered generation=$recycleGeneration" }
                             webview.onPause()
+                            WebViewDiagnostics.record(pooledWebView.id) { "recycle onPause returned generation=$recycleGeneration" }
                         }
                         pooledWebView.isInUse = false
                         pooledWebView.lastUseTime = System.currentTimeMillis()
                         idlePool.push(pooledWebView)
+                        WebViewDiagnostics.record(pooledWebView.id) { "recycle complete generation=$recycleGeneration idle=${idlePool.size}" }
                     }
                 }
             }
+            WebViewDiagnostics.record(pooledWebView.id) { "recycle loadUrl entered generation=$recycleGeneration" }
             loadUrl(recycleUrl)
+            WebViewDiagnostics.record(pooledWebView.id) { "recycle loadUrl returned generation=$recycleGeneration" }
+        }
+    }
+
+    @Synchronized
+    internal fun diagnosticSnapshot() {
+        if (!WebViewDiagnostics.enabled) return
+        WebViewDiagnostics.record("pool") { "snapshot idle=${idlePool.size} inUse=${inUsePool.size}" }
+        (inUsePool.values + idlePool).forEach { pooled ->
+            WebViewDiagnostics.record(pooled.id) {
+                "snapshot borrowed=${pooled.id in inUsePool} generation=${pooled.recycleGeneration} ${WebViewDiagnostics.describe(pooled.realWebView)}"
+            }
         }
     }
 
@@ -181,6 +207,7 @@ object WebViewPool {
                     toRemove.forEach { pooled ->
                         idlePool.remove(pooled)
                         try {
+                            WebViewDiagnostics.record(pooled.id) { "idle cleanup destroy generation=${pooled.recycleGeneration}" }
                             pooled.realWebView.destroy()
                         } catch (e: Exception) {
                             e.printStackTrace()

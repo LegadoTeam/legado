@@ -18,6 +18,8 @@ import io.legado.app.data.entities.rule.ExploreRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.webView.WebViewDiagnostics
+import io.legado.app.help.webView.WebViewDiagnosticsRule
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.webBook.WebBook
@@ -27,14 +29,17 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.UUID
-import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(AndroidJUnit4::class)
 class SourceNavigationUiTest {
+    @get:Rule
+    val webViewDiagnostics = WebViewDiagnosticsRule(watchFromStart = false)
+
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
 
@@ -101,6 +106,7 @@ class SourceNavigationUiTest {
                 for (blocked in listOf(true, false)) {
                     AppConfig.blockSourceNavigation = blocked
                     Log.i("SourceNavigationTest", "webjs start blocked=$blocked")
+                    webViewDiagnostics.watch("webjs-$blocked")
                     val response = try { rule.getString("""@webjs:
                         console.info('navigation webjs: started');
                         java.openUrl('https://navigation.invalid/java');
@@ -112,12 +118,11 @@ class SourceNavigationUiTest {
                         console.info('navigation webjs: stored');
                         source.get('navigationTest') + ':' + document.querySelector('p').textContent + ':' + source.get('navigationLogin');
                     """.trimIndent()) } catch (error: Throwable) {
-                        File(context.getExternalFilesDir("ui-regression"), "source-navigation-timeout-threads.txt")
-                            .writeText("blocked=$blocked; starts=${starts.size}\n" +
-                                Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
-                                    "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
-                                })
+                        WebViewDiagnostics.record("test") { "webjs failed blocked=$blocked starts=${starts.size}" }
+                        WebViewDiagnostics.dump("source-navigation-webjs-$blocked-failure")
                         throw error
+                    } finally {
+                        webViewDiagnostics.stopWatching()
                     }
                     Log.i("SourceNavigationTest", "webjs completed blocked=$blocked response=$response")
                     assertEquals("stored:Background:ok", response)
