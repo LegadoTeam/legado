@@ -301,6 +301,19 @@ data class TextLine(
         if (styledColumnCount > 0) {
             drawHighlightRuns(canvas, underlineBeforeText = true)
         }
+        if (AppConfig.readAloudDragSeek && !AppConfig.isEInkMode) {
+            val spoken = columns.filterIsInstance<TextBaseColumn>().filter { it.isReadAloud }
+            if (spoken.isNotEmpty()) {
+                val paint = PaintPool.obtain()
+                paint.color = 0xFFFFF59D.toInt()
+                paint.style = Paint.Style.FILL
+                val metrics = textPaint.fontMetrics
+                val baseline = lineBase - lineTop
+                canvas.drawRect(spoken.minOf { it.start }, baseline + metrics.ascent,
+                    spoken.maxOf { it.end }, baseline + metrics.descent, paint)
+                PaintPool.recycle(paint)
+            }
+        }
         if (checkFastDraw() && (!isReadAloud || columns.filterIsInstance<TextBaseColumn>().all { it.isReadAloud })) {
             fastDrawTextLine(view, canvas)
         } else {

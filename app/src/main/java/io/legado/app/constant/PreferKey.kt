@@ -56,6 +56,7 @@ object PreferKey {
     const val readAloudStart = "readAloudStart"
     const val readAloudByPage = "readAloudByPage"
     const val readAloudFollowManualPage = "readAloudFollowManualPage"
+    const val readAloudDragSeek = "readAloudDragSeek"
     const val readAloudControlsRealtime = "readAloudControlsRealtime"
     const val readAloudControlsPause = "readAloudControlsPause"
     const val readAloudControlsPosition = "readAloudControlsPosition"

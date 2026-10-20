@@ -77,46 +77,9 @@ class ReadAloudControls(
 
     fun update(menuVisible: Boolean) {
         this.menuVisible = menuVisible
-        val following = ReadAloud.followReadAloudPosition
-        val isRun = BaseReadAloudService.isRun
-        if (isRun != running || following && !wasFollowing) {
-            hidden = false
-            movement = 0f
-        }
-        running = isRun
-        wasFollowing = following
-        val showPause = following && prefs.getBoolean(PreferKey.readAloudControlsPause, true)
-        val shouldShow = ReadAloudBarVisibility.shouldShow(
-            isRun, following, menuVisible, showPause,
-            prefs.getBoolean(PreferKey.readAloudControlsPosition, true),
-        ) && !hidden
-        bar.isVisible = shouldShow
-        if (!shouldShow) return
-        binding.ivPauseAloud.isVisible = showPause
-        binding.llBackToSpeech.isVisible = !showPause
-        binding.llReadFromHere.isVisible = !showPause
-        binding.vBarDivider.isVisible = !showPause
-        binding.ivPauseAloud.setImageResource(
-            if (BaseReadAloudService.pause) R.drawable.ic_play_24dp else R.drawable.ic_pause_24dp,
-        )
-        binding.ivPauseAloud.contentDescription = context.getString(
-            if (BaseReadAloudService.pause) R.string.resume else R.string.pause,
-        )
-        val background = context.bottomBackground
-        val foreground = context.getPrimaryTextColor(ColorUtils.isColorLight(background))
-        val opacity = prefs.getInt(PreferKey.readAloudControlsOpacity, 90).coerceIn(0, 100) / 100f
-        (bar.background.mutate() as GradientDrawable).apply {
-            setColor(ColorUtils.withAlpha(background, opacity))
-            setStroke(1.dpToPx(), ColorUtils.withAlpha(foreground, if (AppConfig.isEInkMode) 1f else .25f))
-        }
-        binding.ivPauseAloud.setColorFilter(foreground)
-        binding.ivBackToSpeech.setColorFilter(foreground)
-        binding.ivReadFromHere.setColorFilter(foreground)
-        binding.tvBackToSpeech.setTextColor(foreground)
-        binding.tvReadFromHere.setTextColor(foreground)
-        binding.vBarDivider.setBackgroundColor(ColorUtils.withAlpha(foreground, .3f))
-        updateSize(showPause)
-        position()
+        // Listening actions live in the tap menu; never animate a floating overlay.
+        bar.animate().cancel()
+        bar.isVisible = false
     }
 
     private fun updateSize(showPause: Boolean) {

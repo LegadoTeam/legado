@@ -64,10 +64,12 @@ class ReadAloudFollowPositionRegressionTest {
         assertTrue(preparation.contains("val prepared = PreparedReadAloud("))
         assertTrue(preparation.contains("withContext(Main.immediate)"))
         val generationGate = preparation.indexOf(
-            "if (generation != readAloudGeneration.get()) return@withContext"
+            "if (generation != readAloudGeneration.get() ||"
         )
         val firstCommit = preparation.indexOf("this@BaseReadAloudService.pageIndex")
         assertTrue(generationGate >= 0 && generationGate < firstCommit)
+        val tokenGate = preparation.indexOf("speechFollowState.pendingPosition != transition) return@withContext")
+        assertTrue(tokenGate > generationGate && tokenGate < firstCommit)
         assertTrue(
             preparation.indexOf("readAloudJob?.cancel()") < preparation.indexOf("playStop()")
         )

@@ -759,6 +759,8 @@
     <string name="timer_m">%d min</string>
     <string name="brightness_auto">Auto-Brightness %s</string>
     <string name="read_aloud_by_page">Speak by pages</string>
+    <string name="read_aloud_drag_seek">Drag the listening position bar</string>
+    <string name="read_aloud_drag_seek_summary">Swipe anywhere in the text to move the bar relative to the current spoken position. Crossing the top or bottom previews the adjacent page. Release to speak the target paragraph. Paused speech stays paused; tap for the menu.</string>
     <string name="read_aloud_follow_manual_page">Follow manual page turns</string>
     <string name="read_aloud_follow_manual_page_summary">Restart speaking from the newly displayed page after a manual page turn; when disabled, speaking continues from its original position</string>
     <string name="speak_engine">Speak Engine</string>
