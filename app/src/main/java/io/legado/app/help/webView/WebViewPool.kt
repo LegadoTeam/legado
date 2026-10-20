@@ -158,7 +158,7 @@ object WebViewPool {
                 WebViewDiagnostics.record(pooled.id) { "DOM probe submitted generation=$generation label=$label" }
                 runCatching {
                     pooled.realWebView.evaluateJavascript(
-                        "JSON.stringify({readyState:document.readyState,title:document.title,body:document.body&&document.body.textContent.slice(0,512)})"
+                        "JSON.stringify({readyState:document.readyState,visibilityState:document.visibilityState,title:document.title,body:document.body&&document.body.textContent.slice(0,512)})"
                     ) { result ->
                         val sameLease = inUsePool[pooled.id] === pooled && pooled.recycleGeneration == generation
                         WebViewDiagnostics.record(pooled.id) {

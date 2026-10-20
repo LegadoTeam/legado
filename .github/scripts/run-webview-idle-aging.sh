@@ -2,7 +2,7 @@
 set -euo pipefail
 
 case "${1:-}" in
-  staticBackstagePageAfterThirtySecondsIdle|staticBackstagePageAfterSixMinutesIdle) ;;
+  staticBackstagePageAfterThirtySecondsIdle|staticBackstagePageAfterSixMinutesIdle|staticBackstagePageAfterSixMinutesIdleAndReattach) ;;
   *) echo 'Select exactly one WebView idle aging method.' >&2; exit 2 ;;
 esac
 

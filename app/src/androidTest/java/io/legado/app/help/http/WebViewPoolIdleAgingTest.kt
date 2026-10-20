@@ -21,6 +21,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -32,7 +33,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Each method requires its own instrumentation process; only idle duration differs. */
+/** Each method requires its own instrumentation process and the same one-view prelude. */
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 29)
 class WebViewPoolIdleAgingTest {
@@ -79,7 +80,11 @@ class WebViewPoolIdleAgingTest {
     @Test
     fun staticBackstagePageAfterSixMinutesIdle() = runIdleProbe(360_000L)
 
-    private fun runIdleProbe(idleMillis: Long) = runBlocking {
+    @Test
+    fun staticBackstagePageAfterSixMinutesIdleAndReattach() =
+        runIdleProbe(360_000L, reattach = true)
+
+    private fun runIdleProbe(idleMillis: Long, reattach: Boolean = false) = runBlocking {
         val pageUrl = "${source.bookSourceUrl}/page"
         val dialog = BottomWebViewDialog(source.bookSourceUrl, 0, pageUrl,
             "<html><head><title>Idle fixture</title></head><body>Idle fixture</body></html>")
@@ -119,24 +124,52 @@ class WebViewPoolIdleAgingTest {
         diagnostics.watch("backstage")
         try {
             val response = withContext(Dispatchers.Main) {
-                // Main/UNDISPATCHED reaches the normal load synchronously, before its first callback.
-                val pending = async(start = CoroutineStart.UNDISPATCHED) { request.getStrResponse() }
-                val actual = BackstageWebView::class.java.getDeclaredField("pooledWebView")
-                    .apply { isAccessible = true }.get(request)
-                assertSame("Backstage must borrow the aged native instance", target, actual)
-                assertEquals(1L, target.recycleGeneration)
-                pending.await()
+                supervisorScope {
+                    // Observe child failure explicitly; it must not cancel the 5s observation delay.
+                    // Main/UNDISPATCHED reaches the normal load before its first callback.
+                    val pending = async(start = CoroutineStart.UNDISPATCHED) { request.getStrResponse() }
+                    assertSame("Backstage must borrow the aged native instance", target, requestLease(request))
+                    assertEquals(1L, target.recycleGeneration)
+                    if (reattach) {
+                        delay(5_000L)
+                        assertFalse("The request must still be pending before reattachment", pending.isCompleted)
+                        assertSame("Reattach only the original active lease", target, requestLease(request))
+                        assertEquals(1L, target.recycleGeneration)
+                        assertTrue(target.isInUse)
+                        assertEquals(null, target.realWebView.parent)
+                        scenario!!.onActivity { activity ->
+                            val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                            assertTrue(content.isAttachedToWindow && content.isShown)
+                            WebViewDiagnostics.record("idle-aging") {
+                                "reattach entered id=${target.id} ${WebViewDiagnostics.describe(target.realWebView)}"
+                            }
+                            content.addView(target.realWebView, ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                            ))
+                            assertTrue(target.realWebView.isAttachedToWindow && target.realWebView.isShown)
+                            WebViewDiagnostics.record("idle-aging") {
+                                "reattach returned id=${target.id} ${WebViewDiagnostics.describe(target.realWebView)}"
+                            }
+                        }
+                    }
+                    pending.await()
+                }
             }
             assertEquals("Background", response.body)
             awaitCondition("The Backstage request did not return its lease") { !target.isInUse }
         } finally {
             diagnostics.stopWatching()
             withContext(NonCancellable + Dispatchers.Main) {
+                (target.realWebView.parent as? ViewGroup)?.removeView(target.realWebView)
                 BackstageWebView::class.java.getDeclaredMethod("destroy")
                     .apply { isAccessible = true }.invoke(request)
             }
         }
     }
+
+    private fun requestLease(request: BackstageWebView): PooledWebView? =
+        BackstageWebView::class.java.getDeclaredField("pooledWebView")
+            .apply { isAccessible = true }.get(request) as? PooledWebView
 
     private fun assertIdleTarget(target: PooledWebView) {
         assertEquals(1, idlePool().size)

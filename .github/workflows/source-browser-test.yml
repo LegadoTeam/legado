@@ -131,7 +131,7 @@ on:
   workflow_dispatch:
     inputs:
       webview_idle_ab:
-        description: 'Also run isolated WebView idle aging controls (30s and 360s)'
+        description: 'Also run isolated WebView idle aging controls (30s, 360s, and reattach)'
         type: boolean
         default: false
 
@@ -200,17 +200,19 @@ jobs:
 
   webview-idle-aging:
     if: github.event_name == 'workflow_dispatch' && inputs.webview_idle_ab
-    name: WebView idle aging (${{ matrix.idle-seconds }}s)
+    name: WebView idle aging (${{ matrix.control }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - idle-seconds: 30
+          - control: 30s
             method: staticBackstagePageAfterThirtySecondsIdle
-          - idle-seconds: 360
+          - control: 360s
             method: staticBackstagePageAfterSixMinutesIdle
+          - control: 360s-reattach
+            method: staticBackstagePageAfterSixMinutesIdleAndReattach
     env:
       IDLE_AGING_METHOD: ${{ matrix.method }}
     steps:
@@ -250,7 +252,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: webview-idle-aging-${{ matrix.idle-seconds }}s
+          name: webview-idle-aging-${{ matrix.control }}
           path: |
             app/build/reports/androidTests/connected/
             app/build/outputs/androidTest-results/connected/
