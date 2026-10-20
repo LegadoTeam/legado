@@ -1,5 +1,8 @@
 package io.legado.app.data
 
+import android.app.Application
+import androidx.lifecycle.Observer
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.testing.MigrationTestHelper
@@ -14,6 +17,8 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.rule.ContentRule
 import io.legado.app.data.entities.saveWithCover
+import io.legado.app.data.entities.mergeRestoredReadRecord
+import io.legado.app.data.entities.withDisplayMetadata
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.globalExecutor
 import io.legado.app.model.ReadBook
@@ -22,8 +27,12 @@ import io.legado.app.model.AudioPlay
 import io.legado.app.help.book.ReadRecordCoverCache
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.prepareReadRecordBackup
+import io.legado.app.service.AudioPlayService
+import io.legado.app.ui.book.info.edit.BookInfoEditViewModel
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -121,8 +130,8 @@ class ReadRecordAuthorIdentityTest {
             lastChapterTitle = "Tablet chapter", lastChapterIndex = 12, lastChapterPos = 17, coverUrl = "tablet-cover")
         records += records.last().copy(deviceId = "desktop", readTime = 300,
             lastChapterTitle = "Tie winner", coverUrl = "desktop-cover")
-        records += records.first().copy(author = "", readTime = 400)
-        records += records.first().copy(author = combinedAuthor, readTime = 500)
+        records += records.first().copy(author = "", displayAuthor = "", readTime = 400)
+        records += records.first().copy(author = combinedAuthor, displayAuthor = combinedAuthor, readTime = 500)
         val expected = records.groupBy { it.bookName to it.author }.values.map { devices ->
             val snapshot = devices.sortedWith(compareByDescending<ReadRecord> { it.lastRead }
                 .thenBy { it.deviceId }).first()
@@ -158,7 +167,7 @@ class ReadRecordAuthorIdentityTest {
                 .addMigrations(*DatabaseMigrations.migrations)
                 .setQueryCallback(object : RoomDatabase.QueryCallback {
                     override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
-                        if (sqlQuery.trimStart().startsWith("select history.bookName")) {
+                        if (sqlQuery.trimStart().startsWith("select history.displayBookName")) {
                             actualQuery.set(sqlQuery to bindArgs.toList())
                         }
                     }
@@ -188,16 +197,45 @@ class ReadRecordAuthorIdentityTest {
     }
 
     @Test
+    fun migrate111To112KeepsPhysicalIdentityAndUsesTheResolvedAuthorForDisplay() {
+        val name = "read-record-display-migration-${UUID.randomUUID()}"
+        try {
+            helper.createDatabase(name, 111).use { legacy ->
+                legacy.execSQL("""insert into readRecord (deviceId, bookName, author, readTime, lastRead,
+                    lastChapterIndex, lastChapterPos, resolvedAuthor)
+                    values ('phone', 'Same', '', 700, 50, 4, 17, 'Resolved author'),
+                        ('tablet', 'Same', 'Known author', 300, 80, 8, 21, null)""")
+            }
+            val database = Room.databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(*DatabaseMigrations.migrations).build()
+            try {
+                assertEquals(112, database.openHelper.writableDatabase.version)
+                val records = database.readRecordDao.all.associateBy { it.deviceId }
+                assertEquals(ReadRecord(deviceId = "phone", bookName = "Same", readTime = 700,
+                    lastRead = 50, lastChapterIndex = 4, lastChapterPos = 17,
+                    resolvedAuthor = "Resolved author", displayBookName = "Same", displayAuthor = "Resolved author"),
+                    records["phone"])
+                assertEquals(ReadRecord(deviceId = "tablet", bookName = "Same", author = "Known author",
+                    readTime = 300, lastRead = 80, lastChapterIndex = 8, lastChapterPos = 21,
+                    displayBookName = "Same", displayAuthor = "Known author"), records["tablet"])
+                assertEquals(1000L, database.readRecordDao.allTime)
+                assertEquals(setOf("Resolved author", "Known author"),
+                    database.readRecordDao.allShow.map { it.author }.toSet())
+            } finally { database.close() }
+        } finally { context.deleteDatabase(name) }
+    }
+
+    @Test
     fun daoAggregatesDevicesButSeparatesAuthorsForSearchAndDeletion() = withDatabase { database ->
         val dao = database.readRecordDao
         val first = ReadRecord(deviceId = "phone", bookName = "Same", author = "Author A", readTime = 100,
             lastRead = 10, lastChapterTitle = "Old A", lastChapterIndex = 1, coverUrl = "old-a")
         val latest = first.copy(deviceId = "tablet", readTime = 200, lastRead = 20,
             lastChapterTitle = "Latest A", lastChapterIndex = 9, lastChapterPos = 31, coverUrl = "latest-a")
-        val other = first.copy(author = "Author B", readTime = 900, lastRead = 90,
+        val other = first.copy(author = "Author B", displayAuthor = "Author B", readTime = 900, lastRead = 90,
             lastChapterTitle = "B chapter", lastChapterIndex = 70, coverUrl = "b-cover")
-        val unknown = first.copy(author = "", readTime = 40)
-        val combined = first.copy(author = combinedAuthor, readTime = 60)
+        val unknown = first.copy(author = "", displayAuthor = "", readTime = 40)
+        val combined = first.copy(author = combinedAuthor, displayAuthor = combinedAuthor, readTime = 60)
         dao.insert(first, latest, other, unknown, combined)
         assertEquals(5, dao.all.size)
         assertEquals(1300L, dao.allTime)
@@ -230,7 +268,7 @@ class ReadRecordAuthorIdentityTest {
         val dao = database.readRecordDao
         val first = ReadRecord(deviceId = "phone", bookName = "Same", author = "Author A", readTime = 100,
             lastRead = 10, lastChapterTitle = "A chapter", coverUrl = "shared-original")
-        val other = first.copy(author = "Author B", readTime = 900, lastChapterTitle = "B chapter")
+        val other = first.copy(author = "Author B", displayAuthor = "Author B", readTime = 900, lastChapterTitle = "B chapter")
         dao.insert(first, other)
         assertEquals(1, dao.updateCoverIfUnchanged("phone", "Same", "Author A", "shared-original", "a-owned"))
         assertEquals(first.copy(coverUrl = "a-owned"), dao.getRecord("phone", "Same", "Author A"))
@@ -251,15 +289,15 @@ class ReadRecordAuthorIdentityTest {
         val localId = AppConst.androidId
         val first = ReadRecord(deviceId = localId, bookName = "Same", author = "Author A", readTime = 1000,
             lastRead = 100, lastChapterTitle = "Current A", lastChapterIndex = 1, coverUrl = "a-cover")
-        val other = first.copy(author = "Author B", readTime = 2000, lastRead = 300,
+        val other = first.copy(author = "Author B", displayAuthor = "Author B", readTime = 2000, lastRead = 300,
             lastChapterTitle = "Current B", lastChapterIndex = 30, coverUrl = "b-cover")
         val remote = first.copy(deviceId = "remote", readTime = 9000, lastRead = 9000)
         val incoming = listOf(
             first.copy(readTime = 900, lastRead = 200, lastChapterTitle = "Restored A", lastChapterIndex = 20),
             other.copy(readTime = 2500, lastRead = 200, lastChapterTitle = "Older B", lastChapterIndex = 2),
-            first.copy(deviceId = "", author = "", readTime = 300, lastRead = 50,
+            first.copy(deviceId = "", author = "", displayAuthor = "", readTime = 300, lastRead = 50,
                 lastChapterTitle = "Unknown history", lastChapterIndex = 5, coverUrl = null),
-            first.copy(deviceId = "legacy", author = combinedAuthor, readTime = 700, lastRead = 40,
+            first.copy(deviceId = "legacy", author = combinedAuthor, displayAuthor = combinedAuthor, readTime = 700, lastRead = 40,
                 lastChapterTitle = "Combined history", lastChapterIndex = 4, coverUrl = null),
             remote.copy(readTime = 40, lastRead = 10000, lastChapterTitle = "Remote restored", lastChapterIndex = 40),
         )
@@ -271,6 +309,9 @@ class ReadRecordAuthorIdentityTest {
             // A real old backup has neither author nor deviceId, not a pre-normalized test record.
             json[2].asJsonObject.remove("author")
             json[2].asJsonObject.remove("deviceId")
+            json.forEach { item ->
+                listOf("displayBookName", "displayAuthor", "metadataEditedAt").forEach(item.asJsonObject::remove)
+            }
             File(directory, "readRecord.json").writeText(GSON.toJson(json))
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath, lanTransfer = true) }
             assertEquals(5, dao.all.size)
@@ -301,14 +342,14 @@ class ReadRecordAuthorIdentityTest {
         val name = "Unknown author ${UUID.randomUUID()}"
         val known = ReadRecord(deviceId = AppConst.androidId, bookName = name, author = "A",
             readTime = 2000, lastRead = 20, lastChapterTitle = "Known", lastChapterIndex = 2)
-        val unknown = known.copy(author = "", readTime = 7000, lastRead = 70,
+        val unknown = known.copy(author = "", displayAuthor = "", readTime = 7000, lastRead = 70,
             lastChapterTitle = "Newer unknown", lastChapterIndex = 7, lastChapterPos = 17)
         val remote = unknown.copy(deviceId = "remote", readTime = 11000)
         val remoteKnown = known.copy(deviceId = "remote", readTime = 5000, lastRead = 90,
             lastChapterTitle = "Newest remote", lastChapterIndex = 9)
-        val other = known.copy(author = "B", readTime = 3000)
-        val otherTitle = unknown.copy(bookName = "Different $name", readTime = 13000)
-        val combined = unknown.copy(author = combinedAuthor, readTime = 17000)
+        val other = known.copy(author = "B", displayAuthor = "B", readTime = 3000)
+        val otherTitle = unknown.copy(bookName = "Different $name", displayBookName = "Different $name", readTime = 13000)
+        val combined = unknown.copy(author = combinedAuthor, displayAuthor = combinedAuthor, readTime = 17000)
         val currentBook = Book(bookUrl = "unknown:$name", name = name, author = "A")
         try {
             dao.clear()
@@ -324,8 +365,8 @@ class ReadRecordAuthorIdentityTest {
             val expectedLocal = known.copy(readTime = 3000, lastRead = 100,
                 lastChapterTitle = "Reading now", lastChapterIndex = 10)
             val expectedRemote = remoteKnown
-            assertEquals(setOf(expectedLocal, expectedRemote, unknown.copy(resolvedAuthor = "A"),
-                remote.copy(resolvedAuthor = "A"), other, otherTitle, combined), dao.all.toSet())
+            assertEquals(setOf(expectedLocal, expectedRemote, unknown.copy(resolvedAuthor = "A", displayAuthor = "A"),
+                remote.copy(resolvedAuthor = "A", displayAuthor = "A"), other, otherTitle, combined), dao.all.toSet())
             assertEquals(total + 1000, dao.allTime)
             assertEquals(26000L, dao.allShow.single { it.bookName == name && it.author == "A" }.readTime)
             assertFalse(dao.allShow.any { it.bookName == name && it.author.isEmpty() })
@@ -358,7 +399,10 @@ class ReadRecordAuthorIdentityTest {
         fun restore() = runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath, lanTransfer = true) }
         try {
             val oldJson = GSON.toJsonTree(listOf(local, remote)).asJsonArray
-            oldJson.forEach { it.asJsonObject.remove("resolvedAuthor") }
+            oldJson.forEach { item ->
+                listOf("resolvedAuthor", "displayBookName", "displayAuthor", "metadataEditedAt")
+                    .forEach(item.asJsonObject::remove)
+            }
             archive.writeText(GSON.toJson(oldJson))
             dao.clear()
             restore()
@@ -560,7 +604,7 @@ class ReadRecordAuthorIdentityTest {
                             expected[creditedAuthor] = expected.getValue(creditedAuthor) + elapsed
                         }
                         assertEquals(first, dao.getRecord(first.deviceId, name, "A"))
-                        assertEquals(other, dao.getRecord(first.deviceId, name, "B"))
+                        assertEquals(other.withDisplayMetadata(), dao.getRecord(first.deviceId, name, "B"))
                     }
                     for ((author, total) in expected) {
                         assertEquals("${type.simpleName}: every interval survives", total,
@@ -731,6 +775,247 @@ class ReadRecordAuthorIdentityTest {
             release.countDown()
             gate.get(10, TimeUnit.SECONDS)
             globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+        }
+    }
+
+    @Test
+    fun editedMetadataSurvivesOldBackupsAndNewDeviceRowsWithoutChangingAccounts() = withDatabase { database ->
+        val dao = database.readRecordDao
+        val old = ReadRecord(deviceId = "phone", bookName = "Old", author = "A", readTime = 100, lastRead = 10)
+        val remote = old.copy(deviceId = "tablet", readTime = 200)
+        val other = ReadRecord(deviceId = "phone", bookName = "Old", author = "B", readTime = 900, lastRead = 1)
+        val target = ReadRecord(deviceId = "phone", bookName = "New", author = "", readTime = 400, lastRead = 5)
+        dao.insert(old, remote, other, target)
+        dao.renameBook("Old", "A", "New", "")
+        val edited = dao.all.toSet()
+        assertEquals(4, edited.size)
+        assertEquals(700L, dao.allShow.single { it.bookName == "New" }.readTime)
+        repeat(2) {
+            for (record in listOf(old, remote)) dao.insert(mergeRestoredReadRecord(
+                dao.getRecord(record.deviceId, record.bookName, record.author), record, record.deviceId == "phone"))
+            assertEquals(edited, dao.all.toSet())
+        }
+        dao.insert(old.copy(deviceId = "new-device", readTime = 50))
+        assertEquals(750L, dao.search("New").single().readTime)
+        assertEquals(other, dao.search("Old").single().let {
+            checkNotNull(dao.getRecord("phone", it.bookName, it.author))
+        })
+        val backup = GSON.toJson(dao.all)
+        dao.clear()
+        dao.insert(*GSON.fromJson(backup, Array<ReadRecord>::class.java))
+        assertEquals(750L, dao.allShow.single { it.bookName == "New" }.readTime)
+        assertEquals(setOf("New" to "", "Old" to "B"), runBlocking { dao.flowBooks().first().map { it.bookName to it.author }.toSet() })
+        dao.deleteByBook("New", "")
+        assertEquals(listOf(other), dao.all)
+    }
+
+    @Test
+    fun restoredBlankAuthorEditsStayWithTheirResolvedAuthorAcrossDevicesAndDeletion() {
+        val dao = appDb.readRecordDao
+        val saved = dao.all
+        val name = "Resolved metadata ${UUID.randomUUID()}"
+        val directory = File(context.cacheDir, "resolved-metadata-${UUID.randomUUID()}").apply { mkdirs() }
+        val first = ReadRecord(deviceId = "phone", bookName = name, resolvedAuthor = "A", readTime = 100, lastRead = 10)
+        val other = first.copy(deviceId = "tablet", resolvedAuthor = "B", readTime = 900)
+        val unknown = first.copy(deviceId = "unknown", resolvedAuthor = null, readTime = 50)
+        val newFirst = first.copy(deviceId = "new-phone", readTime = 17)
+        val newOther = other.copy(deviceId = "new-tablet", readTime = 19)
+        fun writeOldBackup(records: List<ReadRecord>) {
+            val json = GSON.toJsonTree(records).asJsonArray
+            json.forEach { item ->
+                listOf("displayBookName", "displayAuthor", "metadataEditedAt").forEach(item.asJsonObject::remove)
+            }
+            File(directory, "readRecord.json").writeText(GSON.toJson(json))
+        }
+        fun restore() = runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath, lanTransfer = true) }
+        try {
+            dao.clear()
+            writeOldBackup(listOf(first, other, unknown))
+            restore()
+            assertEquals(setOf("A", "B", ""), dao.allShow.map { it.author }.toSet())
+            dao.renameBook(name, "A", name, "Edited A")
+            val edited = checkNotNull(dao.getRecord(first.deviceId, name, ""))
+            writeOldBackup(listOf(first, other, unknown, newFirst, newOther))
+            repeat(2) {
+                restore()
+                assertEquals(edited, dao.getRecord(first.deviceId, name, ""))
+                assertEquals(other.withDisplayMetadata(), dao.getRecord(other.deviceId, name, ""))
+                assertEquals(unknown.withDisplayMetadata(), dao.getRecord(unknown.deviceId, name, ""))
+                assertEquals("Edited A", dao.getRecord(newFirst.deviceId, name, "")!!.displayAuthor)
+                assertEquals(newOther.withDisplayMetadata(), dao.getRecord(newOther.deviceId, name, ""))
+                assertEquals(mapOf("Edited A" to 117L, "B" to 919L, "" to 50L),
+                    dao.allShow.associate { it.author to it.readTime })
+            }
+            // The batched insert used by a full snapshot must isolate the same identities too.
+            val snapshot = dao.all.toTypedArray()
+            dao.clear()
+            dao.insert(*snapshot)
+            assertEquals(snapshot.toSet(), dao.all.toSet())
+            dao.deleteByBook(name, "Edited A")
+            assertEquals(listOf(other, unknown, newOther).map { it.withDisplayMetadata() }.toSet(), dao.all.toSet())
+            assertEquals(969L, dao.allTime)
+        } finally {
+            dao.clear()
+            dao.insert(*saved.toTypedArray())
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun savingBookMetadataDuringAudioPlaybackKeepsBothIntervalsAndTheLatestPosition() {
+        assertAudioMetadataSave(existingHistory = true, synchronizeMetadata = true)
+    }
+
+    @Test
+    fun savingBookMetadataDuringFirstAudioIntervalSynchronizesItsNewHistory() {
+        assertAudioMetadataSave(existingHistory = false, synchronizeMetadata = true)
+    }
+
+    @Test
+    fun savingBookMetadataWithoutSyncKeepsBothAudioIdentities() {
+        for (existingHistory in listOf(false, true)) {
+            assertAudioMetadataSave(existingHistory, synchronizeMetadata = false)
+        }
+    }
+
+    private fun assertAudioMetadataSave(existingHistory: Boolean, synchronizeMetadata: Boolean) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val dao = appDb.readRecordDao
+        globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+        val saved = dao.all
+        val enabled = AppConfig.enableReadRecord
+        val previousBook = AudioPlay.book
+        val previousIndex = AudioPlay.durChapterIndex
+        val previousPos = AudioPlay.durChapterPos
+        val timer = AudioPlay.javaClass.getDeclaredField("readTimeTracker").apply { isAccessible = true }.get(AudioPlay)
+        val fields = listOf("record", "activeRecord", "startedAt")
+            .map { timer.javaClass.getDeclaredField(it).apply { isAccessible = true } }
+        val previousTimer = fields.map { it.get(timer) }
+        val playing = AudioPlayService::class.java.getDeclaredField("isPlaying").apply { isAccessible = true }
+        val wasPlaying = playing.getBoolean(null)
+        val oldBook = Book(bookUrl = "metadata:audio:${UUID.randomUUID()}", name = "Audio ${UUID.randomUUID()}", author = "A",
+            durChapterIndex = 1, durChapterPos = 10, durChapterTitle = "Before edit")
+        val renamed = oldBook.copy(name = "Renamed ${oldBook.name}", author = "B")
+        val model = BookInfoEditViewModel(context.applicationContext as Application)
+        val completed = CountDownLatch(1)
+        val observer = Observer<Boolean> { if (it == true) completed.countDown() }
+        try {
+            dao.clear()
+            val initial = ReadRecord(deviceId = AppConst.androidId, bookName = oldBook.name, author = oldBook.author,
+                readTime = if (existingHistory) 100 else 0, lastRead = 1)
+            if (existingHistory) dao.insert(initial)
+            appDb.bookDao.insert(oldBook)
+            AppConfig.enableReadRecord = true
+            fields[0].set(timer, initial.copy())
+            fields[1].set(timer, null)
+            fields[2].set(timer, null)
+            AudioPlay.book = oldBook.copy()
+            AudioPlay.durChapterIndex = 3
+            AudioPlay.durChapterPos = 300
+            playing.setBoolean(null, true)
+            AudioPlay.markReadTimeStart()
+            fields[2].set(timer, android.os.SystemClock.elapsedRealtime() - 1000)
+            instrumentation.runOnMainSync {
+                model.saved.observeForever(observer)
+                model.saveBook(oldBook, renamed, synchronizeMetadata)
+            }
+            assertTrue("Book metadata save must finish", completed.await(10, TimeUnit.SECONDS))
+            val firstInterval = checkNotNull(dao.getRecord(AppConst.androidId, oldBook.name, oldBook.author))
+            assertTrue("The active old interval must be settled before save completes",
+                firstInterval.readTime >= initial.readTime + 1000)
+            assertEquals(3, firstInterval.lastChapterIndex)
+            assertEquals(300, firstInterval.lastChapterPos)
+            assertEquals(if (synchronizeMetadata) renamed.name else oldBook.name, firstInterval.displayBookName)
+            assertEquals(if (synchronizeMetadata) renamed.author else oldBook.author, firstInterval.displayAuthor)
+            android.os.SystemClock.sleep(20)
+            AudioPlay.book!!.durChapterTitle = "After edit"
+            AudioPlay.durChapterIndex = 9
+            AudioPlay.durChapterPos = 900
+            fields[2].set(timer, android.os.SystemClock.elapsedRealtime() - 500)
+            playing.setBoolean(null, false)
+            AudioPlay.upReadTime()
+            globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+            val secondInterval = checkNotNull(dao.getRecord(AppConst.androidId, renamed.name, renamed.author))
+            assertTrue("Playback must keep counting after the edit", secondInterval.readTime >= 500)
+            val history = dao.allShow
+            assertEquals(if (synchronizeMetadata) 1 else 2, history.size)
+            assertEquals(firstInterval.readTime + secondInterval.readTime, history.sumOf { it.readTime })
+            val shown = history.single { it.bookName == renamed.name && it.author == renamed.author }
+            assertEquals(if (synchronizeMetadata) firstInterval.readTime + secondInterval.readTime else secondInterval.readTime,
+                shown.readTime)
+            assertEquals("After edit", shown.lastChapterTitle)
+            assertEquals(9, shown.lastChapterIndex)
+            assertEquals(900, shown.lastChapterPos)
+            assertEquals(renamed.name, appDb.bookDao.getBook(oldBook.bookUrl)!!.name)
+        } finally {
+            instrumentation.runOnMainSync { model.saved.removeObserver(observer) }
+            runBlocking { model.viewModelScope.coroutineContext[Job]?.cancelAndJoin() }
+            globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+            AudioPlay.book = previousBook
+            AudioPlay.durChapterIndex = previousIndex
+            AudioPlay.durChapterPos = previousPos
+            fields.forEachIndexed { index, field -> field.set(timer, previousTimer[index]) }
+            playing.setBoolean(null, wasPlaying)
+            appDb.bookDao.delete(oldBook)
+            dao.clear()
+            dao.insert(*saved.toTypedArray())
+            AppConfig.enableReadRecord = enabled
+        }
+    }
+
+    @Test
+    fun everyReaderPreservesAnEditMadeWhileItsIntervalIsQueued() {
+        val dao = appDb.readRecordDao
+        val saved = dao.all
+        val enabled = AppConfig.enableReadRecord
+        val name = "Metadata queue ${UUID.randomUUID()}"
+        try {
+            AppConfig.enableReadRecord = true
+            for (model in listOf(ReadBook, ReadManga, AudioPlay)) {
+                globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+                val type = model.javaClass
+                val bookField = type.getDeclaredField("book").apply { isAccessible = true }
+                val previousBook = bookField.get(model)
+                val audio = model === AudioPlay
+                val timer = if (audio) type.getDeclaredField("readTimeTracker").apply { isAccessible = true }.get(model) else model
+                val fields = (if (audio) listOf("record", "activeRecord", "startedAt") else listOf("readRecord", "readStartTime"))
+                    .map { timer.javaClass.getDeclaredField(it).apply { isAccessible = true } }
+                val previous = fields.map { it.get(timer) }
+                try {
+                    dao.clear()
+                    dao.insert(ReadRecord(deviceId = AppConst.androidId, bookName = name, author = "A", readTime = 100))
+                    val book = Book(bookUrl = "metadata:queued", name = name, author = "A")
+                    withReadRecordWritesPaused {
+                        if (audio) {
+                            AudioPlay.replaceBook(book)
+                            AudioPlay.markReadTimeStart()
+                            fields[2].set(timer, android.os.SystemClock.elapsedRealtime() - 1000)
+                            AudioPlay.upReadTime()
+                        } else {
+                            bookField.set(model, book)
+                            type.getDeclaredMethod("resetReadRecord", Book::class.java).apply { isAccessible = true }.invoke(model, book)
+                            fields[1].setLong(timer, System.currentTimeMillis() - 1000)
+                            type.getDeclaredMethod("upReadTime").invoke(model)
+                        }
+                        assertEquals(100L, dao.allTime)
+                        dao.renameBook(name, "A", "Renamed", "")
+                    }
+                    val record = checkNotNull(dao.getRecord(AppConst.androidId, name, "A"))
+                    assertTrue("${type.simpleName}: interval was added", record.readTime >= 1100)
+                    assertEquals("Renamed", record.displayBookName)
+                    assertEquals("", record.displayAuthor)
+                    assertEquals(1, dao.all.size)
+                    assertNull(dao.getRecord(AppConst.androidId, "Renamed", ""))
+                } finally {
+                    globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+                    bookField.set(model, previousBook)
+                    fields.forEachIndexed { index, field -> field.set(timer, previous[index]) }
+                }
+            }
+        } finally {
+            dao.clear()
+            dao.insert(*saved.toTypedArray())
+            AppConfig.enableReadRecord = enabled
         }
     }
 
