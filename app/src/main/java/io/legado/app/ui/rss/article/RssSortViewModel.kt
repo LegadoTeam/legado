@@ -82,6 +82,19 @@ class RssSortViewModel(application: Application) : BaseViewModel(application) {
         return appDb.rssReadRecordDao.countRecords
     }
 
+    fun isRecordEnabled(origin: String?): Boolean {
+        return origin?.let { appDb.rssSourceDao.getByKey(it)?.enableReadRecord } ?: true
+    }
+
+    fun setRecordEnabled(origin: String?, enabled: Boolean) {
+        origin?.let { key ->
+            appDb.rssSourceDao.getByKey(key)?.let { source ->
+                source.enableReadRecord = enabled
+                appDb.rssSourceDao.update(source)
+            }
+        }
+    }
+
     fun deleteAllRecord(origin: String? = null) {
         execute {
             origin?.let {

@@ -203,7 +203,9 @@ open class RssJsExtensions(
                         origin = sourceUrl,
                         readTime = System.currentTimeMillis()
                     )
-                    appDb.rssReadRecordDao.insertRecord(rssReadRecord) //留下历史记录
+                    if (toSource.enableReadRecord) {
+                        appDb.rssReadRecordDao.insertRecord(rssReadRecord) //留下历史记录
+                    }
                     withContext(Main) {
                         ReadRssActivity.start(
                             activity,

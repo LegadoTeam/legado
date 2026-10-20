@@ -43,6 +43,8 @@ class ReadRecordDialog(private val origin: String? = null) : BaseDialogFragment(
             toolBar.setTitle(R.string.read_record)
             toolBar.inflateMenu(R.menu.rss_read_record)
             toolBar.menu.applyTint(requireContext())
+            toolBar.menu.findItem(R.id.menu_more)?.isVisible = !origin.isNullOrBlank()
+            toolBar.menu.findItem(R.id.menu_enable_record)?.isChecked = viewModel.isRecordEnabled(origin)
             toolBar.setOnMenuItemClickListener(this@ReadRecordDialog)
             recyclerView.layoutManager = LinearLayoutManager(requireContext())
             recyclerView.adapter = adapter
@@ -67,6 +69,10 @@ class ReadRecordDialog(private val origin: String? = null) : BaseDialogFragment(
                         adapter.clearItems()
                     }
                 }
+            }
+
+            R.id.menu_enable_record -> {
+                viewModel.setRecordEnabled(origin, !item.isChecked)
             }
         }
         return true

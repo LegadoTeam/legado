@@ -47,7 +47,10 @@ object ReadRss {
 
     fun readRss(fragment: Fragment, rssArticle: RssArticle,rssSource: RssSource? = null) {
         val rssReadRecord = rssArticle.toRecord()
-        appDb.rssReadRecordDao.insertRecord(rssReadRecord)
+        val source = appDb.rssSourceDao.getByKey(rssArticle.origin) ?: rssSource
+        if (source?.enableReadRecord != false) {
+            appDb.rssReadRecordDao.insertRecord(rssReadRecord)
+        }
         val type = rssArticle.type
         if (type == 0) {
             //web网页
@@ -69,7 +72,7 @@ object ReadRss {
             }
             return
         }
-        readNoHtml(fragment, rssArticle, rssSource, type)
+        readNoHtml(fragment, rssArticle, source, type)
     }
 
     private fun readNoHtml(fragment: Fragment, rssArticle: RssArticle, rssSource: RssSource? = null, type: Int) {
