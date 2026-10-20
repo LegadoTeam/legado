@@ -308,7 +308,9 @@ class ExploreCategoriesTest {
         assertTrue("Slow category request started", slowStarted.await(15, TimeUnit.SECONDS))
         scenario!!.onActivity { rows(it)[1].getTabAt(0)!!.select() }
         awaitActivity {
-            rows(it).map { tabs -> tabs.selectedTabPosition } == listOf(-1, 0, -1)
+            rows(it).map { tabs -> tabs.selectedTabPosition } == listOf(-1, 0, -1) &&
+                rows(it).flatMap { tabs -> (0 until tabs.tabCount).mapNotNull { tabs.getTabAt(it)?.view } }
+                    .count { view -> view.isSelected || view.isActivated } == 1
         }
         awaitActivity { it.model.getLoadedBooks().firstOrNull()?.name?.startsWith("Category 8") == true }
         releaseSlow.countDown()
@@ -328,8 +330,26 @@ class ExploreCategoriesTest {
             assertEquals(40, it.model.getLoadedBooks().size)
             assertEquals(40, (it.ui.recyclerView.adapter as ExploreShowAdapter).getActualItemCount())
             assertEquals(listOf(-1, 0, -1), rows(it).map { tabs -> tabs.selectedTabPosition })
+            assertEquals(1, rows(it).flatMap { tabs ->
+                (0 until tabs.tabCount).mapNotNull { tabs.getTabAt(it)?.view }
+            }.count { view -> view.isSelected || view.isActivated })
         }
         screenshot("explore-category-restored")
+    }
+
+    @Test
+    fun categorySwitchKeepsOnlyTheLastRowSelected() {
+        scenario!!.onActivity { toggleCategories(it) }
+        awaitActivity { it.ui.categoriesContainer.childCount == 3 }
+        scenario!!.onActivity {
+            rows(it)[1].getTabAt(0)!!.select()
+            rows(it)[2].getTabAt(0)!!.select()
+        }
+        awaitActivity {
+            rows(it).map { tabs -> tabs.selectedTabPosition } == listOf(-1, -1, 0) &&
+                rows(it).flatMap { tabs -> (0 until tabs.tabCount).mapNotNull { tabs.getTabAt(it)?.view } }
+                    .count { view -> view.isSelected || view.isActivated } == 1
+        }
     }
 
     @Test

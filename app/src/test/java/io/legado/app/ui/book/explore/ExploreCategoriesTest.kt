@@ -63,7 +63,13 @@ class ExploreCategoriesTest {
         assertTrue(activity.contains("minimumHeight = 40.dpToPx()"))
         assertTrue(activity.contains("setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)"))
         assertTrue(activity.contains("clearCategorySelection()"))
+        assertTrue(activity.contains("if (viewModel.categoryData.value == selected)"))
+        assertTrue(activity.contains("isSelected = false"))
+        assertTrue(activity.contains("isActivated = false"))
         assertTrue(activity.contains("tab.parent?.post"))
+        val deferred = activity.indexOf("tab.parent?.post")
+        assertTrue(activity.indexOf("clearCategorySelection()", deferred) <
+            activity.indexOf("tab.select()", deferred))
         assertTrue(activity.contains("viewModel.showPage(1)"))
         assertTrue(source("ui/book/explore/ExploreShowViewModel.kt").contains("fun showPage(page: Int)"))
     }

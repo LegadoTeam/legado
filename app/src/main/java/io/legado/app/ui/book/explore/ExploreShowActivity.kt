@@ -215,13 +215,24 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
         val selected = viewModel.categoryData.value
         categoryTabs.firstOrNull { it.first == selected }?.second?.let { tab ->
             tab.parent?.post {
-                if (viewModel.categoryData.value == selected) tab.select()
+                if (viewModel.categoryData.value == selected) {
+                    clearCategorySelection()
+                    tab.select()
+                }
             }
         }
     }
 
     private fun clearCategorySelection() {
-        categoryTabs.mapNotNull { it.second.parent }.distinct().forEach { it.selectTab(null) }
+        categoryTabs.mapNotNull { it.second.parent }.distinct().forEach { tabs ->
+            for (index in 0 until tabs.tabCount) {
+                tabs.getTabAt(index)?.view?.apply {
+                    isSelected = false
+                    isActivated = false
+                }
+            }
+            tabs.selectTab(null)
+        }
     }
 
     private fun updateTopHeader(page: Int) {
