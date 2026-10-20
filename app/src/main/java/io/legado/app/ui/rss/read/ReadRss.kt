@@ -10,6 +10,7 @@ import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssReadRecord
 import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.ContentEmptyException
+import io.legado.app.help.config.AppConfig
 import io.legado.app.model.rss.Rss
 import io.legado.app.ui.video.VideoPlayerActivity
 import io.legado.app.ui.widget.dialog.PhotoDialog
@@ -47,8 +48,7 @@ object ReadRss {
 
     fun readRss(fragment: Fragment, rssArticle: RssArticle,rssSource: RssSource? = null) {
         val rssReadRecord = rssArticle.toRecord()
-        val source = appDb.rssSourceDao.getByKey(rssArticle.origin) ?: rssSource
-        if (source?.enableReadRecord != false) {
+        if (AppConfig.enableRssReadRecord) {
             appDb.rssReadRecordDao.insertRecord(rssReadRecord)
         }
         val type = rssArticle.type
@@ -72,7 +72,7 @@ object ReadRss {
             }
             return
         }
-        readNoHtml(fragment, rssArticle, source, type)
+        readNoHtml(fragment, rssArticle, rssSource, type)
     }
 
     private fun readNoHtml(fragment: Fragment, rssArticle: RssArticle, rssSource: RssSource? = null, type: Int) {

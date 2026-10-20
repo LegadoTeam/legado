@@ -601,6 +601,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.enableReadRecord, value)
         }
 
+    var enableRssReadRecord: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.enableRssReadRecord, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.enableRssReadRecord, value)
+        }
+
     val autoChangeSource: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.autoChangeSource, true)
 

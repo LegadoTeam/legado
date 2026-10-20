@@ -16,6 +16,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.RssReadRecord
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.ItemRssReadRecordBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.rss.read.ReadRss
@@ -43,8 +44,8 @@ class ReadRecordDialog(private val origin: String? = null) : BaseDialogFragment(
             toolBar.setTitle(R.string.read_record)
             toolBar.inflateMenu(R.menu.rss_read_record)
             toolBar.menu.applyTint(requireContext())
-            toolBar.menu.findItem(R.id.menu_more)?.isVisible = !origin.isNullOrBlank()
-            toolBar.menu.findItem(R.id.menu_enable_record)?.isChecked = viewModel.isRecordEnabled(origin)
+            toolBar.menu.findItem(R.id.menu_more)?.isVisible = origin.isNullOrBlank()
+            toolBar.menu.findItem(R.id.menu_enable_record)?.isChecked = AppConfig.enableRssReadRecord
             toolBar.setOnMenuItemClickListener(this@ReadRecordDialog)
             recyclerView.layoutManager = LinearLayoutManager(requireContext())
             recyclerView.adapter = adapter
@@ -72,7 +73,7 @@ class ReadRecordDialog(private val origin: String? = null) : BaseDialogFragment(
             }
 
             R.id.menu_enable_record -> {
-                viewModel.setRecordEnabled(origin, !item.isChecked)
+                AppConfig.enableRssReadRecord = !item.isChecked
             }
         }
         return true
