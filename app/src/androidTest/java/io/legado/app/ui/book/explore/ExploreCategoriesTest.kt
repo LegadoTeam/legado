@@ -307,8 +307,8 @@ class ExploreCategoriesTest {
         scenario!!.onActivity { rows(it)[0].getTabAt(1)!!.select() }
         assertTrue("Slow category request started", slowStarted.await(15, TimeUnit.SECONDS))
         scenario!!.onActivity { rows(it)[1].getTabAt(0)!!.select() }
-        scenario!!.onActivity {
-            assertEquals(listOf(-1, 0, -1), rows(it).map { tabs -> tabs.selectedTabPosition })
+        awaitActivity {
+            rows(it).map { tabs -> tabs.selectedTabPosition } == listOf(-1, 0, -1)
         }
         awaitActivity { it.model.getLoadedBooks().firstOrNull()?.name?.startsWith("Category 8") == true }
         releaseSlow.countDown()
