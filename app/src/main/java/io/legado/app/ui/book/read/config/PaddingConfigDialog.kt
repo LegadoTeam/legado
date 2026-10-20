@@ -191,12 +191,14 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
         val large = AppConfig.readPaddingLargeControls
         val buttonSize = (if (large) 48 else 30).dpToPx()
         val iconSize = (if (large) 48 else 26).dpToPx()
-        val rowPadding = (48.dpToPx() - buttonSize) / 2
+        val height = (if (large) 48 else 40).dpToPx()
+        val rowPadding = (height - buttonSize) / 2
         arrayOf(dsbTop, dsbBottom, dsbLeft, dsbRight).forEach {
             it.setAdjustButtonSize(buttonSize, iconSize)
+            it.repeatIntervalMillis = if (large) 150L else 100L
+            it.layoutParams = it.layoutParams.apply { this.height = height }
             it.setPadding(0, rowPadding, 0, rowPadding)
         }
-        val height = (if (large) 48 else 40).dpToPx()
         regionButtons().forEach { button ->
             button.layoutParams = button.layoutParams.apply { this.height = height }
         }

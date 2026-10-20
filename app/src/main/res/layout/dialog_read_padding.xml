@@ -104,7 +104,7 @@
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_top"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="400"
             app:adjustButtonSize="30dp"
@@ -115,7 +115,7 @@
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_bottom"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="400"
             app:adjustButtonSize="30dp"
@@ -126,7 +126,7 @@
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_left"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="100"
             app:adjustButtonSize="30dp"
@@ -137,7 +137,7 @@
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_right"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="100"
             app:adjustButtonSize="30dp"

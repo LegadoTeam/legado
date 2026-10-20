@@ -3,7 +3,9 @@ package io.legado.app.ui.book.read
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.ImageView
 import android.widget.SeekBar
 import androidx.test.core.app.ActivityScenario
@@ -27,6 +29,9 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class ReadPaddingControlsTest {
@@ -64,7 +69,10 @@ class ReadPaddingControlsTest {
                     compactTrackWidth = verifyControls(root, 30, 26, 40)
                     assertTrue("The slider must have more width than both adjust buttons",
                         compactTrackWidth > 60.dpToPx())
-                    assertTrue(root.findViewById<View>(R.id.btn_region_header).performLongClick())
+                }
+                val compactInterval = verifyRepeatsStop(scenario, MotionEvent.ACTION_UP)
+                scenario.onActivity {
+                    assertTrue(panel(it).requireView().findViewById<View>(R.id.btn_region_header).performLongClick())
                 }
                 awaitSize(scenario, 48)
                 scenario.onActivity { activity ->
@@ -73,8 +81,13 @@ class ReadPaddingControlsTest {
                     assertEquals(2 * (48.dpToPx() - 30.dpToPx()),
                         compactTrackWidth - verifyControls(root, 48, 48, 48))
                     assertTrue(root.findViewById<View>(R.id.btn_region_body).isSelected)
-                    assertTrue(root.findViewById<View>(R.id.btn_region_footer).performLongClick())
                 }
+                val largeInterval = verifyRepeatsStop(scenario, MotionEvent.ACTION_CANCEL)
+                assertTrue("Large controls repeat more slowly: $compactInterval / $largeInterval ms",
+                    largeInterval >= compactInterval + 25)
+                File(context.getExternalFilesDir("ui-regression"), "padding-repeat-timing.txt")
+                    .writeText("Median repeat intervals: compact=${compactInterval}ms large=${largeInterval}ms\n")
+                verifyRepeatsStop(scenario, switchRegion = R.id.btn_region_footer)
                 awaitSize(scenario, 30)
                 screenshot("padding-compact")
                 scenario.onActivity { activity ->
@@ -107,7 +120,8 @@ class ReadPaddingControlsTest {
     private fun verifyControls(root: View, buttonSize: Int, iconSize: Int, tabHeight: Int): Int {
         for (id in listOf(R.id.dsb_top, R.id.dsb_bottom, R.id.dsb_left, R.id.dsb_right)) {
             val slider = root.findViewById<DetailSeekBar>(id)
-            assertEquals(48.dpToPx(), slider.height)
+            assertEquals(tabHeight.dpToPx(), slider.height)
+            assertEquals(if (buttonSize == 48) 150L else 100L, slider.repeatIntervalMillis)
             for (buttonId in listOf(R.id.iv_seek_plus, R.id.iv_seek_reduce)) {
                 val button = slider.findViewById<ImageView>(buttonId)
                 assertEquals(buttonSize.dpToPx(), button.width)
@@ -128,6 +142,61 @@ class ReadPaddingControlsTest {
         assertTrue(header.right < body.left && body.right < footer.left)
         assertEquals(header.top + header.height / 2, reset.top + reset.height / 2)
         return root.findViewById<DetailSeekBar>(R.id.dsb_top).findViewById<SeekBar>(R.id.seek_bar).width
+    }
+
+    private fun verifyRepeatsStop(
+        scenario: ActivityScenario<ReadBookActivity>,
+        endAction: Int = MotionEvent.ACTION_CANCEL,
+        switchRegion: Int? = null,
+    ): Long {
+        val samples = CopyOnWriteArrayList<Long>()
+        val repeated = CountDownLatch(6)
+        lateinit var slider: DetailSeekBar
+        lateinit var button: View
+        var originalCallback: ((Int) -> Unit)? = null
+        var originalProgress = 0
+        var downTime = 0L
+        var expectedInterval = 0L
+        fun dispatch(action: Int) {
+            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                button.width / 2f, button.height / 2f, 0)
+            try { assertTrue(button.dispatchTouchEvent(event)) } finally { event.recycle() }
+        }
+        scenario.onActivity {
+            slider = panel(it).requireView().findViewById(R.id.dsb_top)
+            button = slider.findViewById(R.id.iv_seek_plus)
+            originalCallback = slider.onChanged
+            originalProgress = slider.progress
+            expectedInterval = slider.repeatIntervalMillis
+            slider.onChanged = {
+                samples += SystemClock.uptimeMillis()
+                repeated.countDown()
+            }
+            downTime = SystemClock.uptimeMillis()
+            dispatch(MotionEvent.ACTION_DOWN)
+        }
+        try {
+            assertTrue("Holding the actual button must repeat", repeated.await(5, TimeUnit.SECONDS))
+            var stoppedCount = 0
+            scenario.onActivity {
+                if (switchRegion == null) dispatch(endAction)
+                else assertTrue(panel(it).requireView().findViewById<View>(switchRegion).performLongClick())
+                stoppedCount = samples.size
+            }
+            SystemClock.sleep(350)
+            scenario.onActivity { assertEquals("Release, cancel and mode changes must stop repeats", stoppedCount, samples.size) }
+            assertTrue("The initial long press delay must be preserved",
+                samples.first() - downTime >= ViewConfiguration.getLongPressTimeout() + 90L)
+            val gaps = samples.zipWithNext { first, second -> second - first }
+            assertTrue("Repeats must respect the configured interval: $gaps", gaps.all { it >= expectedInterval - 5 })
+            return gaps.sorted()[gaps.size / 2]
+        } finally {
+            scenario.onActivity {
+                dispatch(MotionEvent.ACTION_CANCEL)
+                slider.onChanged = originalCallback
+                slider.progress = originalProgress
+            }
+        }
     }
 
     private fun panel(activity: ReadBookActivity) = activity.supportFragmentManager

@@ -30,6 +30,13 @@ class DetailSeekBar @JvmOverloads constructor(
         ViewDetailSeekBarBinding.inflate(LayoutInflater.from(context), this, true)
     private val isBottomBackground: Boolean
     private val repeatOnLongPress: Boolean
+    private val repeatStops = mutableListOf<() -> Unit>()
+
+    var repeatIntervalMillis: Long = 100L
+        set(value) {
+            stopRepeating()
+            field = value.coerceAtLeast(1L)
+        }
 
     var valueFormat: ((progress: Int) -> String)? = null
     var onChanged: ((progress: Int) -> Unit)? = null
@@ -81,6 +88,7 @@ class DetailSeekBar @JvmOverloads constructor(
     }
 
     fun setAdjustButtonSize(size: Int, iconSize: Int = size) {
+        stopRepeating()
         listOf(binding.ivSeekPlus, binding.ivSeekReduce).forEach { button ->
             button.layoutParams = button.layoutParams.apply {
                 width = size
@@ -89,6 +97,15 @@ class DetailSeekBar @JvmOverloads constructor(
             val padding = ((size - iconSize) / 2).coerceAtLeast(0)
             button.setPadding(padding, padding, padding, padding)
         }
+    }
+
+    private fun stopRepeating() {
+        repeatStops.forEach { it.invoke() }
+    }
+
+    override fun onDetachedFromWindow() {
+        stopRepeating()
+        super.onDetachedFromWindow()
     }
 
     private fun bindAdjustButton(button: View, delta: Int) {
@@ -105,20 +122,23 @@ class DetailSeekBar @JvmOverloads constructor(
             override fun run() {
                 if (!pressed) return
                 adjust()
-                button.postDelayed(this, REPEAT_INTERVAL_MILLIS)
+                button.postDelayed(this, repeatIntervalMillis)
             }
         }
+        val stop: () -> Unit = {
+            pressed = false
+            button.removeCallbacks(repeat)
+            button.cancelLongPress()
+        }
+        repeatStops += stop
         button.setOnLongClickListener {
-            button.postDelayed(repeat, REPEAT_INTERVAL_MILLIS)
+            button.postDelayed(repeat, FIRST_REPEAT_DELAY_MILLIS)
             true
         }
         button.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> pressed = true
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    pressed = false
-                    button.removeCallbacks(repeat)
-                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stop()
             }
             false
         }
@@ -173,7 +193,7 @@ class DetailSeekBar @JvmOverloads constructor(
     }
 
     private companion object {
-        const val REPEAT_INTERVAL_MILLIS = 100L
+        const val FIRST_REPEAT_DELAY_MILLIS = 100L
         const val STATE_SUPER = "superState"
         const val STATE_PROGRESS = "progress"
     }

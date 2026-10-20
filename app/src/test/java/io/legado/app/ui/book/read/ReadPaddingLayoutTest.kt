@@ -45,7 +45,7 @@ class ReadPaddingLayoutTest {
         val document = readPaddingLayout()
         (verticalPaddingIds + horizontalPaddingIds).forEach { id ->
             val slider = document.findElementById(id)
-            assertEquals("48dp", slider.androidAttribute("layout_height"))
+            assertEquals("40dp", slider.androidAttribute("layout_height"))
             assertEquals("30dp", slider.appAttribute("adjustButtonSize"))
             assertEquals("26dp", slider.appAttribute("adjustButtonIconSize"))
             assertEquals("true", slider.appAttribute("repeatOnLongPress"))
