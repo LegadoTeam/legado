@@ -54,9 +54,12 @@ class DetailSeekBar @JvmOverloads constructor(
             typedArray.getBoolean(R.styleable.DetailSeekBar_isBottomBackground, false)
         repeatOnLongPress =
             typedArray.getBoolean(R.styleable.DetailSeekBar_repeatOnLongPress, false)
-        typedArray.getDimensionPixelSize(R.styleable.DetailSeekBar_adjustButtonSize, 0)
-            .takeIf { it > 0 }
-            ?.let(::setAdjustButtonSize)
+        val buttonSize = typedArray.getDimensionPixelSize(R.styleable.DetailSeekBar_adjustButtonSize, 0)
+        if (buttonSize > 0) {
+            setAdjustButtonSize(buttonSize, typedArray.getDimensionPixelSize(
+                R.styleable.DetailSeekBar_adjustButtonIconSize, buttonSize
+            ))
+        }
         val title = typedArray.getText(R.styleable.DetailSeekBar_title)
         binding.tvSeekTitle.apply {
             text = title
@@ -77,12 +80,14 @@ class DetailSeekBar @JvmOverloads constructor(
         binding.seekBar.setOnSeekBarChangeListener(this)
     }
 
-    private fun setAdjustButtonSize(size: Int) {
+    fun setAdjustButtonSize(size: Int, iconSize: Int = size) {
         listOf(binding.ivSeekPlus, binding.ivSeekReduce).forEach { button ->
             button.layoutParams = button.layoutParams.apply {
                 width = size
                 height = size
             }
+            val padding = ((size - iconSize) / 2).coerceAtLeast(0)
+            button.setPadding(padding, padding, padding, padding)
         }
     }
 

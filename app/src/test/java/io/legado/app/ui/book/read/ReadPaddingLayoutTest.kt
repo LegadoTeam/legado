@@ -41,31 +41,32 @@ class ReadPaddingLayoutTest {
     }
 
     @Test
-    fun `padding sliders use spacious repeatable controls`() {
+    fun `padding sliders keep compact controls and long press`() {
         val document = readPaddingLayout()
         (verticalPaddingIds + horizontalPaddingIds).forEach { id ->
             val slider = document.findElementById(id)
             assertEquals("48dp", slider.androidAttribute("layout_height"))
-            assertEquals("48dp", slider.appAttribute("adjustButtonSize"))
+            assertEquals("30dp", slider.appAttribute("adjustButtonSize"))
+            assertEquals("26dp", slider.appAttribute("adjustButtonIconSize"))
             assertEquals("true", slider.appAttribute("repeatOnLongPress"))
         }
     }
 
     @Test
-    fun `region controls are equal and touch sized`() {
+    fun `region controls remain equal and aligned with reset`() {
         val document = readPaddingLayout()
         regionButtonIds.forEach { id ->
             val button = document.findElementById(id)
             assertEquals("0dp", button.androidAttribute("layout_width"))
             assertEquals("1", button.androidAttribute("layout_weight"))
-            assertEquals("48dp", button.androidAttribute("layout_height"))
+            assertEquals("40dp", button.androidAttribute("layout_height"))
             assertEquals("true", button.androidAttribute("clickable"))
             assertEquals("true", button.androidAttribute("focusable"))
         }
 
         val reset = document.findElementById("@+id/iv_reset")
-        assertEquals("48dp", reset.androidAttribute("layout_width"))
-        assertEquals("48dp", reset.androidAttribute("layout_height"))
+        assertEquals("40dp", reset.androidAttribute("layout_width"))
+        assertEquals("40dp", reset.androidAttribute("layout_height"))
         assertEquals("@string/restore_default", reset.androidAttribute("contentDescription"))
     }
 

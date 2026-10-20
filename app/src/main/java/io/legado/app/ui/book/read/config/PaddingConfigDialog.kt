@@ -15,6 +15,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.EventBus
 import io.legado.app.databinding.DialogReadPaddingBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.bottomBackground
@@ -108,6 +109,7 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
         swShowLine.setTextColor(textColor)
         ivReset.setColorFilter(textColor)
         TooltipCompat.setTooltipText(ivReset, getString(R.string.restore_default))
+        updateControlSizes()
 
         arrayOf(dsbTop, dsbBottom, dsbLeft, dsbRight).forEach { seekBar ->
             seekBar.onTrackingStart = { startTracking() }
@@ -125,6 +127,13 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
         btnRegionHeader.setOnClickListener { bindRegion(Region.HEADER) }
         btnRegionBody.setOnClickListener { bindRegion(Region.BODY) }
         btnRegionFooter.setOnClickListener { bindRegion(Region.FOOTER) }
+        regionButtons().forEach { button ->
+            button.setOnLongClickListener {
+                AppConfig.readPaddingLargeControls = !AppConfig.readPaddingLargeControls
+                updateControlSizes()
+                true
+            }
+        }
         ivReset.setOnClickListener { askResetRegion() }
         swLockLr.setOnUserCheckedChangeListener { isChecked ->
             finishPendingBodyEdit()
@@ -176,6 +185,27 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
             button.backgroundTintList = null
             button.background = regionBackground(selected)
         }
+    }
+
+    private fun updateControlSizes() = binding.run {
+        val large = AppConfig.readPaddingLargeControls
+        val buttonSize = (if (large) 48 else 30).dpToPx()
+        val iconSize = (if (large) 48 else 26).dpToPx()
+        val rowPadding = (48.dpToPx() - buttonSize) / 2
+        arrayOf(dsbTop, dsbBottom, dsbLeft, dsbRight).forEach {
+            it.setAdjustButtonSize(buttonSize, iconSize)
+            it.setPadding(0, rowPadding, 0, rowPadding)
+        }
+        val height = (if (large) 48 else 40).dpToPx()
+        regionButtons().forEach { button ->
+            button.layoutParams = button.layoutParams.apply { this.height = height }
+        }
+        ivReset.layoutParams = ivReset.layoutParams.apply {
+            width = height
+            this.height = height
+        }
+        val padding = (height - 24.dpToPx()) / 2
+        ivReset.setPadding(padding, padding, padding, padding)
     }
 
     private fun regionBackground(selected: Boolean) = GradientDrawable().apply {

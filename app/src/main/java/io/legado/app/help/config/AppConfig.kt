@@ -72,6 +72,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
     var showBoardLine = appCtx.getPrefInt(PreferKey.showBoardLine, 1).coerceIn(1, 5)
     var adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
+    var readPaddingLargeControls: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.readPaddingLargeControls, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.readPaddingLargeControls, value)
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (key) {

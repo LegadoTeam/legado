@@ -80,6 +80,7 @@
         <attr name="max" format="integer" />
         <attr name="isBottomBackground" />
         <attr name="adjustButtonSize" format="dimension" />
+        <attr name="adjustButtonIconSize" format="dimension" />
         <attr name="repeatOnLongPress" format="boolean" />
     </declare-styleable>
 

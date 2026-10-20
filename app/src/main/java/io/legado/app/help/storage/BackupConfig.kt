@@ -128,6 +128,7 @@ object BackupConfig {
         PreferKey.autoReadSpeed,
         PreferKey.readerMenuConfig,
         PreferKey.showReadTitleChapterNameOnly,
+        PreferKey.readPaddingLargeControls,
         PreferKey.clickActionTL,
         PreferKey.clickActionTC,
         PreferKey.clickActionTR,
