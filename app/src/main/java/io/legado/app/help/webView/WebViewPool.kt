@@ -47,7 +47,7 @@ object WebViewPool {
             forBackground -> idlePool.indexOfFirst {
                 !it.realWebView.hasBeenAttachedToWindow
             }.takeIf { it >= 0 }?.let(idlePool::removeAt)
-            idlePool.isNotEmpty() -> idlePool.pop() // 复用闲置实例
+            !forBackground && idlePool.isNotEmpty() -> idlePool.pop() // 复用闲置实例
             else -> null
         } ?: run {
             if (needInitialize) {
