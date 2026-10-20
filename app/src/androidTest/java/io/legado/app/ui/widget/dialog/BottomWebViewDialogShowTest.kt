@@ -27,6 +27,8 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebViewDiagnostics
+import io.legado.app.help.webView.WebViewDiagnosticsRule
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.utils.defaultSharedPreferences
@@ -36,6 +38,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.BeforeClass
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -49,6 +53,9 @@ import kotlin.math.abs
 
 @RunWith(AndroidJUnit4::class)
 class BottomWebViewDialogShowTest {
+
+    @get:Rule
+    val webViewDiagnostics = WebViewDiagnosticsRule(watchFromStart = false)
 
     private val source = BookSource(
         bookSourceUrl = "https://example.invalid/dialog-test/${UUID.randomUUID()}",
@@ -853,5 +860,14 @@ class BottomWebViewDialogShowTest {
 
     private fun visibleDialogs(manager: FragmentManager) = manager.fragments.count {
         it is BottomWebViewDialog && it.dialog?.isShowing == true
+    }
+
+    companion object {
+        @JvmStatic
+        @BeforeClass
+        fun recordPoolHistory() {
+            // Keep recording between classes; later diagnostic rules preserve this enabled state.
+            WebViewDiagnostics.enabled = true
+        }
     }
 }
