@@ -62,6 +62,8 @@ class ExploreCategoriesTest {
         val activity = source("ui/book/explore/ExploreShowActivity.kt")
         assertTrue(activity.contains("minimumHeight = 40.dpToPx()"))
         assertTrue(activity.contains("setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)"))
+        assertTrue(activity.contains("clearCategorySelection()"))
+        assertTrue(activity.contains("tab.parent?.post"))
         assertTrue(activity.contains("viewModel.showPage(1)"))
         assertTrue(source("ui/book/explore/ExploreShowViewModel.kt").contains("fun showPage(page: Int)"))
     }
@@ -70,9 +72,19 @@ class ExploreCategoriesTest {
     fun `categories wait for the initial explore request`() {
         val model = source("ui/book/explore/ExploreShowViewModel.kt")
         assertTrue(model.contains("categoriesPending = true"))
+        assertTrue(model.contains("loadCategories { explore() }"))
+        assertTrue(model.contains("showExploreCategories"))
         assertTrue(model.indexOf("finishExplore()") < model.indexOf("fun getLoadedBooks()"))
         assertTrue(model.indexOf("if (paginationState.isLoading)") < model.indexOf("categoriesPending = true"))
         assertEquals(2, model.split(".onFinally { finishExplore() }").size - 1)
+    }
+
+    @Test
+    fun `only the discovery entry enables category controls`() {
+        assertTrue(source("ui/main/explore/ExploreFragment.kt")
+            .contains("putExtra(\"showExploreCategories\", true)"))
+        assertFalse(source("ui/rss/read/RssJsExtensions.kt")
+            .contains("putExtra(\"showExploreCategories\", true)"))
     }
 
     private fun source(path: String): String = sequenceOf(
