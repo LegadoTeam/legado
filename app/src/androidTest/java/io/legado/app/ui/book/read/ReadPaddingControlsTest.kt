@@ -89,7 +89,7 @@ class ReadPaddingControlsTest {
                     .writeText("Median repeat intervals: compact=${compactInterval}ms large=${largeInterval}ms\n")
                 verifyRepeatsStop(scenario, switchRegion = R.id.btn_region_footer)
                 awaitSize(scenario, 30)
-                screenshot("padding-compact")
+                screenshot(scenario, "padding-compact")
                 scenario.onActivity { activity ->
                     val root = panel(activity).requireView()
                     verifyControls(root, 30, 26, 40)
@@ -98,7 +98,7 @@ class ReadPaddingControlsTest {
                     PaddingConfigDialog().showNow(activity.supportFragmentManager, "padding-test")
                 }
                 awaitSize(scenario, 48)
-                screenshot("padding-large")
+                screenshot(scenario, "padding-large")
                 scenario.onActivity { verifyControls(panel(it).requireView(), 48, 48, 48) }
             }
         } finally {
@@ -216,12 +216,18 @@ class ReadPaddingControlsTest {
         fail("Padding controls did not lay out at ${size}dp")
     }
 
-    private fun screenshot(name: String) {
+    private fun screenshot(scenario: ActivityScenario<ReadBookActivity>, name: String) {
         instrumentation.waitForIdleSync()
+        val rendered = CountDownLatch(1)
+        scenario.onActivity {
+            val decor = checkNotNull(panel(it).requireDialog().window).decorView
+            decor.postOnAnimation { decor.postOnAnimation { rendered.countDown() } }
+        }
+        assertTrue("The padding dialog must draw before capture", rendered.await(5, TimeUnit.SECONDS))
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
             File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream().use {
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
             }
         } finally {
             bitmap.recycle()
