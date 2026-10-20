@@ -44,6 +44,7 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class ExploreCategoriesTest {
@@ -56,8 +57,16 @@ class ExploreCategoriesTest {
     private val slowStarted = CountDownLatch(1)
     private val releaseSlow = CountDownLatch(1)
     private val slowFinished = CountDownLatch(1)
+    private val initialRequestCount = AtomicInteger()
+    private val releaseInitial = CountDownLatch(1)
+    @Volatile
+    private var blockInitial = false
     private val server = object : NanoHTTPD("127.0.0.1", 0) {
         override fun serve(session: IHTTPSession): Response {
+            if (session.uri == "/category/0" && blockInitial) {
+                initialRequestCount.incrementAndGet()
+                releaseInitial.await(20, TimeUnit.SECONDS)
+            }
             if (session.uri == "/category/1") {
                 slowStarted.countDown()
                 releaseSlow.await(20, TimeUnit.SECONDS)
@@ -102,6 +111,8 @@ class ExploreCategoriesTest {
     @After
     fun tearDown() {
         releaseSlow.countDown()
+        releaseInitial.countDown()
+        blockInitial = false
         scenario?.close()
         server.stop()
         if (::source.isInitialized) {
@@ -296,6 +307,9 @@ class ExploreCategoriesTest {
         scenario!!.onActivity { rows(it)[0].getTabAt(1)!!.select() }
         assertTrue("Slow category request started", slowStarted.await(15, TimeUnit.SECONDS))
         scenario!!.onActivity { rows(it)[1].getTabAt(0)!!.select() }
+        awaitActivity {
+            rows(it).map { tabs -> tabs.selectedTabPosition } == listOf(-1, 0, -1)
+        }
         awaitActivity { it.model.getLoadedBooks().firstOrNull()?.name?.startsWith("Category 8") == true }
         releaseSlow.countDown()
         assertTrue(slowFinished.await(15, TimeUnit.SECONDS))
@@ -318,11 +332,40 @@ class ExploreCategoriesTest {
         screenshot("explore-category-restored")
     }
 
-    private fun launch() {
+    @Test
+    fun categoriesRenderBeforeInitialExploreCompletes() {
+        scenario!!.close()
+        scenario = null
+        AppConfig.showExploreCategories = true
+        blockInitial = true
+        launch()
+        assertTrue("Initial explore request started", awaitCondition {
+            initialRequestCount.get() > 0
+        })
+        awaitActivity { it.ui.categoriesContainer.isVisible }
+        releaseInitial.countDown()
+        awaitActivity { it.model.getLoadedBooks().size == 20 }
+    }
+
+    @Test
+    fun nonDiscoveryEntryHidesCategoryControls() {
+        scenario!!.close()
+        scenario = null
+        AppConfig.showExploreCategories = true
+        launch(discovery = false)
+        awaitActivity { it.model.getLoadedBooks().size == 20 }
+        scenario!!.onActivity {
+            assertFalse(it.ui.categoriesContainer.isVisible)
+            assertTrue(it.ui.titleBar.menu.findItem(R.id.menu_show_explore_categories) == null)
+        }
+    }
+
+    private fun launch(discovery: Boolean = true) {
         scenario = ActivityScenario.launch(Intent(context, ExploreShowActivity::class.java).apply {
             putExtra("sourceUrl", source.bookSourceUrl)
             putExtra("exploreName", "Category 0")
             putExtra("exploreUrl", categoryUrl(0))
+            putExtra("showExploreCategories", discovery)
         })
     }
 
@@ -358,6 +401,15 @@ class ExploreCategoriesTest {
                 "rows=${it.ui.categoriesContainer.childCount}, enabled=${AppConfig.showExploreCategories}"
         }
         throw AssertionError("Timed out: $state")
+    }
+
+    private fun awaitCondition(condition: () -> Boolean): Boolean {
+        val deadline = SystemClock.uptimeMillis() + 15000
+        do {
+            if (condition()) return true
+            SystemClock.sleep(50)
+        } while (SystemClock.uptimeMillis() < deadline)
+        return false
     }
 
     private fun screenshot(name: String) {

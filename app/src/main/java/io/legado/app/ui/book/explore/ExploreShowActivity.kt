@@ -49,15 +49,20 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private var menuAddLoadedBooks: MenuItem? = null
     private var menuPage: MenuItem? = null
 
+    private val isDiscoveryEntry: Boolean
+        get() = intent.getBooleanExtra("showExploreCategories", false)
+
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
-        menuCategories = menu.add(Menu.NONE, R.id.menu_show_explore_categories, Menu.NONE,
-            R.string.show_explore_categories).apply {
-            isCheckable = true
-            setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
-            setOnMenuItemClickListener {
-                AppConfig.showExploreCategories = !AppConfig.showExploreCategories
-                updateCategories()
-                true
+        if (isDiscoveryEntry) {
+            menuCategories = menu.add(Menu.NONE, R.id.menu_show_explore_categories, Menu.NONE,
+                R.string.show_explore_categories).apply {
+                isCheckable = true
+                setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                setOnMenuItemClickListener {
+                    AppConfig.showExploreCategories = !AppConfig.showExploreCategories
+                    updateCategories()
+                    true
+                }
             }
         }
         menuReadRecord = menu.add(Menu.NONE, R.id.menu_show_read_record, Menu.NONE,
@@ -150,7 +155,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     }
 
     private fun updateCategories() {
-        val show = AppConfig.showExploreCategories
+        val show = isDiscoveryEntry && AppConfig.showExploreCategories
         menuCategories?.isChecked = show
         if (show) viewModel.loadCategories()
         val categories = viewModel.categoriesData.value.orEmpty().map {
@@ -188,6 +193,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 override fun onTabSelected(tab: TabLayout.Tab) {
                     val category = tab.tag as ExploreCategory
                     if (category != viewModel.categoryData.value) {
+                        clearCategorySelection()
                         isClearAll = false
                         binding.recyclerView.scrollToPosition(0)
                         viewModel.switchCategory(category)
@@ -205,14 +211,17 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     }
 
     private fun updateCategorySelection() {
+        clearCategorySelection()
         val selected = viewModel.categoryData.value
-        categoryTabs.forEach { (category, tab) ->
-            if (category == selected) {
-                tab.select()
-            } else if (tab.isSelected) {
-                tab.parent?.selectTab(null)
+        categoryTabs.firstOrNull { it.first == selected }?.second?.let { tab ->
+            tab.parent?.post {
+                if (viewModel.categoryData.value == selected) tab.select()
             }
         }
+    }
+
+    private fun clearCategorySelection() {
+        categoryTabs.mapNotNull { it.second.parent }.distinct().forEach { it.selectTab(null) }
     }
 
     private fun updateTopHeader(page: Int) {
