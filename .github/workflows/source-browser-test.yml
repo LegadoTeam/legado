@@ -52,6 +52,8 @@ on:
       - 'app/src/androidTest/java/io/legado/app/ui/book/explore/**'
       - 'app/src/main/java/io/legado/app/ui/book/read/ContentEditDialog.kt'
       - 'app/src/main/java/io/legado/app/ui/book/read/ContentSearch.kt'
+      - 'app/src/main/java/io/legado/app/ui/book/searchContent/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/searchContent/**'
       - 'app/src/main/res/layout/dialog_content_edit.xml'
       - 'app/src/main/res/menu/content_edit.xml'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentEditSearchTest.kt'
