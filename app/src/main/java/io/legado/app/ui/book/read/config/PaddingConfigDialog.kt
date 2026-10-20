@@ -198,7 +198,7 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
 
     private fun updateControlSizes() = binding.run {
         val large = AppConfig.readPaddingLargeControls
-        val buttonSize = (if (large) 48 else 27).dpToPx()
+        val buttonSize = (if (large) 48 else 28).dpToPx()
         val iconSize = (if (large) 48 else 24).dpToPx()
         val height = (if (large) 48 else 40).dpToPx()
         val rowPadding = (height - buttonSize) / 2
@@ -212,7 +212,10 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
             it.minimumHeight = height
             it.layoutParams = it.layoutParams.apply { this.height = height }
         }
-        headerControls.layoutParams = headerControls.layoutParams.apply { this.height = height }
+        headerControls.layoutParams = (headerControls.layoutParams as LinearLayout.LayoutParams).apply {
+            this.height = height
+            bottomMargin = (if (large) 12 else 13).dpToPx()
+        }
         val tabHeight = (if (large) 48 else 36).dpToPx()
         regionButtons().forEach { button ->
             button.layoutParams = button.layoutParams.apply { this.height = tabHeight }

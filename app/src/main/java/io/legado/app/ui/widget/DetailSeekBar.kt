@@ -129,9 +129,11 @@ class DetailSeekBar @JvmOverloads constructor(
         val stop: () -> Unit = {
             pressed = false
             button.removeCallbacks(repeat)
+        }
+        repeatStops += {
+            stop()
             button.cancelLongPress()
         }
-        repeatStops += stop
         button.setOnLongClickListener {
             button.postDelayed(repeat, FIRST_REPEAT_DELAY_MILLIS)
             true
@@ -139,6 +141,8 @@ class DetailSeekBar @JvmOverloads constructor(
         button.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> pressed = true
+                // View handles its own long-press/tap callbacks after this listener. Cancelling
+                // them here clears PREPRESSED and loses quick taps inside scrolling containers.
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stop()
             }
             false

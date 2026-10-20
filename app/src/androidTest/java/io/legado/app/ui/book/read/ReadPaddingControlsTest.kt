@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.widget.ImageView
 import android.widget.SeekBar
+import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
@@ -80,16 +81,17 @@ class ReadPaddingControlsTest {
                         .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
                 }
                 scenario.onActivity { PaddingConfigDialog().showNow(it.supportFragmentManager, "padding-test") }
-                awaitSize(scenario, 27)
+                awaitSize(scenario, 28)
                 verifyBodyLink(scenario)
                 var compactTrackWidth = 0
                 scenario.onActivity { activity ->
                     assertFalse(AppConfig.readPaddingLargeControls)
                     val root = panel(activity).requireView()
-                    compactTrackWidth = verifyControls(root, 27, 24, 40)
+                    compactTrackWidth = verifyControls(root, 28, 24, 40)
                     assertTrue("The slider must have more width than both adjust buttons",
-                        compactTrackWidth > 54.dpToPx())
+                        compactTrackWidth > 56.dpToPx())
                 }
+                verifyQuickTaps(scenario)
                 val compactInterval = verifyRepeatsStop(scenario, MotionEvent.ACTION_UP)
                 scenario.onActivity {
                     assertTrue(panel(it).requireView().findViewById<View>(R.id.btn_region_header).performLongClick())
@@ -98,20 +100,21 @@ class ReadPaddingControlsTest {
                 scenario.onActivity { activity ->
                     assertTrue(AppConfig.readPaddingLargeControls)
                     val root = panel(activity).requireView()
-                    assertEquals(2 * (48.dpToPx() - 27.dpToPx()),
+                    assertEquals(2 * (48.dpToPx() - 28.dpToPx()),
                         compactTrackWidth - verifyControls(root, 48, 48, 48))
                     assertTrue(root.findViewById<View>(R.id.btn_region_body).isSelected)
                 }
+                verifyQuickTaps(scenario)
                 val largeInterval = verifyRepeatsStop(scenario, MotionEvent.ACTION_CANCEL)
                 File(context.getExternalFilesDir("ui-regression"), "padding-repeat-timing.txt")
                     .writeText("Configured interval: compact=150ms large=150ms\n" +
                         "Median observed intervals: compact=${compactInterval}ms large=${largeInterval}ms\n")
                 verifyRepeatsStop(scenario, switchRegion = R.id.btn_region_footer)
-                awaitSize(scenario, 27)
+                awaitSize(scenario, 28)
                 screenshot(scenario, "padding-compact")
                 scenario.onActivity { activity ->
                     val root = panel(activity).requireView()
-                    verifyControls(root, 27, 24, 40)
+                    verifyControls(root, 28, 24, 40)
                     assertTrue(root.findViewById<View>(R.id.btn_region_body).performLongClick())
                     panel(activity).dismissNow()
                     PaddingConfigDialog().showNow(activity.supportFragmentManager, "padding-test")
@@ -165,6 +168,20 @@ class ReadPaddingControlsTest {
         val reset = root.findViewById<View>(R.id.iv_reset)
         assertEquals((if (buttonSize == 48) 48 else 36).dpToPx(), header.height)
         assertEquals((if (buttonSize == 48) 48 else 32).dpToPx(), reset.height)
+        for (id in listOf(R.id.btn_region_header, R.id.btn_region_body, R.id.btn_region_footer)) {
+            val button = root.findViewById<TextView>(id)
+            assertFalse(button.includeFontPadding)
+            assertEquals(0, button.paddingTop)
+            assertEquals(0, button.paddingBottom)
+            val textLayout = checkNotNull(button.layout)
+            val textTop = button.baseline - textLayout.getLineBaseline(0)
+            assertEquals("Region text must be vertically centered", button.height / 2f,
+                textTop + textLayout.height / 2f, 1f)
+        }
+        val headerRow = root.findViewById<View>(R.id.header_controls)
+        assertEquals(24.dpToPx(), (headerRow.parent as View).paddingTop)
+        assertEquals((if (buttonSize == 48) 12 else 13).dpToPx(),
+            root.findViewById<View>(R.id.dsb_top).top - headerRow.bottom)
         listOf(R.id.sw_lock_lr, R.id.sw_lock_tb, R.id.sw_show_line).forEach { id ->
             val control = root.findViewById<View>(id)
             assertEquals(rowHeight.dpToPx(), control.layoutParams.height)
@@ -290,6 +307,55 @@ class ReadPaddingControlsTest {
                 dispatch(MotionEvent.ACTION_CANCEL)
                 slider.onChanged = originalCallback
                 slider.progress = originalProgress
+            }
+        }
+    }
+
+    private fun verifyQuickTaps(scenario: ActivityScenario<ReadBookActivity>) {
+        lateinit var slider: DetailSeekBar
+        var originalCallback: ((Int) -> Unit)? = null
+        var originalProgress = 0
+        val changes = CopyOnWriteArrayList<Int>()
+        scenario.onActivity {
+            slider = panel(it).requireView().findViewById(R.id.dsb_top)
+            originalProgress = slider.progress
+            originalCallback = slider.onChanged
+            slider.onChanged = { value ->
+                originalCallback?.invoke(value)
+                changes += value
+            }
+        }
+        try {
+            var expected = originalProgress
+            // No sleeps between taps. Each DOWN/UP pair runs in one main-thread turn, before
+            // the scrolling container's tap timeout; performClick would miss this regression.
+            (List(6) { 1 } + List(6) { -1 }).forEachIndexed { index, delta ->
+                expected += delta
+                val clickDispatched = CountDownLatch(1)
+                scenario.onActivity {
+                    val button = slider.findViewById<View>(
+                        if (delta > 0) R.id.iv_seek_plus else R.id.iv_seek_reduce)
+                    val downTime = SystemClock.uptimeMillis()
+                    for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+                        val event = MotionEvent.obtain(downTime, downTime, action,
+                            button.width / 2f, button.height / 2f, 0)
+                        try { assertTrue(button.dispatchTouchEvent(event)) } finally { event.recycle() }
+                    }
+                    // View posts its click callback during UP; this barrier waits for that click.
+                    button.post { clickDispatched.countDown() }
+                }
+                assertTrue("Quick tap must be dispatched", clickDispatched.await(5, TimeUnit.SECONDS))
+                scenario.onActivity {
+                    assertEquals("Every quick tap must produce one adjustment", index + 1, changes.size)
+                    assertEquals(expected, slider.progress)
+                    assertEquals(expected, ReadBookConfig.paddingTop)
+                }
+            }
+        } finally {
+            scenario.onActivity {
+                slider.onChanged = originalCallback
+                slider.progress = originalProgress
+                originalCallback?.invoke(originalProgress)
             }
         }
     }

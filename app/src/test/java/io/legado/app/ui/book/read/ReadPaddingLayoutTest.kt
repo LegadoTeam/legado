@@ -46,7 +46,7 @@ class ReadPaddingLayoutTest {
         (verticalPaddingIds + horizontalPaddingIds).forEach { id ->
             val slider = document.findElementById(id)
             assertEquals("40dp", slider.androidAttribute("layout_height"))
-            assertEquals("27dp", slider.appAttribute("adjustButtonSize"))
+            assertEquals("28dp", slider.appAttribute("adjustButtonSize"))
             assertEquals("24dp", slider.appAttribute("adjustButtonIconSize"))
             assertEquals("true", slider.appAttribute("repeatOnLongPress"))
         }
@@ -62,7 +62,11 @@ class ReadPaddingLayoutTest {
             assertEquals("36dp", button.androidAttribute("layout_height"))
             assertEquals("true", button.androidAttribute("clickable"))
             assertEquals("true", button.androidAttribute("focusable"))
+            assertEquals("center", button.androidAttribute("gravity"))
+            assertEquals("false", button.androidAttribute("includeFontPadding"))
+            assertEquals("0dp", button.androidAttribute("paddingVertical"))
         }
+        assertEquals("13dp", document.findElementById("@+id/header_controls").androidAttribute("layout_marginBottom"))
 
         val reset = document.findElementById("@+id/iv_reset")
         assertEquals("32dp", reset.androidAttribute("layout_width"))
