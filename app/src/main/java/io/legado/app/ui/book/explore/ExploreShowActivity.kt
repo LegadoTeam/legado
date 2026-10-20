@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.explore
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -215,13 +216,28 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
         val selected = viewModel.categoryData.value
         categoryTabs.firstOrNull { it.first == selected }?.second?.let { tab ->
             tab.parent?.post {
-                if (viewModel.categoryData.value == selected) tab.select()
+                if (viewModel.categoryData.value == selected) {
+                    clearCategorySelection()
+                    tab.parent?.setSelectedTabIndicatorColor(accentColor)
+                    tab.select()
+                }
             }
         }
     }
 
     private fun clearCategorySelection() {
-        categoryTabs.mapNotNull { it.second.parent }.distinct().forEach { it.selectTab(null) }
+        categoryTabs.mapNotNull { it.second.parent }.distinct().forEach { tabs ->
+            // selectTab(null) leaves the indicator drawn; tint it directly to keep it hidden.
+            tabs.getTabSelectedIndicator().setTint(Color.TRANSPARENT)
+            tabs.getChildAt(0)?.invalidate()
+            for (index in 0 until tabs.tabCount) {
+                tabs.getTabAt(index)?.view?.apply {
+                    isSelected = false
+                    isActivated = false
+                }
+            }
+            tabs.selectTab(null)
+        }
     }
 
     private fun updateTopHeader(page: Int) {

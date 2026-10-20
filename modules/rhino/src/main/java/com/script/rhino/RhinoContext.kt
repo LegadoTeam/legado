@@ -47,6 +47,8 @@ class RhinoContext(factory: ContextFactory) : Context(factory) {
     override fun initStandardObjects(scope: TopLevel?, sealedScope: Boolean): TopLevel {
         return super.initStandardObjects(scope, sealedScope).also {
             XMLLoaderImpl().load(it, sealedScope)
+            // JSON 的延迟初始化会提前发布对象；在共享作用域前先装齐 parse/stringify。
+            ScriptableObject.getProperty(it, "JSON")
         }
     }
 
