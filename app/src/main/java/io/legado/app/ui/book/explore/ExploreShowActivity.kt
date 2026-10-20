@@ -228,7 +228,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private fun clearCategorySelection() {
         categoryTabs.mapNotNull { it.second.parent }.distinct().forEach { tabs ->
             // selectTab(null) leaves the indicator drawn; tint it directly to keep it hidden.
-            tabs.tabSelectedIndicator.setTint(Color.TRANSPARENT)
+            tabs.getTabSelectedIndicator().setTint(Color.TRANSPARENT)
             tabs.getChildAt(0)?.invalidate()
             for (index in 0 until tabs.tabCount) {
                 tabs.getTabAt(index)?.view?.apply {

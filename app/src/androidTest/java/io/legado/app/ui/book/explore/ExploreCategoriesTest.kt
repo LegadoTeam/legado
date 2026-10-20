@@ -413,7 +413,7 @@ class ExploreCategoriesTest {
             val canvas = Canvas(bitmap)
             strip.draw(canvas) // Let TabLayout resolve the indicator's drawing bounds.
             bitmap.eraseColor(Color.TRANSPARENT)
-            tabs.tabSelectedIndicator.draw(canvas)
+            tabs.getTabSelectedIndicator().draw(canvas)
             val pixels = IntArray(bitmap.width * bitmap.height)
             bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
             return pixels.any { Color.alpha(it) != 0 }
