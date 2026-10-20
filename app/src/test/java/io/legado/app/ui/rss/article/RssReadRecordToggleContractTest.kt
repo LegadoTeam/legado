@@ -20,7 +20,7 @@ class RssReadRecordToggleContractTest {
 
         assertTrue(source.contains("@ColumnInfo(defaultValue = \"1\") var enableReadRecord: Boolean = true"))
         assertTrue(database.contains("version = 112"))
-        assertTrue(database.contains("AutoMigration(from = 111, to = 112)"))
+        assertTrue(database.contains("AutoMigration(from = 111, to = 112, spec = DatabaseMigrations.Migration_111_112::class)"))
         assertTrue(schema.contains("\"version\": 112"))
         assertTrue(schema.contains("\"columnName\": \"enableReadRecord\""))
         assertTrue(appConfig.contains("enableRssReadRecord"))
