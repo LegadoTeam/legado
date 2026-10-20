@@ -6,6 +6,7 @@ on:
       - '.github/workflows/source-browser-test.yml'
       - '.github/scripts/source-browser-test.init.gradle'
       - '.github/scripts/run-ui-regression.sh'
+      - '.github/scripts/run-webview-idle-aging.sh'
       - '.github/scripts/prepare-pdf-zoom-fixture.py'
       - 'app/build.gradle'
       - 'gradle.properties'
@@ -14,6 +15,7 @@ on:
       - 'app/src/main/java/io/legado/app/help/webView/WebViewPool.kt'
       - 'app/src/main/java/io/legado/app/help/http/BackstageWebView.kt'
       - 'app/src/androidTest/java/io/legado/app/help/http/BackstageWebViewLifecycleTest.kt'
+      - 'app/src/androidTest/java/io/legado/app/help/http/WebViewPoolIdleAgingTest.kt'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BookMemoDialog.kt'
       - 'app/src/main/java/io/legado/app/ui/code/**'
       - 'app/src/androidTest/java/io/legado/app/ui/code/**'
@@ -127,6 +129,11 @@ on:
       - 'app/src/androidTest/java/io/legado/app/model/webBook/**'
       - 'app/src/androidTest/assets/issue1180*'
   workflow_dispatch:
+    inputs:
+      webview_idle_ab:
+        description: 'Also run isolated WebView idle aging controls (30s and 360s)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -190,3 +197,61 @@ jobs:
             app/build/outputs/androidTest-results/connected/
             app/build/ui-regression/
             app/schemas/
+
+  webview-idle-aging:
+    if: github.event_name == 'workflow_dispatch' && inputs.webview_idle_ab
+    name: WebView idle aging (${{ matrix.idle-seconds }}s)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - idle-seconds: 30
+            method: staticBackstagePageAfterThirtySecondsIdle
+          - idle-seconds: 360
+            method: staticBackstagePageAfterSixMinutesIdle
+    env:
+      IDLE_AGING_METHOD: ${{ matrix.method }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Build instrumented test APKs
+        run: |
+          python3 .github/scripts/prepare-pdf-zoom-fixture.py
+          chmod +x gradlew
+          ./gradlew :app:assembleAppDebug :app:assembleAppDebugAndroidTest \
+            --init-script .github/scripts/source-browser-test.init.gradle \
+            --build-cache --no-daemon --max-workers=2
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run one aging method in a fresh Android 16 emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          pre-emulator-launch-script: |
+            sed -i '/^hw\.mainKeys=/d' "$ANDROID_AVD_HOME/test.avd/config.ini"
+            echo 'hw.mainKeys=no' >> "$ANDROID_AVD_HOME/test.avd/config.ini"
+          script: bash .github/scripts/run-webview-idle-aging.sh "$IDLE_AGING_METHOD"
+      - name: Upload aging evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: webview-idle-aging-${{ matrix.idle-seconds }}s
+          path: |
+            app/build/reports/androidTests/connected/
+            app/build/outputs/androidTest-results/connected/
+            app/build/ui-regression/
