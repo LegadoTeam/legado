@@ -73,7 +73,8 @@ class ReadRecordDialog(private val origin: String? = null) : BaseDialogFragment(
             }
 
             R.id.menu_enable_record -> {
-                AppConfig.enableRssReadRecord = !item.isChecked
+                item.isChecked = !item.isChecked
+                AppConfig.enableRssReadRecord = item.isChecked
             }
         }
         return true

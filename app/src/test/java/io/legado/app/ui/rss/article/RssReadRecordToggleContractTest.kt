@@ -25,7 +25,7 @@ class RssReadRecordToggleContractTest {
         assertTrue(schema.contains("\"columnName\": \"enableReadRecord\""))
         assertTrue(appConfig.contains("enableRssReadRecord"))
         assertTrue(preferKey.contains("const val enableRssReadRecord"))
-        assertTrue(dialog.contains("AppConfig.enableRssReadRecord = !item.isChecked"))
+        assertTrue(dialog.contains("item.isChecked = !item.isChecked AppConfig.enableRssReadRecord = item.isChecked"))
         assertTrue(readRss.contains("if (AppConfig.enableRssReadRecord)"))
         assertTrue(jsExtensions.contains("if (AppConfig.enableRssReadRecord)"))
         assertTrue(!dialog.contains("setRecordEnabled"))
