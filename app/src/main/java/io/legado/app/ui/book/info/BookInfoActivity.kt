@@ -268,21 +268,17 @@ class BookInfoActivity :
         binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
         viewModel.bookData.observe(this) { showBook(it) }
         viewModel.chapterListData.observe(this) {
-            upLoading(
-                viewModel.loadingData.value == true,
-                it,
-                viewModel.tocLoadProgressData.value,
-            )
+            upLoading(viewModel.loadingData.value == true, it)
         }
         viewModel.tocLoadProgressData.observe(this) { progress ->
-            if (progress != null) {
+            if (viewModel.loadingData.value == true) {
                 upLoading(true, tocLoadProgress = progress)
             }
         }
         viewModel.loadingData.observe(this) { isLoading ->
             binding.refreshProgressBar.isAutoLoading = isLoading
             if (isLoading) {
-                upLoading(true, tocLoadProgress = viewModel.tocLoadProgressData.value)
+                upLoading(true)
             } else {
                 viewModel.chapterListData.value?.let { upLoading(false, it) }
             }
@@ -982,7 +978,8 @@ class BookInfoActivity :
     ) {
         when {
             isLoading -> {
-                val loadingText = tocLoadProgress?.let {
+                val progress = tocLoadProgress ?: viewModel.tocLoadProgressData.value
+                val loadingText = progress?.let {
                     getString(
                         R.string.toc_loading_progress,
                         it.loadedPageCount,
