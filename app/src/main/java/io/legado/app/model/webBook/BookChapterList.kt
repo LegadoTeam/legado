@@ -29,6 +29,14 @@ import io.legado.app.constant.AppPattern
 import kotlinx.coroutines.currentCoroutineContext
 
 /**
+ * 目录分页加载进度
+ */
+data class TocLoadProgress(
+    val loadedPageCount: Int,
+    val loadedChapterCount: Int,
+)
+
+/**
  * 获取目录
  */
 object BookChapterList {
@@ -39,12 +47,34 @@ object BookChapterList {
         baseUrl: String,
         redirectUrl: String,
         body: String?,
-        isFromBookInfo: Boolean = false
+        isFromBookInfo: Boolean = false,
+        onProgress: ((TocLoadProgress) -> Unit)? = null,
     ): List<BookChapter> {
         body ?: throw NoStackTraceException(
             appCtx.getString(R.string.error_get_web_content, baseUrl)
         )
         val chapterList = ArrayList<BookChapter>()
+        val progressChapterSet = if (onProgress == null) null else LinkedHashSet<BookChapter>()
+        var loadedPageCount = 0
+
+        fun addChapterPage(
+            chapters: List<BookChapter>,
+            reportProgress: Boolean = true,
+        ) {
+            chapterList.addAll(chapters)
+            if (!reportProgress) return
+            progressChapterSet?.let { loadedChapters ->
+                loadedPageCount++
+                loadedChapters.addAll(chapters)
+                onProgress?.invoke(
+                    TocLoadProgress(
+                        loadedPageCount = loadedPageCount,
+                        loadedChapterCount = loadedChapters.size,
+                    )
+                )
+            }
+        }
+
         Debug.log(bookSource.bookSourceUrl, "≡获取成功:${baseUrl}")
         Debug.log(bookSource.bookSourceUrl, body, state = 30)
         val tocRule = bookSource.getTocRule()
@@ -64,7 +94,10 @@ object BookChapterList {
                 tocRule, listRule, bookSource, log = true,
                 isFromBookInfo = isFromBookInfo
             )
-        chapterList.addAll(chapterData.first)
+        addChapterPage(
+            chapterData.first,
+            reportProgress = chapterData.second.isNotEmpty(),
+        )
         when (chapterData.second.size) {
             0 -> Unit
             1 -> {
@@ -85,7 +118,7 @@ object BookChapterList {
                             isFromBookInfo = isFromBookInfo
                         )
                         nextUrl = chapterData.second.firstOrNull() ?: ""
-                        chapterList.addAll(chapterData.first)
+                        addChapterPage(chapterData.first)
                     }
                 }
                 Debug.log(bookSource.bookSourceUrl, "◇目录总页数:${nextUrlList.size}")
@@ -114,7 +147,7 @@ object BookChapterList {
                         isFromBookInfo = isFromBookInfo
                     ).first
                 }.collect {
-                    chapterList.addAll(it)
+                    addChapterPage(it)
                 }
             }
         }

@@ -159,6 +159,7 @@
     <string name="interface_setting">界面</string>
     <string name="brightness">亮度</string>
     <string name="chapter_list">目录</string>
+    <string name="toc_loading_progress">加载中 · 已完成 %1$d 页 · 已获取 %2$d 章</string>
     <string name="next_chapter">下一章</string>
     <string name="previous_chapter">上一章</string>
     <string name="pt_hide_status_bar">隐藏状态栏</string>

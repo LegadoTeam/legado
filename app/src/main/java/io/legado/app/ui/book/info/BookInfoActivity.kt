@@ -73,6 +73,7 @@ import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.AutoTask
 import io.legado.app.model.BookCover
 import io.legado.app.model.remote.RemoteBookWebDav
+import io.legado.app.model.webBook.TocLoadProgress
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.autoTask.AutoTaskEditActivity
 import io.legado.app.ui.autoTask.ImportAutoTaskDialog
@@ -267,12 +268,21 @@ class BookInfoActivity :
         binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
         viewModel.bookData.observe(this) { showBook(it) }
         viewModel.chapterListData.observe(this) {
-            upLoading(viewModel.loadingData.value == true, it)
+            upLoading(
+                viewModel.loadingData.value == true,
+                it,
+                viewModel.tocLoadProgressData.value,
+            )
+        }
+        viewModel.tocLoadProgressData.observe(this) { progress ->
+            if (progress != null) {
+                upLoading(true, tocLoadProgress = progress)
+            }
         }
         viewModel.loadingData.observe(this) { isLoading ->
             binding.refreshProgressBar.isAutoLoading = isLoading
             if (isLoading) {
-                upLoading(true)
+                upLoading(true, tocLoadProgress = viewModel.tocLoadProgressData.value)
             } else {
                 viewModel.chapterListData.value?.let { upLoading(false, it) }
             }
@@ -965,10 +975,21 @@ class BookInfoActivity :
         }
     }
 
-    private fun upLoading(isLoading: Boolean, chapterList: List<BookChapter>? = null) {
+    private fun upLoading(
+        isLoading: Boolean,
+        chapterList: List<BookChapter>? = null,
+        tocLoadProgress: TocLoadProgress? = null,
+    ) {
         when {
             isLoading -> {
-                binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
+                val loadingText = tocLoadProgress?.let {
+                    getString(
+                        R.string.toc_loading_progress,
+                        it.loadedPageCount,
+                        it.loadedChapterCount,
+                    )
+                } ?: getString(R.string.loading)
+                binding.tvToc.text = getString(R.string.toc_s, loadingText)
             }
 
             chapterList.isNullOrEmpty() -> {

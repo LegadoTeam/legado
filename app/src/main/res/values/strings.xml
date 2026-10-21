@@ -161,6 +161,7 @@
     <string name="interface_setting">Interface</string>
     <string name="brightness">Brightness</string>
     <string name="chapter_list">Chapters</string>
+    <string name="toc_loading_progress">Loading · %1$d page(s) loaded · %2$d chapter(s) found</string>
     <string name="next_chapter">Next</string>
     <string name="previous_chapter">Prior</string>
     <string name="pt_hide_status_bar">Hide status bar</string>
