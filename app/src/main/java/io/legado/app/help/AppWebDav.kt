@@ -29,9 +29,15 @@ import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.removePref
 import io.legado.app.utils.runCatchingCancellable
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
 
@@ -44,19 +50,28 @@ object AppWebDav {
     private val exportsWebDavUrl get() = "${rootWebDavUrl}books/"
     private val bgWebDavUrl get() = "${rootWebDavUrl}background/"
 
+    @Volatile
     var authorization: Authorization? = null
         private set
 
+    @Volatile
     var defaultBookWebDav: RemoteBookWebDav? = null
 
     val isOk get() = authorization != null
 
     val isJianGuoYun get() = rootWebDavUrl.startsWith(defaultWebDavUrl, true)
 
-    init {
-        runBlocking {
-            upConfig()
-        }
+    private val configMutex = Mutex()
+
+    // 在 IO 线程初始化，避免首次访问 AppWebDav 时阻塞主线程
+    private val initialConfig = CoroutineScope(SupervisorJob() + Dispatchers.IO).async {
+        refreshConfig()
+    }
+
+    private suspend fun awaitConfig() {
+        initialConfig.await()
+        // 等待正在进行的配置刷新完成
+        configMutex.withLock { }
     }
 
     private val rootWebDavUrl: String
@@ -73,21 +88,34 @@ object AppWebDav {
         }
 
     suspend fun upConfig() {
-        kotlin.runCatching {
-            authorization = null
-            defaultBookWebDav = null
-            val account = appCtx.getPrefString(PreferKey.webDavAccount)
-            val password = appCtx.getPrefString(PreferKey.webDavPassword)
-            if (!account.isNullOrEmpty() && !password.isNullOrEmpty()) {
-                val mAuthorization = Authorization(account, password)
-                checkAuthorization(mAuthorization)
-                WebDav(rootWebDavUrl, mAuthorization).makeAsDir()
-                WebDav(bookProgressUrl, mAuthorization).makeAsDir()
-                WebDav(exportsWebDavUrl, mAuthorization).makeAsDir()
-                WebDav(bgWebDavUrl, mAuthorization).makeAsDir()
-                val rootBooksUrl = "${rootWebDavUrl}books/"
-                defaultBookWebDav = RemoteBookWebDav(rootBooksUrl, mAuthorization)
-                authorization = mAuthorization
+        // 先完成首次初始化，防止旧配置覆盖手动更新的账号
+        initialConfig.await()
+        refreshConfig()
+    }
+
+    private suspend fun refreshConfig(): Result<Unit> = withContext(Dispatchers.IO) {
+        configMutex.withLock {
+            runCatchingCancellable {
+                authorization = null
+                defaultBookWebDav = null
+                val account = appCtx.getPrefString(PreferKey.webDavAccount)
+                val password = appCtx.getPrefString(PreferKey.webDavPassword)
+                if (!account.isNullOrEmpty() && !password.isNullOrEmpty()) {
+                    val mAuthorization = Authorization(account, password)
+                    checkAuthorization(mAuthorization)
+                    WebDav(rootWebDavUrl, mAuthorization).makeAsDir()
+                    WebDav(bookProgressUrl, mAuthorization).makeAsDir()
+                    WebDav(exportsWebDavUrl, mAuthorization).makeAsDir()
+                    WebDav(bgWebDavUrl, mAuthorization).makeAsDir()
+                    val rootBooksUrl = "${rootWebDavUrl}books/"
+                    defaultBookWebDav = RemoteBookWebDav(rootBooksUrl, mAuthorization)
+                    authorization = mAuthorization
+                }
+            }.onFailure { error ->
+                // 日志写入失败不应阻止后续重试
+                runCatching {
+                    AppLog.put("WebDav初始化失败\n${error.localizedMessage}", error)
+                }
             }
         }
     }
@@ -103,6 +131,7 @@ object AppWebDav {
 
     @Throws(Exception::class)
     suspend fun getBackupNames(): ArrayList<String> {
+        awaitConfig()
         val names = arrayListOf<String>()
         authorization?.let {
             var files = WebDav(rootWebDavUrl, it).listFiles()
@@ -121,6 +150,7 @@ object AppWebDav {
 
     @Throws(WebDavException::class)
     suspend fun restoreWebDav(name: String) {
+        awaitConfig()
         authorization?.let {
             val webDav = WebDav(rootWebDavUrl + name, it)
             val archive = File.createTempFile("webdav-restore-", ".zip", appCtx.cacheDir)
@@ -134,6 +164,7 @@ object AppWebDav {
     }
 
     suspend fun hasBackUp(backUpName: String): Boolean {
+        awaitConfig()
         authorization?.let {
             val url = "$rootWebDavUrl${backUpName}"
             return WebDav(url, it).exists()
@@ -142,6 +173,7 @@ object AppWebDav {
     }
 
     suspend fun lastBackUp(): Result<WebDavFile?> {
+        awaitConfig()
         return runCatchingCancellable {
             authorization?.let {
                 var lastBackupFile: WebDavFile? = null
@@ -165,6 +197,7 @@ object AppWebDav {
      */
     @Throws(Exception::class)
     suspend fun backUpWebDav(fileName: String) {
+        awaitConfig()
         val authorization = authorization ?: throw NoStackTraceException("webDav未配置或授权失败")
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
         val putUrl = "$rootWebDavUrl$fileName"
@@ -189,6 +222,7 @@ object AppWebDav {
      * 上传背景图片
      */
     suspend fun upBgs(files: Array<File>) {
+        awaitConfig()
         val authorization = authorization ?: throw NoStackTraceException("webDav未配置或授权失败")
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
         val bgWebDavFiles = getAllBgWebDavFiles().getOrThrow()
@@ -206,6 +240,7 @@ object AppWebDav {
      * 下载背景图片
      */
     suspend fun downBgs() {
+        awaitConfig()
         val authorization = authorization ?: return
         if (!NetworkUtils.isAvailable()) return
         val bgWebDavFiles = getAllBgWebDavFiles().getOrThrow()
@@ -215,6 +250,7 @@ object AppWebDav {
 
     @Suppress("unused")
     suspend fun exportWebDav(byteArray: ByteArray, fileName: String) {
+        awaitConfig()
         if (!NetworkUtils.isAvailable()) return
         try {
             authorization?.let {
@@ -229,6 +265,7 @@ object AppWebDav {
     }
 
     suspend fun exportWebDav(uri: Uri, fileName: String) {
+        awaitConfig()
         if (!NetworkUtils.isAvailable()) return
         try {
             authorization?.let {
@@ -247,6 +284,7 @@ object AppWebDav {
         toast: Boolean = false,
         onSuccess: (() -> Unit)? = null
     ) {
+        awaitConfig()
         val authorization = authorization ?: return
         if (!AppConfig.syncBookProgress) return
         if (!NetworkUtils.isAvailable()) return
@@ -264,6 +302,7 @@ object AppWebDav {
     }
 
     suspend fun uploadBookProgress(bookProgress: BookProgress, onSuccess: (() -> Unit)? = null) {
+        awaitConfig()
         try {
             val authorization = authorization ?: return
             if (!AppConfig.syncBookProgress) return
@@ -290,6 +329,7 @@ object AppWebDav {
      * 获取书籍进度
      */
     suspend fun getBookProgress(book: Book): BookProgress? {
+        awaitConfig()
         val url = getProgressUrl(book.name, book.author)
         kotlin.runCatching {
             val authorization = authorization ?: return null
@@ -307,6 +347,7 @@ object AppWebDav {
     }
 
     suspend fun downloadAllBookProgress() {
+        awaitConfig()
         val authorization = authorization ?: return
         if (!NetworkUtils.isAvailable()) return
         val bookProgressFiles = WebDav(bookProgressUrl, authorization).listFiles()
