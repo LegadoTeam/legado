@@ -43,12 +43,9 @@ object DatabaseMigrations {
                 db.execSQL("ALTER TABLE readRecord ADD COLUMN displayBookName TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE readRecord ADD COLUMN displayAuthor TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE readRecord ADD COLUMN metadataEditedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("""UPDATE readRecord SET displayBookName = bookName,
+                    displayAuthor = CASE WHEN author = '' THEN coalesce(resolvedAuthor, '') ELSE author END""")
             }
-            // AutoMigration 111->112 also creates these columns with empty defaults.
-            // Only rows without an explicit metadata edit may be initialized here.
-            db.execSQL("""UPDATE readRecord SET displayBookName = bookName,
-                displayAuthor = CASE WHEN author = '' THEN coalesce(resolvedAuthor, '') ELSE author END
-                WHERE metadataEditedAt = 0""")
             db.execSQL("DROP INDEX IF EXISTS index_readRecord_snapshot")
             db.execSQL("""CREATE INDEX index_readRecord_snapshot ON readRecord
                 (displayBookName ASC, displayAuthor ASC, lastRead DESC, deviceId ASC, bookName ASC, author ASC)""")
