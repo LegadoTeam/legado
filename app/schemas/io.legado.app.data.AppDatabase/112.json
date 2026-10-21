@@ -1661,7 +1661,7 @@
       },
       {
         "tableName": "readRecord",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceId` TEXT NOT NULL, `bookName` TEXT NOT NULL, `author` TEXT NOT NULL DEFAULT '', `readTime` INTEGER NOT NULL DEFAULT 0, `lastRead` INTEGER NOT NULL DEFAULT 0, `lastChapterTitle` TEXT, `lastChapterIndex` INTEGER NOT NULL DEFAULT -1, `lastChapterPos` INTEGER NOT NULL DEFAULT 0, `coverUrl` TEXT, `resolvedAuthor` TEXT, `displayBookName` TEXT NOT NULL DEFAULT '', `displayAuthor` TEXT NOT NULL DEFAULT '', `metadataEditedAt` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`deviceId`, `bookName`, `author`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceId` TEXT NOT NULL, `bookName` TEXT NOT NULL, `author` TEXT NOT NULL DEFAULT '', `readTime` INTEGER NOT NULL DEFAULT 0, `lastRead` INTEGER NOT NULL DEFAULT 0, `lastChapterTitle` TEXT, `lastChapterIndex` INTEGER NOT NULL DEFAULT -1, `lastChapterPos` INTEGER NOT NULL DEFAULT 0, `coverUrl` TEXT, `resolvedAuthor` TEXT, PRIMARY KEY(`deviceId`, `bookName`, `author`))",
         "fields": [
           {
             "fieldPath": "deviceId",
@@ -1724,27 +1724,6 @@
             "fieldPath": "resolvedAuthor",
             "columnName": "resolvedAuthor",
             "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "displayBookName",
-            "columnName": "displayBookName",
-            "affinity": "TEXT",
-            "notNull": true,
-            "defaultValue": "''"
-          },
-          {
-            "fieldPath": "displayAuthor",
-            "columnName": "displayAuthor",
-            "affinity": "TEXT",
-            "notNull": true,
-            "defaultValue": "''"
-          },
-          {
-            "fieldPath": "metadataEditedAt",
-            "columnName": "metadataEditedAt",
-            "affinity": "INTEGER",
-            "notNull": true,
-            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -1760,32 +1739,20 @@
             "name": "index_readRecord_snapshot",
             "unique": false,
             "columnNames": [
-              "displayBookName",
-              "displayAuthor",
+              "bookName",
+              "author",
               "lastRead",
               "deviceId",
-              "bookName",
-              "author"
+              "resolvedAuthor"
             ],
             "orders": [
               "ASC",
               "ASC",
               "DESC",
               "ASC",
-              "ASC",
               "ASC"
             ],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_readRecord_snapshot` ON `${TABLE_NAME}` (`displayBookName` ASC, `displayAuthor` ASC, `lastRead` DESC, `deviceId` ASC, `bookName` ASC, `author` ASC)"
-          },
-          {
-            "name": "index_readRecord_bookName_author",
-            "unique": false,
-            "columnNames": [
-              "bookName",
-              "author"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_readRecord_bookName_author` ON `${TABLE_NAME}` (`bookName`, `author`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_readRecord_snapshot` ON `${TABLE_NAME}` (`bookName` ASC, `author` ASC, `lastRead` DESC, `deviceId` ASC, `resolvedAuthor` ASC)"
           }
         ]
       },
