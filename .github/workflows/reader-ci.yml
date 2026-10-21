@@ -49,7 +49,7 @@ jobs:
       - name: Build unsigned-release-free Debug APK
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:assembleAppDebug --build-cache --stacktrace --no-daemon
+          ./gradlew :app:assembleAppDebug -PciMinifyDebug=true --build-cache --stacktrace --no-daemon
 
       - name: Check generated APK files
         run: |
