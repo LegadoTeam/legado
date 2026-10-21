@@ -131,7 +131,7 @@ android {
 
             applicationIdSuffix '.debug'
             versionNameSuffix 'debug'
-            minifyEnabled false
+            minifyEnabled = (project.findProperty('ciMinifyDebug')?.toString() == 'true')
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'cronet-proguard-rules.pro'
         }
     }
