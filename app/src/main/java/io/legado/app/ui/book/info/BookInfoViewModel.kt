@@ -40,6 +40,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.model.webBook.TocLoadProgress
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.login.SourceLoginJsExtensions
@@ -97,6 +98,7 @@ internal class BookInfoNetworkLoadingCounter(
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
     val chapterListData = MutableLiveData<List<BookChapter>>()
+    val tocLoadProgressData = MutableLiveData<TocLoadProgress?>()
     val webFiles = mutableListOf<WebFile>()
     var inBookshelf = false
     var hasCustomBtn = false
@@ -234,6 +236,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         runPreUpdateJs: Boolean = true,
         scope: CoroutineScope = viewModelScope
     ) {
+        tocLoadProgressData.postValue(null)
         if (book.isLocal) {
             LocalBook.upBookInfo(book)
             bookData.postValue(book)
@@ -290,6 +293,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         isFromBookInfo: Boolean = false,
         oldBook: Book = book.copy(),
     ) {
+        tocLoadProgressData.postValue(null)
         if (book.isLocal) {
             execute(scope) {
                 LocalBook.getChapterList(book).let {
@@ -316,6 +320,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 book,
                 runPreUpdateJs,
                 isFromBookInfo = isFromBookInfo,
+                onProgress = { tocLoadProgressData.postValue(it) },
             )
                 .onSuccess(IO) {
                     if (inBookshelf) {
@@ -338,6 +343,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     chapterListData.postValue(chapterListData.value.orEmpty())
                     AppLog.put("获取目录失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_chapter_list)
+                }
+                .onFinally {
+                    tocLoadProgressData.postValue(null)
                 }
                 .trackNetworkLoading()
         }

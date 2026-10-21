@@ -73,6 +73,7 @@ import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.AutoTask
 import io.legado.app.model.BookCover
 import io.legado.app.model.remote.RemoteBookWebDav
+import io.legado.app.model.webBook.TocLoadProgress
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.autoTask.AutoTaskEditActivity
 import io.legado.app.ui.autoTask.ImportAutoTaskDialog
@@ -268,6 +269,11 @@ class BookInfoActivity :
         viewModel.bookData.observe(this) { showBook(it) }
         viewModel.chapterListData.observe(this) {
             upLoading(viewModel.loadingData.value == true, it)
+        }
+        viewModel.tocLoadProgressData.observe(this) { progress ->
+            if (viewModel.loadingData.value == true) {
+                upLoading(true, tocLoadProgress = progress)
+            }
         }
         viewModel.loadingData.observe(this) { isLoading ->
             binding.refreshProgressBar.isAutoLoading = isLoading
@@ -965,10 +971,22 @@ class BookInfoActivity :
         }
     }
 
-    private fun upLoading(isLoading: Boolean, chapterList: List<BookChapter>? = null) {
+    private fun upLoading(
+        isLoading: Boolean,
+        chapterList: List<BookChapter>? = null,
+        tocLoadProgress: TocLoadProgress? = null,
+    ) {
         when {
             isLoading -> {
-                binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
+                val progress = tocLoadProgress ?: viewModel.tocLoadProgressData.value
+                val loadingText = progress?.let {
+                    getString(
+                        R.string.toc_loading_progress,
+                        it.loadedPageCount,
+                        it.loadedChapterCount,
+                    )
+                } ?: getString(R.string.loading)
+                binding.tvToc.text = getString(R.string.toc_s, loadingText)
             }
 
             chapterList.isNullOrEmpty() -> {

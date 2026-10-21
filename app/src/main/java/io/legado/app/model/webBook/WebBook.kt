@@ -273,10 +273,17 @@ object WebBook {
         book: Book,
         runPerJs: Boolean = false,
         context: CoroutineContext = Dispatchers.IO,
-        isFromBookInfo : Boolean = false
+        isFromBookInfo : Boolean = false,
+        onProgress: ((TocLoadProgress) -> Unit)? = null,
     ): Coroutine<List<BookChapter>> {
         return Coroutine.async(scope, context) {
-            getChapterListAwait(bookSource, book, runPerJs,isFromBookInfo).getOrThrow()
+            getChapterListAwait(
+                bookSource,
+                book,
+                runPerJs,
+                isFromBookInfo,
+                onProgress,
+            ).getOrThrow()
         }
     }
 
@@ -298,7 +305,8 @@ object WebBook {
         bookSource: BookSource,
         book: Book,
         runPerJs: Boolean = false,
-        isFromBookInfo : Boolean = false
+        isFromBookInfo : Boolean = false,
+        onProgress: ((TocLoadProgress) -> Unit)? = null,
     ): Result<List<BookChapter>> {
         if (bookSource.isJsSource()) {
             return JsSourceBook.getChapterListAwait(bookSource, book)
@@ -316,7 +324,8 @@ object WebBook {
                     baseUrl = book.tocUrl,
                     redirectUrl = book.tocUrl,
                     body = book.tocHtml,
-                    isFromBookInfo = isFromBookInfo
+                    isFromBookInfo = isFromBookInfo,
+                    onProgress = onProgress,
                 )
             } else {
                 val analyzeUrl = AnalyzeUrl(
@@ -358,7 +367,8 @@ object WebBook {
                     baseUrl = book.tocUrl,
                     redirectUrl = res.url,
                     body = res.body,
-                    isFromBookInfo = isFromBookInfo
+                    isFromBookInfo = isFromBookInfo,
+                    onProgress = onProgress,
                 )
             }
         }.onFailure {
