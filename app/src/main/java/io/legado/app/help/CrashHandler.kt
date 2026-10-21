@@ -47,14 +47,38 @@ class CrashHandler(val context: Context) : Thread.UncaughtExceptionHandler {
     /**
      * uncaughtException 回调函数
      */
+    
     override fun uncaughtException(thread: Thread, ex: Throwable) {
         if (shouldAbsorb(ex)) {
-            AppLog.put("发生未捕获的异常\n${ex.localizedMessage}", ex)
-            Looper.loop()
-        } else {
-            ReadAloud.stop(context)
-            handleException(ex)
-            mDefaultHandler?.uncaughtException(thread, ex)
+            // 尽量记录已知的系统异常，避免日志失败造成二次异常
+            runCatching {
+                AppLog.put("发生未捕获的异常\n${ex.localizedMessage}", ex)
+            }
+            // 工作线程的已知异常可以忽略，但线程仍会结束
+            // 主线程发生未捕获异常时，必须交给正常崩溃处理流程
+            if (thread !== Looper.getMainLooper().thread) {
+                return
+            }
+        }
+
+        try {
+            // 崩溃清理和记录不能阻止原始异常继续向系统传递
+            runCatching {
+                ReadAloud.stop(context)
+            }
+
+            runCatching {
+                handleException(ex)
+            }
+        } finally {
+            val handler = mDefaultHandler
+            if (handler != null && handler !== this) {
+                handler.uncaughtException(thread, ex)
+            } else {
+                // 没有可用的默认异常处理器时，避免留下异常进程
+                android.os.Process.killProcess(android.os.Process.myPid())
+                kotlin.system.exitProcess(10)
+            }
         }
     }
 
