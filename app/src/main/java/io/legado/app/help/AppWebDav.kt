@@ -184,15 +184,16 @@ object AppWebDav {
      * 阅读的备份名是 `backup<yyyy-MM-dd>-<deviceName>.zip`，每备份一次就新建一个文件，
      * 不同日期的不会互相覆盖，于是长期使用会不断累积（实测 4 个多月攒了 17 个）。
      *
-     * 保留份数由「备份保留数量」设置控制，默认 3，下限 1。
-     * 之所以不默认只留 1 份：备份本身可能残缺（曾出现过 36 KB、缺书源书架的坏备份，
-     * 且 CRC 校验通过），若只有一份，坏备份会把好的挤掉，用户将失去回退余地。
+     * 保留份数由「WebDAV 备份保留数量」设置控制，**默认 0 表示不自动清理**，
+     * 需要用户显式填正整数才生效（填 1 即只保留最新一份）。
+     * 默认不清理是为了避免存量用户升级后，历史备份在下一次备份时被一次性删掉。
      *
      * 顺序上先上传成功再清理，最坏情况只是多留一份（下次备份会再清），不会丢数据。
      * 失败只记日志，不影响备份本身。
      */
     private suspend fun pruneOldBackups(authorization: Authorization, currentFileName: String) {
         val keep = AppConfig.webDavBackupKeepCount
+        if (keep <= 0) return
         val backups = WebDav(rootWebDavUrl, authorization).listFiles()
             .filter { !it.isDir && it.displayName.startsWith("backup") && it.displayName.endsWith(".zip") }
             .sortedByDescending { it.displayName }

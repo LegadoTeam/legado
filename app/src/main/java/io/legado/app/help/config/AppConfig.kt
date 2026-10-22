@@ -785,12 +785,15 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.webDavBookAutoRestore, false)
 
     /**
-     * WebDAV 上保留的备份份数，默认 3。
-     * 设为 1 表示只保留最新一份；下限为 1，避免把备份删光。
+     * WebDAV 上保留的备份份数，默认 0 表示**不自动清理**。
+     *
+     * 之所以默认不清理：已有用户可能积累了大量备份，升级后若默认取一个小数字，
+     * 会在下一次备份时把历史备份一次性删掉。设成 0 则对存量用户零影响，
+     * 需要清理的用户自行填一个正整数（填 1 即只保留最新一份）。
      */
     val webDavBackupKeepCount: Int
         get() = appCtx.getPrefString(PreferKey.webDavBackupKeepCount)
-            ?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 3
+            ?.trim()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
 
     val recordHeapDump get() = appCtx.getPrefBoolean(PreferKey.recordHeapDump, false)
 
