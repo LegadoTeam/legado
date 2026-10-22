@@ -41,6 +41,15 @@
             app:allowDividerBelow="false"
             app:iconSpaceReserved="false" />
 
+        <io.legado.app.lib.prefs.EditTextPreference
+            android:defaultValue="3"
+            android:key="webDavBackupKeepCount"
+            android:summary="@string/webdav_backup_keep_count_s"
+            android:title="@string/webdav_backup_keep_count_t"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="false"
             android:key="webDavBookAutoRestore"

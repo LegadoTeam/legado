@@ -214,6 +214,7 @@ object PreferKey {
     const val noAnimScrollPage = "noAnimScrollPage"
     const val webDavDeviceName = "webDavDeviceName"
     const val webDavBookAutoRestore = "webDavBookAutoRestore"
+    const val webDavBackupKeepCount = "webDavBackupKeepCount"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"
     const val readAloudWakeLock = "readAloudWakeLock"

@@ -179,21 +179,24 @@ object AppWebDav {
     }
 
     /**
-     * 删除服务器上的历史备份，只保留 [currentFileName]。
+     * 清理 WebDAV 上的历史备份，只保留最近 [AppConfig.webDavBackupKeepCount] 份。
      *
      * 阅读的备份名是 `backup<yyyy-MM-dd>-<deviceName>.zip`，每备份一次就新建一个文件，
      * 不同日期的不会互相覆盖，于是长期使用会不断累积（实测 4 个多月攒了 17 个）。
      *
-     * 清理策略与客户端 PicaComic 保持一致：**服务器上只保留 1 份**，
-     * 即除了本次刚上传的文件，其余 `backup*.zip` 全部删除，不区分设备。
-     * 顺序上先上传成功再清理，最坏情况只是多留一份（下次备份会再清），不会丢数据。
+     * 保留份数由「备份保留数量」设置控制，默认 3，下限 1。
+     * 之所以不默认只留 1 份：备份本身可能残缺（曾出现过 36 KB、缺书源书架的坏备份，
+     * 且 CRC 校验通过），若只有一份，坏备份会把好的挤掉，用户将失去回退余地。
      *
+     * 顺序上先上传成功再清理，最坏情况只是多留一份（下次备份会再清），不会丢数据。
      * 失败只记日志，不影响备份本身。
      */
     private suspend fun pruneOldBackups(authorization: Authorization, currentFileName: String) {
+        val keep = AppConfig.webDavBackupKeepCount
         val backups = WebDav(rootWebDavUrl, authorization).listFiles()
             .filter { !it.isDir && it.displayName.startsWith("backup") && it.displayName.endsWith(".zip") }
-        backups.forEach { file ->
+            .sortedByDescending { it.displayName }
+        backups.drop(keep).forEach { file ->
             if (file.displayName != currentFileName) {
                 kotlin.runCatching {
                     WebDav(file.path, authorization).delete()
