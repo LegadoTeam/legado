@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--App-->
-    <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
-    <string name="receiving_shared_label">Legado·pesquisa</string>
-    <string name="receiving_shared_import_label">Legado·importar</string>
-    <string name="tip_perm_request_storage">Legado precisa de acesso ao armazenamento para encontrar e ler livros. Por favor, vá às "Configurações do App" para conceder "Permissão de armazenamento".</string>
+    <string name="app_name">Reader</string>
+    <string name="app_name_a">Reader·A</string>
+    <string name="receiving_shared_label">Reader·pesquisa</string>
+    <string name="receiving_shared_import_label">Reader·importar</string>
+    <string name="tip_perm_request_storage">Reader precisa de acesso ao armazenamento para encontrar e ler livros. Por favor, vá às "Configurações do App" para conceder "Permissão de armazenamento".</string>
 
     <!--Other-->
     <string name="menu_backup">Início</string>
@@ -98,12 +98,8 @@
     <string name="offline_cache_t">Cache off-line</string>
     <string name="offline_cache_s">salvar o(s) capítulo(s) selecionado(s) no Armazenamento em cache</string>
     <string name="change_origin">Alterar a origem</string>
-    <string name="about_description">
-        \u3000\u3000 Este é um App de leitura de software livre, desenvolvido em Kotlin, você é bem-vindo a participar em projeto.
-    </string>
-    <string name="app_share_description">
-        Legado (YueDu 3.0) link de download：\n https://github.com/LegadoTeam/legado/releases
-    </string>
+    <string name="about_description">Reader é uma versão independente derivada do projeto de código aberto Legado. Não é uma versão oficial do Legado e continua sob a GNU GPL v3.0.</string>
+    <string name="app_share_description">Download do Reader：\nhttps://github.com/yuanxiaoaihezhou/Reader/releases\nProjeto original Legado：https://github.com/LegadoTeam/legado</string>
     <string name="version_name">Versão %s</string>
     <string name="pt_background_verification">Verificação em segundo plano</string>
     <string name="ps_background_verification">Poderá usar a vontade ao verificar a fonte do livro</string>
@@ -657,7 +653,7 @@
     <string name="app_folder_picker">Seletor de pastas do App</string>
     <string name="app_file_picker">Seletor de arquivos do App</string>
     <string name="a10_permission_toast">Android 10+ não é capaz de ler e salvar arquivos devido a restrições de permissão</string>
-    <string name="add_to_text_context_menu_s">Clique longo para exibir o Legado·Pesquisa no menu de operação</string>
+    <string name="add_to_text_context_menu_s">Clique longo para exibir o Reader·Pesquisa no menu de operação</string>
     <string name="add_to_text_context_menu_t">Visualização da operação de texto na Pesquisa</string>
     <string name="record_log">Record log</string>
     <string name="log">Log</string>
@@ -699,7 +695,7 @@
     <string name="btn_default_s">Padrão</string>
     <string name="main_menu">Menu principal</string>
     <string name="request_permission">Toque para conceder permissão</string>
-    <string name="tip_local_perm_request_storage">Legado precisa de permissão de armazenamento, por favor toque abaixo no botão "Conceder Permissão", ou vá às "Configurações"-"Permissões do Apps"-para abrir a permissão necessária. Se a permissão não funcionar, por favor, toque no "Selecionar Pasta" no canto superior direito para usar o seletor de pastas do sistema.</string>
+    <string name="tip_local_perm_request_storage">Reader precisa de permissão de armazenamento, por favor toque abaixo no botão "Conceder Permissão", ou vá às "Configurações"-"Permissões do Apps"-para abrir a permissão necessária. Se a permissão não funcionar, por favor, toque no "Selecionar Pasta" no canto superior direito para usar o seletor de pastas do sistema.</string>
     <string name="alouding_disable">O texto selecionado não pode ser falado como texto completo</string>
     <string name="read_body_to_lh">Ampliar para recortar</string>
     <string name="toc_updateing">Atualização de capítulos</string>

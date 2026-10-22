@@ -1,16 +1,14 @@
-[![icon_android](https://github.com/gedoor/gedoor.github.io/blob/master/static/img/legado/icon_android.png)](https://play.google.com/store/apps/details?id=io.legado.play.release)
-<a href="https://jb.gg/OpenSourceSupport" target="_blank">
-<img width="24" height="24" src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg?_gl=1*135yekd*_ga*OTY4Mjg4NDYzLjE2Mzk0NTE3MzQ.*_ga_9J976DJZ68*MTY2OTE2MzM5Ny4xMy4wLjE2NjkxNjMzOTcuNjAuMC4w&_ga=2.257292110.451256242.1669085120-968288463.1639451734" alt="idea"/>
-</a>
+# Reader / 阅读
 
-<div align="center">
-  
-Legado 是一款免费的 Android 平台开源小说阅读器。
-</div>
+Reader（中文应用名仍为「阅读」）是基于 [Legado](https://github.com/LegadoTeam/legado) 的独立二次开发版本，**不是 Legado 官方发行版**。
 
-# Sponsor
+- Reader 源码：https://github.com/yuanxiaoaihezhou/Reader
+- 上游项目：https://github.com/LegadoTeam/legado
+- Android applicationId：`io.github.yuanxiaoaihezhou.reader`
+- 许可证：GNU GPL v3.0（本仓库继续遵循上游许可证要求）
+- 二次开发修改说明：本仓库为 Legado 的修改版本，本次独立应用身份调整日期为 2026-10-22。
 
-> 感谢 [PiPio 中转站](https://pipio.io/offer/miaogongzi) 对项目的赞助支持。
+本项目会持续跟随 Legado 上游，并在此基础上维护 Reader 自己的功能、构建与发布渠道。原项目作者、贡献者及第三方依赖的版权与许可声明继续保留。
 
 # Grateful-感谢 [![](https://img.shields.io/badge/-Grateful-F5F5F5.svg)](#Grateful-感谢-)
 > * org.jsoup:jsoup

@@ -67,7 +67,7 @@ jobs:
           fetch-depth: 0
 
       - name: Verify Beta Release Notes
-        if: ${{ matrix.type == 'release' }}
+        if: ${{ matrix.type == 'release' && github.repository == 'LegadoTeam/legado' }}
         run: bash .github/scripts/test-extract-latest-update.sh
 
       - name: Verify Help Highlight Bundle
@@ -124,7 +124,7 @@ jobs:
         if: ${{ always() && matrix.type == 'release' }}
         uses: actions/upload-artifact@v7
         with:
-          name: legado.app.release.unit-tests
+          name: reader.app.release.unit-tests
           if-no-files-found: warn
           path: app/build/test-results/testAppReleaseUnitTest/*.xml
 
@@ -135,20 +135,20 @@ jobs:
           echo "当前版本号: $VERSION"
           sed -i "s/^def version = .*/def version = \"$VERSION\"/" "$GITHUB_WORKSPACE/app/build.gradle"
 
+          gradle_variant_args=()
           if [ "$type" == "release" ]; then
-            typeName="新包名"
+            typeName="release"
           else
-            typeName="新共存"
-            # 替换 releaseA 相关包名（防止冲突）
-            sed -i "s/'.release'/'.releaseA'/" "$GITHUB_WORKSPACE/app/build.gradle"
-            if [ -f "$GITHUB_WORKSPACE/app/google-services.json" ]; then
-              sed -i 's/.release/.releaseA/' "$GITHUB_WORKSPACE/app/google-services.json"
-            fi
+            typeName="releaseA"
+            gradle_variant_args+=(
+              -PreaderApplicationIdSuffix=.releaseA
+              -PreaderAppNameA=true
+            )
           fi
 
           chmod +x gradlew
           echo "开始构建 ARM APK: $product - $typeName"
-          ./gradlew :$product:assembleRelease -ParmOnly=true --build-cache --parallel --daemon --warning-mode all \
+          ./gradlew :$product:assembleRelease -ParmOnly=true "${gradle_variant_args[@]}" --build-cache --parallel --daemon --warning-mode all \
             2>&1 | tee "$build_log"
           mkdir -p ${{ github.workspace }}/apk/
           bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
@@ -160,7 +160,7 @@ jobs:
             arm
 
           echo "开始构建通用 APK: $product - $typeName"
-          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all \
+          ./gradlew :$product:assembleRelease "${gradle_variant_args[@]}" --build-cache --parallel --daemon --warning-mode all \
             2>&1 | tee -a "$build_log"
           bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
             $GITHUB_WORKSPACE/app/build/outputs/apk \
@@ -193,7 +193,7 @@ jobs:
       - name: Upload Missing Rules File
         uses: actions/upload-artifact@v7
         with:
-          name: legado.${{ env.product }}.${{ env.type }}.mapping.missing_rules
+          name: reader.${{ env.product }}.${{ env.type }}.mapping.missing_rules
           if-no-files-found: ignore
           path: ${{ github.workspace }}/mapping/missing_rules.txt
 
@@ -201,7 +201,7 @@ jobs:
         run: |
           expected_packages=(arm universal)
           mapfile -d '' apks < <(find ${{ github.workspace }}/apk -maxdepth 1 \
-            -type f -name 'legado_*.apk' -print0)
+            -type f -name 'reader_*.apk' -print0)
           if [[ ${#apks[@]} -ne ${#expected_packages[@]} ]]; then
             echo "Expected ${#expected_packages[@]} APKs, found ${#apks[@]}"
             exit 1
@@ -256,13 +256,13 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: legado.${{ env.product }}.${{ env.type }}
+          name: reader.${{ env.product }}.${{ env.type }}
           if-no-files-found: ignore
           path: ${{ github.workspace }}/apk/*.apk
 
       - name: Upload Mapping Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: legado.${{ env.product }}.${{ env.type }}.mapping
+          name: reader.${{ env.product }}.${{ env.type }}.mapping
           if-no-files-found: ignore
           path: ${{ github.workspace }}/mapping/mapping.txt

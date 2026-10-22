@@ -14,18 +14,18 @@ class AppUpdateSelectorTest {
     fun formalReleaseAssetsKeepTheirConfiguredVariants() {
         assertEquals(
             AppVariant.BETA_RELEASE,
-            inferAppVariant("legado_app_3.26071313_release_vc38194.apk", preRelease = false)
+            inferAppVariant("reader_app_3.26071313_release_vc38194.apk", preRelease = false)
         )
         assertEquals(
             AppVariant.BETA_RELEASEA,
             inferAppVariant(
-                "legado_app_3.26071313_universal_releaseA_vc38194.apk",
+                "reader_app_3.26071313_universal_releaseA_vc38194.apk",
                 preRelease = false
             )
         )
         assertEquals(
             AppVariant.OFFICIAL,
-            inferAppVariant("legado_app_3.26071313_universal.apk", preRelease = false)
+            inferAppVariant("reader_app_3.26071313_universal.apk", preRelease = false)
         )
     }
 
@@ -35,35 +35,35 @@ class AppUpdateSelectorTest {
             "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "3.26.0713134507",
-                assetName = "legado_app_3.26.0713134507_release.apk"
+                assetName = "reader_app_3.26.0713134507_release.apk"
             )
         )
         assertEquals(
             "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "beta",
-                assetName = "legado_app_3.26.07131345_release.apk"
+                assetName = "reader_app_3.26.07131345_release.apk"
             )
         )
         assertEquals(
             "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "beta",
-                assetName = "legado_app_3.26.071313450700_universal_release.apk"
+                assetName = "reader_app_3.26.071313450700_universal_release.apk"
             )
         )
         assertEquals(
             "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "",
-                assetName = "legado_app_3.26.071313.apk"
+                assetName = "reader_app_3.26.071313.apk"
             )
         )
         assertEquals(
             "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "3.26071313",
-                assetName = "legado_app_3.26071313_release.apk"
+                assetName = "reader_app_3.26071313_release.apk"
             )
         )
     }
@@ -76,7 +76,7 @@ class AppUpdateSelectorTest {
             createdAt = "2026-08-09T18:12:00Z",
             downloadCount = 0,
             id = 1,
-            name = "legado_app_3.26080918_release_vc38194.apk",
+            name = "reader_app_3.26080918_release_vc38194.apk",
             state = "uploaded",
             url = "https://api.github.com/assets/1",
             size = 17_800_000
@@ -97,8 +97,8 @@ class AppUpdateSelectorTest {
 
     @Test
     fun armDevicePrefersSmallPackageRegardlessOfUploadOrder() {
-        val arm = release("legado_app_version_release.apk", createdAt = 1)
-        val universal = release("legado_app_version_通用_release.apk", createdAt = 2)
+        val arm = release("reader_app_version_release.apk", createdAt = 1)
+        val universal = release("reader_app_version_通用_release.apk", createdAt = 2)
 
         val selected = selectUpdateRelease(
             releases = listOf(universal, arm),
@@ -112,8 +112,8 @@ class AppUpdateSelectorTest {
 
     @Test
     fun x86DevicePrefersUniversalPackage() {
-        val arm = release("legado_app_version_release.apk", createdAt = 2)
-        val universal = release("legado_app_version_universal_release.apk", createdAt = 1)
+        val arm = release("reader_app_version_release.apk", createdAt = 2)
+        val universal = release("reader_app_version_universal_release.apk", createdAt = 1)
 
         val selected = selectUpdateRelease(
             releases = listOf(arm, universal),
@@ -127,16 +127,16 @@ class AppUpdateSelectorTest {
 
     @Test
     fun betaAssetNameExposesTheMonotonicVersionCode() {
-        assertEquals(38194L, parseAssetVersionCode("legado_app_release_vc38194.apk"))
-        assertEquals(38195L, parseAssetVersionCode("legado_app_release-VC38195.apk"))
-        assertEquals(0L, parseAssetVersionCode("legado_app_release.apk"))
+        assertEquals(38194L, parseAssetVersionCode("reader_app_release_vc38194.apk"))
+        assertEquals(38195L, parseAssetVersionCode("reader_app_release-VC38195.apk"))
+        assertEquals(0L, parseAssetVersionCode("reader_app_release.apk"))
     }
 
     @Test
     fun x86DeviceRejectsArmOnlyPackage() {
         assertNull(
             selectUpdateRelease(
-                releases = listOf(release("legado_app_version_release.apk")),
+                releases = listOf(release("reader_app_version_release.apk")),
                 appVariant = AppVariant.BETA_RELEASE,
                 currentVersionName = "3.26071312",
                 supportedAbis = listOf("x86_64", "x86")
@@ -147,11 +147,11 @@ class AppUpdateSelectorTest {
     @Test
     fun x86DeviceUsesOlderCompatibleVersionWhenLatestIsArmOnly() {
         val latestArm = release(
-            "legado_app_latest_release.apk",
+            "reader_app_latest_release.apk",
             versionName = "3.26082119"
         )
         val olderUniversal = release(
-            "legado_app_older_universal_release.apk",
+            "reader_app_older_universal_release.apk",
             versionName = "3.26082118"
         )
 
@@ -169,7 +169,7 @@ class AppUpdateSelectorTest {
     @Test
     fun sameHourBetaUsesVersionCodeInsteadOfWallClockTime() {
         val replacement = release(
-            "legado_app_3.26082118_release.apk",
+            "reader_app_3.26082118_release.apk",
             versionName = "3.26082118",
             versionCode = 38194
         )
@@ -198,12 +198,12 @@ class AppUpdateSelectorTest {
     @Test
     fun versionCodeOverridesConflictingDisplayVersions() {
         val laterNameWithLowerCode = release(
-            "legado_app_3.26082123_release_vc38192.apk",
+            "reader_app_3.26082123_release_vc38192.apk",
             versionName = "3.26082123",
             versionCode = 38192
         )
         val earlierNameWithHigherCode = release(
-            "legado_app_3.26082121_release_vc38194.apk",
+            "reader_app_3.26082121_release_vc38194.apk",
             versionName = "3.26082121",
             versionCode = 38194
         )
@@ -219,12 +219,12 @@ class AppUpdateSelectorTest {
     @Test
     fun highestVersionCodeWinsEvenWithAnEarlierDisplayVersion() {
         val lowerCode = release(
-            "legado_app_3.26082123_release_vc38194.apk",
+            "reader_app_3.26082123_release_vc38194.apk",
             versionName = "3.26082123",
             versionCode = 38194
         )
         val higherCode = release(
-            "legado_app_3.26082122_release_vc38195.apk",
+            "reader_app_3.26082122_release_vc38195.apk",
             versionName = "3.26082122",
             versionCode = 38195
         )
@@ -243,7 +243,7 @@ class AppUpdateSelectorTest {
 
     @Test
     fun missingPreferredPackageFallsBackWithinLatestVersion() {
-        val universal = release("legado_app_version_通用_release.apk")
+        val universal = release("reader_app_version_通用_release.apk")
 
         assertSame(
             universal,
@@ -259,11 +259,11 @@ class AppUpdateSelectorTest {
     @Test
     fun newerVersionWinsBeforePackagePreference() {
         val olderArm = release(
-            "legado_app_old_release.apk",
+            "reader_app_old_release.apk",
             versionName = "3.26071313"
         )
         val newerUniversal = release(
-            "legado_app_new_通用_release.apk",
+            "reader_app_new_通用_release.apk",
             versionName = "3.26071314"
         )
 
@@ -280,12 +280,12 @@ class AppUpdateSelectorTest {
     @Test
     fun restoredHourVersionWinsOverHistoricalSecondVersion() {
         val historical = release(
-            "legado_app_3.26.0713082212_release.apk",
+            "reader_app_3.26.0713082212_release.apk",
             versionName = "3.26.0713082212",
             createdAt = 2
         )
         val restored = release(
-            "legado_app_3.26071309_release.apk",
+            "reader_app_3.26071309_release.apk",
             versionName = "3.26071309",
             createdAt = 1
         )
@@ -303,9 +303,9 @@ class AppUpdateSelectorTest {
 
     @Test
     fun updateChannelRemainsIsolated() {
-        val release = release("legado_app_version_release.apk")
+        val release = release("reader_app_version_release.apk")
         val releaseA = release(
-            "legado_app_version_releaseA.apk",
+            "reader_app_version_releaseA.apk",
             appVariant = AppVariant.BETA_RELEASEA
         )
 
@@ -332,8 +332,8 @@ class AppUpdateSelectorTest {
 
     @Test
     fun x86DeviceRecognizesHistoricalSanitizedUniversalPackage() {
-        val arm = release("legado_app_3.26.0713082212_release.apk", createdAt = 2)
-        val universal = release("legado_app_3.26.0713082212_._release.apk", createdAt = 1)
+        val arm = release("reader_app_3.26.0713082212_release.apk", createdAt = 2)
+        val universal = release("reader_app_3.26.0713082212_._release.apk", createdAt = 1)
 
         assertSame(
             universal,
@@ -347,97 +347,38 @@ class AppUpdateSelectorTest {
     }
 
     @Test
-    fun updateDownloadsUseCdnExceptForHistoricalSanitizedNames() {
-        val armFile = "legado_app_3.26071309_release.apk"
+    fun updateDownloadsUseGithubAssetsDirectly() {
+        val githubUrl = "https://github.com/yuanxiaoaihezhou/Reader/releases/download/v/app.apk"
+
         assertEquals(
-            "https://cdn.mgz.la/app/legado_app_3.26071309_release.apk",
-            resolveAppUpdateDownloadUrl(
-                armFile,
-                "https://github.com/example/arm.apk"
-            )
-        )
-        assertEquals(
-            "https://cdn.gigu.edu.kg/app/legado_app_3.26071309_release.apk",
-            resolveAppUpdateMirrorUrl(
-                armFile,
-                "https://cdn.mgz.la/app/$armFile"
-            )
-        )
-        assertEquals(
-            "https://cdn.mgz.edu.kg/app/legado_app_3.26071309_release.apk",
-            resolveAppUpdateAlternateMirrorUrl(
-                armFile,
-                "https://cdn.mgz.la/app/$armFile",
-                "https://cdn.gigu.edu.kg/app/$armFile"
-            )
-        )
-        assertEquals(
-            "https://cdn.mgz.la/app/legado_app_3.26071309_universal_release.apk",
-            resolveAppUpdateDownloadUrl(
-                "legado_app_3.26071309_universal_release.apk",
-                "https://github.com/example/universal.apk"
-            )
-        )
-        assertEquals(
-            "https://github.com/example/legacy-universal.apk",
-            resolveAppUpdateDownloadUrl(
-                "legado_app_3.26.0713082212_._release.apk",
-                "https://github.com/example/legacy-universal.apk"
-            )
+            githubUrl,
+            resolveAppUpdateDownloadUrl("reader_app_3.26071309_release.apk", githubUrl)
         )
         assertNull(
-            resolveAppUpdateMirrorUrl(
-                "legado_app_3.26.0713082212_._release.apk",
-                "https://github.com/example/legacy-universal.apk"
-            )
+            resolveAppUpdateMirrorUrl("reader_app_3.26071309_release.apk", githubUrl)
         )
         assertNull(
             resolveAppUpdateAlternateMirrorUrl(
-                "legado_app_3.26.0713082212_._release.apk",
-                "https://github.com/example/legacy-universal.apk",
+                "reader_app_3.26071309_release.apk",
+                githubUrl,
                 null
             )
         )
-    }
-
-    @Test
-    fun updateFallbackAndIgnorePoliciesStayScoped() {
-        val githubUrl = "https://github.com/example/app.apk"
-        val cdnUrl = resolveAppUpdateDownloadUrl("legado_app_release.apk", githubUrl)
-
-        assertEquals(githubUrl, resolveAppUpdateBackupUrl(cdnUrl, githubUrl))
-        assertEquals(
-            "https://cdn.gigu.edu.kg/app/legado_app_release.apk",
-            resolveAppUpdateMirrorUrl("legado_app_release.apk", cdnUrl)
-        )
-        assertEquals(
-            "https://cdn.mgz.edu.kg/app/legado_app_release.apk",
-            resolveAppUpdateAlternateMirrorUrl(
-                "legado_app_release.apk",
-                cdnUrl,
-                "https://cdn.gigu.edu.kg/app/legado_app_release.apk"
-            )
-        )
-        val update = release("legado_app_release.apk").copy(downloadUrl = githubUrl)
-            .toUpdateInfo()
-        assertEquals(cdnUrl, update.downloadUrl)
-        assertEquals(
-            "https://cdn.gigu.edu.kg/app/legado_app_release.apk",
-            update.mirrorDownloadUrl
-        )
-        assertEquals(
-            "https://cdn.mgz.edu.kg/app/legado_app_release.apk",
-            update.alternateMirrorDownloadUrl
-        )
-        assertEquals(githubUrl, update.backupDownloadUrl)
         assertNull(resolveAppUpdateBackupUrl(githubUrl, githubUrl))
+
+        val update = release("reader_app_release.apk").copy(downloadUrl = githubUrl)
+            .toUpdateInfo()
+        assertEquals(githubUrl, update.downloadUrl)
+        assertNull(update.mirrorDownloadUrl)
+        assertNull(update.alternateMirrorDownloadUrl)
+        assertNull(update.backupDownloadUrl)
         assertTrue(isIgnoredAppUpdate("3.26080220", "3.26080220"))
         assertFalse(isIgnoredAppUpdate("3.26080221", "3.26080220"))
     }
 
     @Test
     fun betaUpdateUsesTheRawGithubAssetInBrowserMode() {
-        val release = release("legado_app_3.26082118_release.apk")
+        val release = release("reader_app_3.26082118_release.apk")
 
         val update = release.toUpdateInfo(isBeta = true)
 

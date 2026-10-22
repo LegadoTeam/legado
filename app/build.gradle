@@ -11,7 +11,6 @@ plugins {
     alias libs.plugins.kotlin.parcelize
     alias libs.plugins.room
     alias libs.plugins.ksp
-    alias libs.plugins.google.services
 }
 apply from: 'download.gradle'
 apply from: 'cronet-loader.gradle'
@@ -20,8 +19,12 @@ static def releaseTime() {
     return new Date().format("yyMMddHH", TimeZone.getTimeZone("GMT+8"))
 }
 
-def name = "legado"
+def name = "reader"
 def version = "3." + releaseTime()
+def readerVersion = version + "-reader"
+def readerApplicationId = "io.github.yuanxiaoaihezhou.reader"
+def readerApplicationIdSuffix = project.findProperty("readerApplicationIdSuffix")?.toString()?.trim()
+def readerAppNameA = project.findProperty("readerAppNameA")?.toBoolean() ?: false
 def versionCodeValue = 30000
 // Preserve the published code at this point, then ignore GitHub wrapper merge commits.
 def versionCodeBaseCommit = '9639f027fbc8cfdf57ce136a9e0c98829a235aef'
@@ -63,11 +66,11 @@ android {
         }
     }
     defaultConfig {
-        applicationId "com.legado.app"
+        applicationId readerApplicationId
         minSdk 23
         targetSdk 36
         versionCode = versionCodeValue
-        versionName version
+        versionName readerVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Keep app translations while dropping unused transitive dependency locales.
         resourceConfigurations += [
@@ -112,12 +115,13 @@ android {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
                 signingConfig = signingConfigs.myConfig
             }
-            applicationIdSuffix '.release'
-            if (getApplicationIdSuffix() == '.releaseA') {
-                manifestPlaceholders.put("app_name", "@string/app_name_a")
-            } else {
-                manifestPlaceholders.put("app_name", "@string/app_name")
+            if (readerApplicationIdSuffix) {
+                applicationIdSuffix readerApplicationIdSuffix
             }
+            manifestPlaceholders.put(
+                    "app_name",
+                    readerAppNameA ? "@string/app_name_a" : "@string/app_name"
+            )
 
             minifyEnabled true
             shrinkResources = true
@@ -130,7 +134,7 @@ android {
             manifestPlaceholders.put("app_name", "@string/app_name")
 
             applicationIdSuffix '.debug'
-            versionNameSuffix 'debug'
+            versionNameSuffix '-debug'
             minifyEnabled = (project.findProperty('ciMinifyDebug')?.toString() == 'true')
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'cronet-proguard-rules.pro'
         }
@@ -359,11 +363,6 @@ dependencies {
         // PDFBox's older jdk15to18 artifacts duplicate the project's jdk18on classes.
         exclude group: 'org.bouncycastle'
     }
-
-    //firebase, 崩溃统计和性能统计
-    implementation platform(libs.firebase.bom)
-    implementation libs.firebase.analytics
-    implementation libs.firebase.perf
 
     implementation libs.glide.recyclerview
 

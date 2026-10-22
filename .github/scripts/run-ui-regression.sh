@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-trap 'adb pull /sdcard/Android/data/com.legado.app.debug/files/ui-regression app/build/ui-regression || true' EXIT
+trap 'adb pull /sdcard/Android/data/io.github.yuanxiaoaihezhou.reader.debug/files/ui-regression app/build/ui-regression || true' EXIT
 
 ./gradlew :app:connectedAppDebugAndroidTest \
   --init-script .github/scripts/source-browser-test.init.gradle \

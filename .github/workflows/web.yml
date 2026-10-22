@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  UPSTREAM_REPOSITORY: LegadoTeam/legado
+  TARGET_REPOSITORY: yuanxiaoaihezhou/Reader
 
 permissions:
   actions: write
@@ -59,7 +59,7 @@ jobs:
 
       - name: Commit web assets
         id: web-commit
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository == env.UPSTREAM_REPOSITORY }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository == env.TARGET_REPOSITORY }}
         uses: stefanzweifel/git-auto-commit-action@v7.2.0
         with:
           commit_message: Bump web ${{ env.APP_VER}}

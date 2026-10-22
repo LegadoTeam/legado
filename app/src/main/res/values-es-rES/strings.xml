@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--App-->
-    <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
-    <string name="receiving_shared_label">Legado·buscador</string>
-    <string name="receiving_shared_import_label">Legado·importar</string>
-    <string name="tip_perm_request_storage">Legado necesita de acceso de almacenamineto para buscar y leer libros. Por favor, diríjase a los "Ajustes de la aplicación" para conceder el "Permiso de almacenamineto".</string>
+    <string name="app_name">Reader</string>
+    <string name="app_name_a">Reader·A</string>
+    <string name="receiving_shared_label">Reader·buscador</string>
+    <string name="receiving_shared_import_label">Reader·importar</string>
+    <string name="tip_perm_request_storage">Reader necesita de acceso de almacenamineto para buscar y leer libros. Por favor, diríjase a los "Ajustes de la aplicación" para conceder el "Permiso de almacenamineto".</string>
 
     <!--Other-->
     <string name="menu_backup">Inicio</string>
@@ -98,8 +98,8 @@
     <string name="offline_cache_t">Caché sin conexión</string>
     <string name="offline_cache_s">precarga el o los capítulos(s) seleccionado(s) en Almacenamiento en caché</string>
     <string name="change_origin">Cambiar origen</string>
-    <string name="about_description">\u3000\u3000 Este es una aplicación de lectura bajo software libre, desarrollado en Kotlin, en que podrás participar. </string>
-    <string name="app_share_description">Legado (YueDu 3.0) disponible para descargar en：\n https://github.com/LegadoTeam/legado/releases</string>
+    <string name="about_description">Reader es una versión independiente derivada del proyecto de código abierto Legado. No es una versión oficial de Legado y continúa bajo GNU GPL v3.0.</string>
+    <string name="app_share_description">Descargar Reader：\nhttps://github.com/yuanxiaoaihezhou/Reader/releases\nProyecto original Legado：https://github.com/LegadoTeam/legado</string>
     <string name="version_name">Versión %s</string>
     <string name="pt_background_verification">Verificación en segundo plano</string>
     <string name="ps_background_verification">podrá utilizar con libertad cuando se verifique la fuente del libro</string>
@@ -655,7 +655,7 @@
     <string name="app_folder_picker">Selector de carpetas de aplicaciones</string>
     <string name="app_file_picker">Selector de archivos de la aplicación</string>
     <string name="a10_permission_toast">En Android 10+ no puede leer ni guardar archivos debido a restricciones de permisos</string>
-    <string name="add_to_text_context_menu_s">Mantenga pulsado para mostrar Legado·Búsqueda en el menú de operaciones</string>
+    <string name="add_to_text_context_menu_s">Mantenga pulsado para mostrar Reader·Búsqueda en el menú de operaciones</string>
     <string name="add_to_text_context_menu_t">Buscar en pantalla de operación de texto</string>
     <string name="record_log">Registro</string>
     <string name="log">Registro</string>
@@ -697,7 +697,7 @@
     <string name="btn_default_s">Default</string>
     <string name="main_menu">Main menu</string>
     <string name="request_permission">Tap to grant permission</string>
-    <string name="tip_local_perm_request_storage">Legado needs Storage permission, please tap the "Grant Permission" button below, or go to "Settings"-"Application Permissions"-to open the required permission. If the permission is still not work, please tap "Select Folder" in the upper right corner to use the system folder picker.</string>
+    <string name="tip_local_perm_request_storage">Reader needs Storage permission, please tap the "Grant Permission" button below, or go to "Settings"-"Application Permissions"-to open the required permission. If the permission is still not work, please tap "Select Folder" in the upper right corner to use the system folder picker.</string>
     <string name="alouding_disable">The selected text cannot be spoken in full text speech</string>
     <string name="read_body_to_lh">Extend to cutout</string>
     <string name="toc_updateing">Updating Chapters</string>

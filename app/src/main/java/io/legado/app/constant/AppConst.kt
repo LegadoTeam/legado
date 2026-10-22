@@ -2,23 +2,20 @@ package io.legado.app.constant
 
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.os.Build
 import android.provider.Settings
 import androidx.annotation.Keep
-import cn.hutool.crypto.digest.DigestUtil
 import io.legado.app.BuildConfig
 import io.legado.app.help.update.AppVariant
 import org.apache.commons.lang3.time.FastDateFormat
 import splitties.init.appCtx
 
-private const val BETA_SIGNATURE =
-    "E2400519DF26F329EFC3FA1288DB46E8A23C6AEEB14B5378AD80CA9F8136C146"
-
 @Suppress("ConstPropertyName")
 @SuppressLint("SimpleDateFormat")
 object AppConst {
 
-    const val APP_TAG = "Legado"
+    const val APP_TAG = "Reader"
+
+    const val READER_APPLICATION_ID = "io.github.yuanxiaoaihezhou.reader"
 
     const val channelIdDownload = "channel_download"
     const val channelIdReadAloud = "channel_read_aloud"
@@ -30,8 +27,6 @@ object AppConst {
 
     const val DEFAULT_WEBDAV_ID = -1L
 
-    private const val OFFICIAL_SIGNATURE =
-        "8DACBF25EC667C9B1374DB1450C1A866C2AAA1173016E80BF6AD2F06FABDDC08"
     val timeFormat: FastDateFormat by lazy {
         FastDateFormat.getInstance("HH:mm")
     }
@@ -66,10 +61,9 @@ object AppConst {
         appCtx.packageManager.getPackageInfo(appCtx.packageName, PackageManager.GET_ACTIVITIES)
             ?.let {
                 appInfo.versionName = it.versionName!!
-                appInfo.appVariant = when {
-                    it.packageName.contains("releaseA") -> AppVariant.BETA_RELEASEA
-                    isBeta -> AppVariant.BETA_RELEASE
-                    isOfficial -> AppVariant.OFFICIAL
+                appInfo.appVariant = when (it.packageName) {
+                    READER_APPLICATION_ID -> AppVariant.OFFICIAL
+                    "$READER_APPLICATION_ID.releaseA" -> AppVariant.BETA_RELEASEA
                     else -> AppVariant.UNKNOWN
                 }
 
@@ -83,38 +77,8 @@ object AppConst {
         appInfo
     }
 
-    @Suppress("DEPRECATION")
-    private val sha256Signatures: List<String> by lazy {
-        val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            appCtx.packageManager.getPackageInfo(
-                appCtx.packageName,
-                PackageManager.GET_SIGNING_CERTIFICATES
-            )
-        } else {
-            appCtx.packageManager.getPackageInfo(
-                appCtx.packageName,
-                PackageManager.GET_SIGNATURES
-            )
-        }
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageInfo.signingInfo?.apkContentsSigners
-        } else {
-            packageInfo.signatures
-        }
-        signatures.orEmpty().map {
-            DigestUtil.sha256Hex(it.toByteArray()).uppercase()
-        }
-    }
-
-    private val sha256Signature: String?
-        get() = sha256Signatures.singleOrNull()
-
-    private val isOfficial = sha256Signature == OFFICIAL_SIGNATURE
-
-    private val isBeta = sha256Signature == BETA_SIGNATURE || BuildConfig.DEBUG
-
     val betaUpdateVariant: AppVariant? by lazy {
-        resolveBetaUpdateVariant(appCtx.packageName, sha256Signatures)
+        resolveBetaUpdateVariant(appCtx.packageName)
     }
 
     val charsets =
@@ -134,15 +98,10 @@ object AppConst {
 
 }
 
-internal fun resolveBetaUpdateVariant(
-    packageName: String,
-    signatureSha256: List<String>
-): AppVariant? {
-    val currentSignature = signatureSha256.singleOrNull() ?: return null
-    if (!currentSignature.equals(BETA_SIGNATURE, ignoreCase = true)) return null
+internal fun resolveBetaUpdateVariant(packageName: String): AppVariant? {
     return when (packageName) {
-        "com.legado.app.release" -> AppVariant.BETA_RELEASE
-        "com.legado.app.releaseA" -> AppVariant.BETA_RELEASEA
+        AppConst.READER_APPLICATION_ID -> AppVariant.BETA_RELEASE
+        "${AppConst.READER_APPLICATION_ID}.releaseA" -> AppVariant.BETA_RELEASEA
         else -> null
     }
 }

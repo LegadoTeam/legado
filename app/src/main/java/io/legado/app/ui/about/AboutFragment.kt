@@ -48,6 +48,8 @@ class AboutFragment : PreferenceFragmentCompat() {
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
+            "reader_source" -> openUrl(R.string.reader_source_url)
+            "upstream_project" -> openUrl(R.string.upstream_source_url)
             "contributors" -> openUrl(R.string.contributors_url)
             "update_log" -> showMdFile(getString(R.string.update_log), "updateLog.md")
             "check_update" -> checkAppUpdate()

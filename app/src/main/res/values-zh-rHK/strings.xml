@@ -95,12 +95,12 @@
     <string name="offline_cache_t">離線緩存</string>
     <string name="offline_cache_s">緩存已選擇的章節到本地</string>
     <string name="change_origin">換源</string>
-    <string name="about_description">
-        \u3000\u3000這是一款使用 Kotlin 全新開發的開源的閲讀應用程式，歡迎你的加入。
-    </string>
-    <string name="app_share_description">
-        閲讀3.0下載地址：\nhttps://github.com/LegadoTeam/legado/releases
-    </string>
+    <string name="about_description">Reader（閲讀）是基於 Legado 開源項目二次開發的獨立版本，並非 Legado 官方發行版，繼續遵循 GNU GPL v3.0。</string>
+    <string name="app_share_description">Reader（閲讀）下載地址：\nhttps://github.com/yuanxiaoaihezhou/Reader/releases\n上游 Legado：https://github.com/LegadoTeam/legado</string>
+    <string name="reader_source">Reader 原始碼</string>
+    <string name="reader_source_summary">yuanxiaoaihezhou/Reader</string>
+    <string name="upstream_project">Legado 上游項目</string>
+    <string name="upstream_project_summary">LegadoTeam/legado</string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">後臺校驗書源</string>
     <string name="ps_background_verification">打開后可以在校驗書源時自由操作</string>

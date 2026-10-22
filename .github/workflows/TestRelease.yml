@@ -29,6 +29,8 @@ jobs:
       versionCode: ${{ steps.set-ver.outputs.versionCode }}
       label: ${{ steps.set-ver.outputs.label }}
       commit: ${{ steps.set-ver.outputs.commit }}
+      lanzou: ${{ steps.check.outputs.lanzou }}
+      sign: ${{ steps.check.outputs.sign }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -67,7 +69,7 @@ jobs:
             current_beta_code=$(
               gh api "repos/${GITHUB_REPOSITORY}/releases/tags/beta" \
                 --jq '.body' 2>/dev/null \
-                | sed -nE 's/.*legado-version-code:([0-9]+).*/\1/p' \
+                | sed -nE 's/.*(reader|legado)-version-code:([0-9]+).*/\2/p' \
                 | head -n 1
             )
           fi
@@ -82,26 +84,29 @@ jobs:
           echo "label=${branch}_${COMMIT_SHA:0:7}" >> "$GITHUB_OUTPUT"
           echo "commit=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Verify Release Credentials
+      - id: check
         env:
-          RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           LANZOU_ID: ${{ secrets.LANZOU_ID }}
           LANZOU_PSD: ${{ secrets.LANZOU_PSD }}
           LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
+          RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
-          for name in \
-            RELEASE_KEY_STORE RELEASE_KEY_PASSWORD RELEASE_STORE_PASSWORD \
-            LANZOU_ID LANZOU_PSD LANZOU_FOLDER_ID; do
-            if [ -z "${!name}" ]; then
-              echo "Missing required secret: $name"
-              exit 1
-            fi
-          done
+          if [ -n "$LANZOU_ID" ] && [ -n "$LANZOU_PSD" ] && [ -n "$LANZOU_FOLDER_ID" ]; then
+            echo "lanzou=yes" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$RELEASE_KEY_STORE" ] && [ -n "$RELEASE_KEY_ALIAS" ] && \
+            [ -n "$RELEASE_KEY_PASSWORD" ] && [ -n "$RELEASE_STORE_PASSWORD" ]; then
+            echo "sign=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "Reader release signing secrets are not configured; beta build/publish will be skipped."
+          fi
 
   build:
     needs: prepare
+    if: ${{ needs.prepare.outputs.sign == 'yes' }}
     strategy:
       matrix:
         product: [app]
@@ -134,16 +139,17 @@ jobs:
       - name: Release APK Sign
         env:
           RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
           printf '%s' "$RELEASE_KEY_STORE" | base64 --decode \
-            > "$GITHUB_WORKSPACE/app/legado.jks"
+            > "$GITHUB_WORKSPACE/app/reader.jks"
           {
             printf '%s\n' "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
             printf '%s\n' "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
-            echo "RELEASE_STORE_FILE=./legado.jks"
-            echo "RELEASE_KEY_ALIAS=legado"
+            echo "RELEASE_STORE_FILE=./reader.jks"
+            echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
           } >> "$GITHUB_WORKSPACE/gradle.properties"
 
       - name: Build With Gradle
@@ -151,20 +157,19 @@ jobs:
           sed -i "s/^def version = .*/def version = \"$VERSION\"/" \
             "$GITHUB_WORKSPACE/app/build.gradle"
 
+          gradle_variant_args=()
           if [ "$type" = "release" ]; then
-            typeName="新包名"
+            typeName="release"
           else
-            typeName="新共存"
-            sed -i "s/'.release'/'.releaseA'/" \
-              "$GITHUB_WORKSPACE/app/build.gradle"
-            if [ -f "$GITHUB_WORKSPACE/app/google-services.json" ]; then
-              sed -i 's/.release/.releaseA/' \
-                "$GITHUB_WORKSPACE/app/google-services.json"
-            fi
+            typeName="releaseA"
+            gradle_variant_args+=(
+              -PreaderApplicationIdSuffix=.releaseA
+              -PreaderAppNameA=true
+            )
           fi
 
           chmod +x gradlew
-          ./gradlew :$product:assembleRelease -ParmOnly=true \
+          ./gradlew :$product:assembleRelease -ParmOnly=true "${gradle_variant_args[@]}" \
             --build-cache --parallel --daemon --warning-mode all
           mkdir -p "$GITHUB_WORKSPACE/apk"
           bash "$GITHUB_WORKSPACE/.github/scripts/collect-apks.sh" \
@@ -172,7 +177,7 @@ jobs:
             "$GITHUB_WORKSPACE/apk" \
             "$product" "$VERSION" "$typeName" arm
 
-          ./gradlew :$product:assembleRelease \
+          ./gradlew :$product:assembleRelease "${gradle_variant_args[@]}" \
             --build-cache --parallel --daemon --warning-mode all
           bash "$GITHUB_WORKSPACE/.github/scripts/collect-apks.sh" \
             "$GITHUB_WORKSPACE/app/build/outputs/apk" \
@@ -183,7 +188,7 @@ jobs:
         run: |
           expected_packages=(arm universal)
           mapfile -d '' apks < <(find "$GITHUB_WORKSPACE/apk" -maxdepth 1 \
-            -type f -name 'legado_*.apk' -print0)
+            -type f -name 'reader_*.apk' -print0)
           if [[ ${#apks[@]} -ne ${#expected_packages[@]} ]]; then
             echo "Expected ${#expected_packages[@]} APKs, found ${#apks[@]}"
             exit 1
@@ -227,7 +232,7 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: legado.test.${{ env.type }}
+          name: reader.test.${{ env.type }}
           if-no-files-found: error
           path: ${{ github.workspace }}/apk/*.apk
 
@@ -260,18 +265,13 @@ jobs:
           mv */*.apk .
           rm -rf -- */
           for file in *.apk; do
-            if [[ "$file" = *新包名* ]]; then
-              renamed="${file/新包名/release}"
-            else
-              renamed="${file/新共存/releaseA}"
-            fi
-            mv -- "$file" "${renamed%.apk}_vc${VERSION_CODE}.apk"
+            mv -- "$file" "${file%.apk}_vc${VERSION_CODE}.apk"
           done
 
       - name: Prepare Release Notes
         run: |
           {
-            printf '<!-- legado-version-code:%s -->\n' "$VERSION_CODE"
+            printf '<!-- reader-version-code:%s -->\n' "$VERSION_CODE"
             printf '此版本为提交测试版，可能存在不稳定情况，升级前请备份数据。\n\n'
             bash .github/scripts/extract-latest-update.sh \
               app/src/main/assets/updateLog.md
@@ -285,7 +285,7 @@ jobs:
       - name: Publish Beta Release
         uses: ncipollo/release-action@v1
         with:
-          name: legado_app_${{ env.VERSION }}
+          name: reader_app_${{ env.VERSION }}
           tag: beta
           bodyFile: ${{ github.workspace }}/release-notes.md
           prerelease: true
@@ -305,17 +305,17 @@ jobs:
             --notes-file "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Prepare Lanzou APKs
+        if: ${{ needs.prepare.outputs.lanzou == 'yes' }}
         working-directory: apk/
         run: |
           bash "$GITHUB_WORKSPACE/.github/scripts/remove-universal-apks.sh" \
             "$GITHUB_WORKSPACE/apk"
           for file in *.apk; do
-            renamed="${file/新包名/release}"
-            renamed="${renamed/新共存/releaseA}"
-            mv -- "$file" "${renamed%.apk}_测试版_${RELEASE_LABEL}.apk"
+            mv -- "$file" "${file%.apk}_测试版_${RELEASE_LABEL}.apk"
           done
 
       - name: Upload To Lanzou
+        if: ${{ needs.prepare.outputs.lanzou == 'yes' }}
         run: |
           python3 "$GITHUB_WORKSPACE/.github/scripts/lzy_web.py" \
             "$GITHUB_WORKSPACE/apk" "$LANZOU_FOLDER_ID"

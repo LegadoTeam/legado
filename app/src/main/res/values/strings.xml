@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--App-->
-    <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
-    <string name="app_name_s" translatable="false">LegadoPlus</string>
-    <string name="receiving_shared_label">Legado·search</string>
-    <string name="receiving_shared_import_label">Legado·import</string>
-    <string name="tip_perm_request_storage">Legado needs storage access to find and read books. please go "App Settings" to allow "Storage permission".</string>
+    <string name="app_name">Reader</string>
+    <string name="app_name_a">Reader·A</string>
+    <string name="app_name_s" translatable="false">ReaderPlus</string>
+    <string name="receiving_shared_label">Reader·search</string>
+    <string name="receiving_shared_import_label">Reader·import</string>
+    <string name="tip_perm_request_storage">Reader needs storage access to find and read books. please go "App Settings" to allow "Storage permission".</string>
 
     <!--Other-->
     <string name="menu_backup">Home</string>
@@ -108,12 +108,12 @@
     <string name="offline_cache_t">Offline cache</string>
     <string name="offline_cache_s">cache the selected chapter(s) to Storage</string>
     <string name="change_origin">Change Origin</string>
-    <string name="about_description">
-        \u3000\u3000 This is an open source reading software newly developed by Kotlin, welcome to join us.
-    </string>
-    <string name="app_share_description">
-        Legado (YueDu 3.0) download link：\n https://github.com/LegadoTeam/legado/releases
-    </string>
+    <string name="about_description">Reader is an independent secondary-development build based on the open-source Legado project. It is not an official Legado release and remains licensed under GNU GPL v3.0.</string>
+    <string name="app_share_description">Reader download：\nhttps://github.com/yuanxiaoaihezhou/Reader/releases\nUpstream Legado：https://github.com/LegadoTeam/legado</string>
+    <string name="reader_source">Reader source code</string>
+    <string name="reader_source_summary">yuanxiaoaihezhou/Reader</string>
+    <string name="upstream_project">Legado upstream</string>
+    <string name="upstream_project_summary">LegadoTeam/legado</string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">Background-verification</string>
     <string name="ps_background_verification">you can operate freely when verifying the book source</string>
@@ -839,7 +839,7 @@
     <string name="app_folder_picker">App folder picker</string>
     <string name="app_file_picker">App file picker</string>
     <string name="a10_permission_toast">Android 10+ unable to read and write file due to permission restrictions</string>
-    <string name="add_to_text_context_menu_s">Long tap to display Legado·Search in the operation menu</string>
+    <string name="add_to_text_context_menu_s">Long tap to display Reader·Search in the operation menu</string>
     <string name="add_to_text_context_menu_t">Text operation display Search</string>
     <string name="record_log">Record log</string>
     <string name="record_http_log">Record HTTP requests</string>
@@ -901,7 +901,7 @@
     <string name="btn_default_s">Default</string>
     <string name="main_menu">Main menu</string>
     <string name="request_permission">Tap to grant permission</string>
-    <string name="tip_local_perm_request_storage">Legado needs Storage permission, please tap the "Grant Permission" button below, or go to "Settings"-"Application Permissions"-to open the required permission. If the permission is still not work, please tap "Select Folder" in the upper right corner to use the system folder picker.</string>
+    <string name="tip_local_perm_request_storage">Reader needs Storage permission, please tap the "Grant Permission" button below, or go to "Settings"-"Application Permissions"-to open the required permission. If the permission is still not work, please tap "Select Folder" in the upper right corner to use the system folder picker.</string>
     <string name="alouding_disable">The selected text cannot be spoken in full text speech</string>
     <string name="read_body_to_lh">Extend to cutout</string>
     <string name="toc_updateing">Updating Chapters</string>
