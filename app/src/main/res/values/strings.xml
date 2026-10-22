@@ -301,6 +301,10 @@
     <string name="download_live_update_completed">Install</string>
     <string name="download_live_canceled">Canceled</string>
     <string name="download_live_failed">Download failed</string>
+    <string name="cache_download_failed_title">%1$d chapter(s) failed to download</string>
+    <string name="cache_download_failed_item">Chapter %1$d · %2$s\n%3$s · attempted %4$d times</string>
+    <string name="cache_download_rate_limited">Request rate limited (HTTP 429)</string>
+    <string name="retry_failed_chapters">Retry failed chapters</string>
     <string name="web_service_live_started">Web service started</string>
     <string name="web_service_live_stopped">Web service stopped</string>
     <string name="mcp_service_live_started">MCP service started</string>

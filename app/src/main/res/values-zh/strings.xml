@@ -298,6 +298,10 @@
     <string name="download_live_update_completed">待安装</string>
     <string name="download_live_canceled">已取消</string>
     <string name="download_live_failed">下载失败</string>
+    <string name="cache_download_failed_title">有 %1$d 章下载失败</string>
+    <string name="cache_download_failed_item">第 %1$d 章 · %2$s\n%3$s · 已尝试 %4$d 次</string>
+    <string name="cache_download_rate_limited">请求频率受限（HTTP 429）</string>
+    <string name="retry_failed_chapters">重试失败章节</string>
     <string name="web_service_live_started">Web已开启</string>
     <string name="web_service_live_stopped">Web已关闭</string>
     <string name="mcp_service_live_started">MCP已开启</string>
