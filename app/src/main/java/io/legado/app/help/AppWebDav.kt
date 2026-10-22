@@ -194,14 +194,21 @@ object AppWebDav {
     private suspend fun pruneOldBackups(authorization: Authorization, currentFileName: String) {
         val keep = AppConfig.webDavBackupKeepCount
         if (keep <= 0) return
-        val backups = WebDav(rootWebDavUrl, authorization).listFiles()
+        val all = WebDav(rootWebDavUrl, authorization).listFiles()
             .filter { !it.isDir && it.displayName.startsWith("backup") && it.displayName.endsWith(".zip") }
             .sortedByDescending { it.displayName }
-        backups.drop(keep).forEach { file ->
-            if (file.displayName != currentFileName) {
-                kotlin.runCatching {
-                    WebDav(file.path, authorization).delete()
-                }
+        // 先把本次刚上传的文件排除，再决定要删哪些。
+        //
+        // 不能直接 `all.drop(keep)`：服务器 PROPFIND 可能尚未列出刚上传的文件
+        // （缓存/最终一致性），此时 all 里根本没有 currentFileName，
+        // drop(keep) 会把旧备份当成「最新 N 份」保留下来，一份都不删，
+        // 表现就是「设置填了 1，却还是两份」。
+        // 排除 currentFileName 后，本次上传的文件无论如何都不会被删，
+        // 剩余名额固定为 keep - 1 份历史备份。
+        val others = all.filter { it.displayName != currentFileName }
+        others.drop((keep - 1).coerceAtLeast(0)).forEach { file ->
+            kotlin.runCatching {
+                WebDav(file.path, authorization).delete()
             }
         }
     }
