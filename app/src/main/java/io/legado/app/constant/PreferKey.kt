@@ -215,6 +215,7 @@ object PreferKey {
     const val webDavDeviceName = "webDavDeviceName"
     const val webDavBookAutoRestore = "webDavBookAutoRestore"
     const val webDavBackupKeepCount = "webDavBackupKeepCount"
+    const val webDavBookAutoUpload = "webDavBookAutoUpload"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"
     const val readAloudWakeLock = "readAloudWakeLock"
