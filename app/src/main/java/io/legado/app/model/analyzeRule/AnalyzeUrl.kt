@@ -64,13 +64,37 @@ import okhttp3.Request
 import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import java.net.URLEncoder
 import java.nio.charset.Charset
 import java.util.regex.Pattern
+import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.max
+
+
+/**
+ * Marks network requests that belong to an explicit offline-cache download.
+ * Normal reading/search requests keep their existing HTTP behavior.
+ */
+class DownloadRequestContext : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<DownloadRequestContext>
+}
+
+class DownloadRateLimitException(
+    val retryAfterMillis: Long?,
+    val requestUrl: String,
+) : IOException(
+    buildString {
+        append("HTTP 429 Too Many Requests")
+        retryAfterMillis?.let { append(", retry after ${it / 1000}s") }
+    }
+)
 
 /**
  * Created by GKF on 2018/1/24.
@@ -448,6 +472,32 @@ class AnalyzeUrl(
             ?: ""
     }
 
+    private val isDownloadRequest: Boolean
+        get() = coroutineContext[DownloadRequestContext] != null
+
+    private fun requestRetryCount(): Int = if (isDownloadRequest) 0 else retry
+
+    private fun throwIfDownloadRateLimited(response: Response) {
+        if (!isDownloadRequest || response.code != 429) return
+        val retryAfterMillis = parseRetryAfterMillis(response.header("Retry-After"))
+        val requestUrl = response.request.url.toString()
+        response.close()
+        throw DownloadRateLimitException(retryAfterMillis, requestUrl)
+    }
+
+    private fun parseRetryAfterMillis(value: String?): Long? {
+        val retryAfter = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        retryAfter.toLongOrNull()?.let { seconds ->
+            return seconds.coerceIn(1L, 300L) * 1000L
+        }
+        val retryAt = runCatching {
+            SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("GMT")
+            }.parse(retryAfter)?.time
+        }.getOrNull() ?: return null
+        return (retryAt - System.currentTimeMillis()).coerceIn(1_000L, 300_000L)
+    }
+
     /**
      * 访问网站,返回StrResponse
      */
@@ -482,7 +532,7 @@ class AnalyzeUrl(
             if (this.useWebView && useWebView) {
                 strResponse = when (method) {
                     RequestMethod.POST -> {
-                        val res = getClient().newCallStrResponse(retry) {
+                        val res = getClient().newCallStrResponse(requestRetryCount()) {
                             addHeaders(headerMap)
                             url(urlNoQuery)
                             if (!encodedForm.isNullOrEmpty() || body.isNullOrBlank()) {
@@ -491,6 +541,7 @@ class AnalyzeUrl(
                                 postJson(body)
                             }
                         }
+                        throwIfDownloadRateLimited(res.raw)
                         if (shouldReturnRedirectBeforeWebView(followRedirects, res.raw.code)) {
                             res
                         } else {
@@ -516,7 +567,7 @@ class AnalyzeUrl(
                     ).getStrResponse()
                 }
             } else {
-                strResponse = getClient().newCallStrResponse(retry) {
+                strResponse = getClient().newCallStrResponse(requestRetryCount()) {
                     addHeaders(headerMap)
                     when (method) {
                         RequestMethod.POST -> {
@@ -551,6 +602,7 @@ class AnalyzeUrl(
                     } else it
                 }
             }
+            throwIfDownloadRateLimited(strResponse.raw)
             val connectionTime = System.currentTimeMillis() - startTime
             strResponse.putCallTime(connectionTime.toInt())
             return strResponse
@@ -594,7 +646,7 @@ class AnalyzeUrl(
     suspend fun getResponseAwait(): Response {
         concurrentRateLimiter.withLimit {
             setCookie()
-            val response = getClient().newCallResponse(retry) {
+            val response = getClient().newCallResponse(requestRetryCount()) {
                 addHeaders(headerMap)
                 when (method) {
                     RequestMethod.POST -> {
@@ -614,6 +666,7 @@ class AnalyzeUrl(
                     else -> get(urlNoQuery, encodedQuery)
                 }
             }
+            throwIfDownloadRateLimited(response)
             return response
         }
     }

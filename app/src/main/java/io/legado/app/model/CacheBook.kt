@@ -16,6 +16,8 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.CompositeCoroutine
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.model.analyzeRule.DownloadRateLimitException
+import io.legado.app.model.analyzeRule.DownloadRequestContext
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
@@ -39,15 +41,42 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 
 object CacheBook {
 
     val cacheBookMap = ConcurrentHashMap<String, CacheBookModel>()
 
+    private const val maxDownloadAttempts = 3
+    private const val firstRateLimitBackoffMs = 5_000L
+
     private val workingState = MutableStateFlow(true)
     private val mutex = Mutex()
+    private val sourceCooldownUntil = ConcurrentHashMap<String, Long>()
+    private val failedDownloadMap = ConcurrentHashMap<String, FailedChapterDownload>()
+    private val failedDownloadVersion = AtomicLong(0)
+
+    data class FailedChapterDownload(
+        val bookUrl: String,
+        val bookName: String,
+        val chapterIndex: Int,
+        val chapterTitle: String,
+        val errorMessage: String,
+        val httpStatus: Int?,
+        val attemptCount: Int,
+    )
+
+    val failedDownloadReportVersion: Long
+        get() = failedDownloadVersion.get()
+
+    fun failedDownloads(): List<FailedChapterDownload> =
+        failedDownloadMap.values.sortedWith(
+            compareBy<FailedChapterDownload> { it.bookName }
+                .thenBy { it.chapterIndex }
+        )
 
     @Synchronized
     fun invalidateChapters(bookUrl: String, indexes: Iterable<Int>) {
@@ -106,6 +135,28 @@ object CacheBook {
         }
     }
 
+    fun retryFailed(context: Context): Int {
+        val failures = failedDownloads()
+        failures.groupBy { it.bookUrl }.forEach { (bookUrl, bookFailures) ->
+            val book = appDb.bookDao.getBook(bookUrl) ?: return@forEach
+            val indexes = bookFailures.map { it.chapterIndex }.distinct().sorted()
+            if (indexes.isEmpty()) return@forEach
+            var rangeStart = indexes.first()
+            var previous = rangeStart
+            for (index in indexes.drop(1)) {
+                if (index == previous + 1) {
+                    previous = index
+                    continue
+                }
+                start(context, book, rangeStart, previous)
+                rangeStart = index
+                previous = index
+            }
+            start(context, book, rangeStart, previous)
+        }
+        return failures.size
+    }
+
     fun remove(context: Context, bookUrl: String) {
         context.startService<CacheBookService> {
             action = IntentAction.remove
@@ -125,6 +176,72 @@ object CacheBook {
         cacheBookMap.forEach { it.value.stop() }
         successDownloadSet.clear()
         errorDownloadMap.clear()
+    }
+
+    private fun failureKey(bookUrl: String, chapterIndex: Int) = "$bookUrl#$chapterIndex"
+
+    private fun recordFinalFailure(
+        requestBook: Book,
+        chapter: BookChapter,
+        error: Throwable,
+        attemptCount: Int,
+    ) {
+        val failure = FailedChapterDownload(
+            bookUrl = requestBook.bookUrl,
+            bookName = requestBook.name,
+            chapterIndex = chapter.index,
+            chapterTitle = chapter.title,
+            errorMessage = error.localizedMessage ?: error::class.java.simpleName,
+            httpStatus = if (error is DownloadRateLimitException) 429 else null,
+            attemptCount = attemptCount,
+        )
+        failedDownloadMap[failureKey(requestBook.bookUrl, chapter.index)] = failure
+        failedDownloadVersion.incrementAndGet()
+    }
+
+    private fun clearFinalFailure(bookUrl: String, chapterIndex: Int) {
+        if (failedDownloadMap.remove(failureKey(bookUrl, chapterIndex)) != null) {
+            failedDownloadVersion.incrementAndGet()
+        }
+    }
+
+    private suspend fun awaitSourceCooldown(source: BookSource) {
+        val key = source.bookSourceUrl
+        while (true) {
+            val until = sourceCooldownUntil[key] ?: return
+            val remaining = until - System.currentTimeMillis()
+            if (remaining <= 0L) {
+                synchronized(sourceCooldownUntil) {
+                    if (sourceCooldownUntil[key] == until) {
+                        sourceCooldownUntil.remove(key)
+                    }
+                }
+                return
+            }
+            delay(remaining)
+        }
+    }
+
+    private fun registerRateLimit(
+        source: BookSource,
+        error: DownloadRateLimitException,
+        attemptCount: Int,
+    ) {
+        val exponent = (attemptCount - 1).coerceIn(0, 5)
+        val fallback = (firstRateLimitBackoffMs * (1L shl exponent)).coerceAtMost(120_000L)
+        val waitMillis = error.retryAfterMillis ?: fallback
+        val until = System.currentTimeMillis() + waitMillis
+        synchronized(sourceCooldownUntil) {
+            val current = sourceCooldownUntil[source.bookSourceUrl] ?: 0L
+            if (until > current) {
+                sourceCooldownUntil[source.bookSourceUrl] = until
+            }
+        }
+    }
+
+    private suspend fun <T> runDownloadRequest(source: BookSource, block: suspend () -> T): T {
+        awaitSourceCooldown(source)
+        return withContext(DownloadRequestContext()) { block() }
     }
 
     fun setWorkingState(value: Boolean) {
@@ -260,6 +377,7 @@ object CacheBook {
                     manualComplete = { notifyReader && !needsResourceRefresh(requestBook, chapter) }) {
                 successDownloadSet.add(chapter.primaryStr())
                 errorDownloadMap.remove(chapter.primaryStr())
+                clearFinalFailure(requestBook.bookUrl, chapter.index)
             }) return false
             synchronized(ReadBook) {
                 if (ReadBook.book?.bookUrl == requestBook.bookUrl && BookHelp.isContentSaveCurrent(contentToken)) {
@@ -272,17 +390,21 @@ object CacheBook {
             return true
         }
 
+        private fun nextErrorCount(chapter: BookChapter, error: Throwable): Int =
+            (errorDownloadMap[chapter.primaryStr()] ?: 0) +
+                if (error is ConcurrentException) 0 else 1
+
         private fun onError(
             ticket: ChapterDownloadState.Ticket,
             requestBook: Book,
             chapter: BookChapter,
             error: Throwable,
+            errorCount: Int,
             contentToken: ContentSaveToken,
+            recordFailure: Boolean,
         ): Boolean {
             if (!BookHelp.isContentSaveCurrent(contentToken)) return false
-            val errorCount = (errorDownloadMap[chapter.primaryStr()] ?: 0) +
-                if (error is ConcurrentException) 0 else 1
-            if (!downloads.finish(ticket, Result.failure(error), retryManual = errorCount < 3) {
+            if (!downloads.finish(ticket, Result.failure(error), retryManual = errorCount < maxDownloadAttempts) {
                 errorDownloadMap[chapter.primaryStr()] = errorCount
             }) return false
             synchronized(ReadBook) {
@@ -291,7 +413,12 @@ object CacheBook {
                         (ReadBook.downloadFailChapters[chapter.index] ?: 0) + 1
                 }
             }
-            if (errorCount >= 3) AppLog.put("下载${requestBook.name}-${chapter.title}失败\n${error.localizedMessage}", error)
+            if (errorCount >= maxDownloadAttempts) {
+                if (recordFailure) {
+                    recordFinalFailure(requestBook, chapter, error, errorCount)
+                }
+                AppLog.put("下载${requestBook.name}-${chapter.title}失败\n${error.localizedMessage}", error)
+            }
             return true
         }
 
@@ -326,7 +453,11 @@ object CacheBook {
                     .also { if (it) downloads.discardWaiting(index) }
             }
             if (skip) {
-                if (chapter?.isVolume == true) postEvent(EventBus.SAVE_CONTENT, Pair(requestBook, chapter))
+                if (chapter?.isVolume == true) {
+                    postEvent(EventBus.SAVE_CONTENT, Pair(requestBook, chapter))
+                } else if (chapter != null) {
+                    clearFinalFailure(requestBook.bookUrl, chapter.index)
+                }
                 return onFinally()
             }
             if (chapter == null) return onFinally()
@@ -336,19 +467,23 @@ object CacheBook {
             startManual(scope, context, listOf(ticket)) {
                 try {
                     val content = if (refreshingResources) {
-                        resourceRefreshMutex.withLock {
-                            refreshBookResources(source, requestBook, listOf(chapter), onPublished = { accepted ->
-                                val refreshed = accepted.single()
-                                contentToken = refreshed.token
-                                onSuccess(ticket, requestBook, refreshed.chapter, refreshed.content,
-                                    notifyReader = true, contentToken = refreshed.token)
-                            }) {
-                                downloads.isCurrent(ticket)
-                            }.single().content
+                        runDownloadRequest(source) {
+                            resourceRefreshMutex.withLock {
+                                refreshBookResources(source, requestBook, listOf(chapter), onPublished = { accepted ->
+                                    val refreshed = accepted.single()
+                                    contentToken = refreshed.token
+                                    onSuccess(ticket, requestBook, refreshed.chapter, refreshed.content,
+                                        notifyReader = true, contentToken = refreshed.token)
+                                }) {
+                                    downloads.isCurrent(ticket)
+                                }.single().content
+                            }
                         }
                     } else {
                         val content = BookHelp.getContent(requestBook, chapter)
-                            ?: WebBook.getContentAwait(source, requestBook, chapter)
+                            ?: runDownloadRequest(source) {
+                                WebBook.getContentAwait(source, requestBook, chapter)
+                            }
                         BookHelp.saveImages(source, requestBook, chapter, content, 1)
                         content
                     }
@@ -358,8 +493,20 @@ object CacheBook {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    delay(1000)
-                    if (onError(ticket, requestBook, chapter, e, contentToken) && !refreshingResources) {
+                    val errorCount = nextErrorCount(chapter, e)
+                    if (errorCount < maxDownloadAttempts) {
+                        if (e is DownloadRateLimitException) {
+                            registerRateLimit(source, e, errorCount)
+                            awaitSourceCooldown(source)
+                        } else {
+                            delay(1000)
+                        }
+                    }
+                    if (onError(
+                            ticket, requestBook, chapter, e, errorCount, contentToken,
+                            recordFailure = true
+                        ) && !refreshingResources
+                    ) {
                         downloadFinish(requestBook, chapter, "获取正文失败\n${e.localizedMessage}",
                             contentToken = contentToken)
                     }
@@ -397,10 +544,15 @@ object CacheBook {
             val contentTokens = claimed.associate { it.index to BookHelp.contentSaveToken(requestBook, it) }
             try {
                 try {
-                    WebBook.getContentBatchAwait(source, requestBook, claimed)
+                    runDownloadRequest(source) {
+                        WebBook.getContentBatchAwait(source, requestBook, claimed)
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    if (e is DownloadRateLimitException) {
+                        registerRateLimit(source, e, 1)
+                    }
                     // A script may have saved some chapters before failing. Keep that progress.
                     AppLog.put("《${requestBook.name}》批量下载失败,未完成章节退回单章下载\n${e.localizedMessage}", e)
                 }
@@ -502,7 +654,12 @@ object CacheBook {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (!model.onError(ticket, requestBook, chapter, e, contentToken)) continue
+                    val errorCount = model.nextErrorCount(chapter, e)
+                    if (!model.onError(
+                            ticket, requestBook, chapter, e, errorCount, contentToken,
+                            recordFailure = false
+                        )
+                    ) continue
                     if (refreshingResources) BookHelp.getContent(requestBook, chapter)?.let { return it }
                     return "获取正文失败\n${e.localizedMessage}"
                 } finally {

@@ -79,6 +79,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     private val adapter by lazy { CacheAdapter(this, this) }
     private var booksFlowJob: Job? = null
     private var menu: Menu? = null
+    private var lastFailedDownloadReportVersion = 0L
     private val groupList: ArrayList<BookGroup> = arrayListOf()
     private var groupId: Long = -1
 
@@ -119,6 +120,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
         initRecyclerView()
         initGroupData()
         initBookData()
+        binding.root.post { showFailedDownloadsIfNeeded() }
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
@@ -300,6 +302,50 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
         }
     }
 
+    private fun showFailedDownloadsIfNeeded() {
+        if (CacheBook.isRun) return
+        val version = CacheBook.failedDownloadReportVersion
+        if (version == 0L || version == lastFailedDownloadReportVersion) return
+        val failures = CacheBook.failedDownloads()
+        lastFailedDownloadReportVersion = version
+        if (failures.isEmpty()) return
+
+        val message = buildString {
+            failures.groupBy { it.bookUrl }.values.forEachIndexed { bookIndex, bookFailures ->
+                if (bookIndex > 0) append("\n")
+                append("《${bookFailures.first().bookName}》\n")
+                bookFailures.forEach { failure ->
+                    val reason = if (failure.httpStatus == 429) {
+                        getString(R.string.cache_download_rate_limited)
+                    } else {
+                        failure.errorMessage.ifBlank { getString(R.string.download_error) }
+                    }
+                    append(
+                        getString(
+                            R.string.cache_download_failed_item,
+                            failure.chapterIndex + 1,
+                            failure.chapterTitle,
+                            reason,
+                            failure.attemptCount,
+                        )
+                    )
+                    append("\n")
+                }
+            }
+        }.trimEnd()
+
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.cache_download_failed_title, failures.size))
+            .setMessage(message)
+            .setNegativeButton(R.string.close, null)
+            .setPositiveButton(R.string.retry_failed_chapters) { _, _ ->
+                lifecycleScope.launch(IO) {
+                    CacheBook.retryFailed(this@CacheActivity)
+                }
+            }
+            .show()
+    }
+
     private fun updateDownloadMenuState() {
         menu?.findItem(R.id.menu_download)?.let { item ->
             if (CacheBook.isRun) {
@@ -326,6 +372,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
         }
         observeEvent<String>(EventBus.UP_DOWNLOAD_STATE) {
             updateDownloadMenuState()
+            showFailedDownloadsIfNeeded()
         }
         observeEvent<Pair<Book, BookChapter>>(EventBus.SAVE_CONTENT) { (book, chapter) ->
             viewModel.cacheChapters[book.bookUrl]?.add(chapter.url)
