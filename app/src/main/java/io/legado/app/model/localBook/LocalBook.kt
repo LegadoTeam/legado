@@ -463,6 +463,7 @@ object LocalBook {
      * 打开时只能提示「选择文件」。
      *
      * 这里在本地导入成功后自动补传一次。约束：
+     * - 受「导入后自动上传本地书」开关控制（AppConfig.webDavBookAutoUpload），**默认关闭**
      * - 未配置 WebDAV 时直接跳过（defaultBookWebDav 为 null）
      * - 只处理本地书（isLocal 对 localTag 与 webDavTag 都返回 true，
      *   所以 upload 把 origin 改成 webDavTag 之后依然认作本地书，阅读不受影响）
@@ -470,6 +471,7 @@ object LocalBook {
      */
     private fun autoUploadToWebDav(books: List<Book>) {
         if (books.isEmpty()) return
+        if (!AppConfig.webDavBookAutoUpload) return
         val bookWebDav = AppWebDav.defaultBookWebDav ?: return
         Coroutine.async {
             books.forEach { book ->

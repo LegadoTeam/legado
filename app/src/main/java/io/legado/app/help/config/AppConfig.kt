@@ -784,6 +784,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val webDavBookAutoRestore
         get() = appCtx.getPrefBoolean(PreferKey.webDavBookAutoRestore, false)
 
+    val webDavBookAutoUpload
+        get() = appCtx.getPrefBoolean(PreferKey.webDavBookAutoUpload, false)
+
     val recordHeapDump get() = appCtx.getPrefBoolean(PreferKey.recordHeapDump, false)
 
     val loadCoverOnlyWifi get() = appCtx.getPrefBoolean(PreferKey.loadCoverOnlyWifi, false)
