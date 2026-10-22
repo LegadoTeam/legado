@@ -3,6 +3,8 @@ package io.legado.app.ui.book.read.config
 import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.os.Bundle
+import android.os.Build
+import android.view.KeyEvent
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -32,8 +34,51 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
     private val callBack: CallBack? get() = activity as? CallBack
     private val binding by viewBinding(DialogReadAloudBinding::bind)
 
+    private val tapToResume get() = arguments?.getBoolean("tapToResume", false) == true
+    private var backCallback: android.window.OnBackInvokedCallback? = null
+
+    private fun handleListeningBack() {
+        if (BaseReadAloudService.isPlay()) {
+            ReadAloud.pause(requireContext())
+        } else if (BaseReadAloudService.isRun) {
+            ReadAloud.stop(requireContext())
+        }
+        dismissAllowingStateLoss()
+    }
+
+    override fun onCancel(dialog: DialogInterface) {
+        // Only an outside tap cancels this dialog. Back is handled separately below.
+        if (tapToResume && BaseReadAloudService.isRun && BaseReadAloudService.pause) {
+            ReadAloud.resume(requireContext())
+        }
+        super.onCancel(dialog)
+    }
+
+    override fun onStop() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            backCallback?.let { dialog?.window?.onBackInvokedDispatcher?.unregisterOnBackInvokedCallback(it) }
+        }
+        backCallback = null
+        super.onStop()
+    }
+
     override fun onStart() {
         super.onStart()
+        if (tapToResume) {
+            dialog?.setCanceledOnTouchOutside(true)
+            dialog?.setOnKeyListener { _, keyCode, event ->
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) handleListeningBack()
+                    true
+                } else false
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                val callback = android.window.OnBackInvokedCallback { handleListeningBack() }
+                backCallback = callback
+                dialog?.window?.onBackInvokedDispatcher?.registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+            }
+        }
         dialog?.window?.run {
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             setBackgroundDrawableResource(R.color.background)

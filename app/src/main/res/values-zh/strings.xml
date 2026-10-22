@@ -757,6 +757,8 @@
     <string name="timer_m">%d 分钟</string>
     <string name="brightness_auto">自动亮度 %s</string>
     <string name="read_aloud_by_page">按页朗读</string>
+    <string name="read_aloud_drag_seek">听书时拖动播放定位条</string>
+    <string name="read_aloud_drag_seek_summary">在正文任意位置上下滑动，播放条从当前朗读位置按滑动距离移动，越过顶部或底部可翻页；松手从目标段落朗读，原先暂停时保持暂停。点击正文打开菜单</string>
     <string name="read_aloud_follow_manual_page">手动翻页时跟随朗读</string>
     <string name="read_aloud_follow_manual_page_summary">朗读期间手动翻页后，从新页面重新开始朗读；关闭时继续朗读原位置</string>
     <string name="speak_engine">朗读引擎</string>

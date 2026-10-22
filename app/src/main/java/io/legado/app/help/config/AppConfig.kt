@@ -771,6 +771,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val readAloudFollowManualPage
         get() = appCtx.getPrefBoolean(PreferKey.readAloudFollowManualPage, false)
 
+    val readAloudDragSeek
+        get() = appCtx.getPrefBoolean(PreferKey.readAloudDragSeek, true)
+
     val replaceEnableDefault get() = appCtx.getPrefBoolean(PreferKey.replaceEnableDefault, true)
 
     var manualReplaceRule: Boolean

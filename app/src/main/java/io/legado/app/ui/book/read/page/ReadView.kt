@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
 import android.util.AttributeSet
@@ -16,11 +17,13 @@ import android.widget.Magnifier
 import androidx.annotation.RequiresApi
 import io.legado.app.BuildConfig
 import io.legado.app.R
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.PageAnim
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadAloud
+import io.legado.app.model.ReadAloudDragSeekSession
 import io.legado.app.model.ReadBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.ContentEditDialog
@@ -147,11 +150,28 @@ class ReadView(context: Context, attrs: AttributeSet) :
     val nextPage by lazy { PageView(context) }
     val defaultAnimationSpeed = 300
     private var pressDown = false
-    internal val isTouching: Boolean get() = pressDown
+    internal val isTouching: Boolean get() = pressDown || aloudTouchOwned
     // 翻页动画正跟随手指拖动，抬起手指后才会完成或取消翻页
     private val isPageDragging: Boolean get() = pressDown && pageDelegate?.isMoved == true
     private var isMove = false
     private val readPositionVersion = ReadPositionVersion()
+    private val dragSeek = ReadAloudDragSeekSession()
+    val isReadAloudDragging: Boolean get() = dragSeek.isActive
+    val isListeningNavigationLocked: Boolean
+        get() = AppConfig.readAloudDragSeek && BaseReadAloudService.isRun && !pdfZoom.isEnabled()
+    private var aloudTouchOwned = false
+    private var aloudDirection = ReadAloudDragSeekSession.Direction.PENDING
+    private var aloudTargets = emptyList<ReadAloudDragSeekSession.Target>()
+    private var aloudTarget: ReadAloudDragSeekSession.Target? = null
+    private val aloudRelativePosition = ReadAloudDragSeekSession.RelativePosition()
+    private var aloudGestureBook: String? = null
+    private var aloudPreviewChapter: TextChapter? = null
+    private var aloudPreviewPage = 0
+    private var aloudPreviewTurned = false
+    private var aloudBarY = 0f
+    private var aloudBarAlpha = 0f
+    private var aloudBarFade: ValueAnimator? = null
+    private val aloudBarPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     //起始点
     var startX: Float = 0f
@@ -268,6 +288,13 @@ class ReadView(context: Context, attrs: AttributeSet) :
         super.dispatchDraw(canvas)
         pageDelegate?.onDraw(canvas)
         autoPager.onDraw(canvas)
+        if (aloudBarAlpha > 0f) {
+            val thickness = 3f * resources.displayMetrics.density
+            aloudBarPaint.color = 0xFF666666.toInt()
+            aloudBarPaint.alpha = (aloudBarAlpha * 150).toInt()
+            canvas.drawRect(0f, aloudBarY - thickness / 2, width.toFloat(),
+                aloudBarY + thickness / 2, aloudBarPaint)
+        }
     }
 
     override fun computeScroll() {
@@ -284,6 +311,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // Listening owns the complete stream before any page delegate or selection gesture.
+        if (aloudTouchOwned || isListeningNavigationLocked) return handleAloudTouch(event)
         if (pdfZoom.onTouch(event) { x, y ->
                 setStartPoint(x, y, false)
                 isAbortAnim = false
@@ -314,6 +343,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
 
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            finishReadAloudDrag(cancelled = true)
             curPage.cancelHighlightTap()
             if (startReplacePreviewGesture(event)) return true
         }
@@ -340,6 +370,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 isMove = false
                 pullBookmarkCandidate = AppConfig.pullToToggleBookmark &&
                         !pressOnTextSelected && !isAutoPage &&
+                        !(isScroll && AppConfig.readAloudDragSeek && BaseReadAloudService.isRun) &&
                         (!isScroll || curPage.isAtChapterTop())
                 pageDelegate?.onTouch(event)
                 pageDelegate?.onDown()
@@ -418,6 +449,13 @@ class ReadView(context: Context, attrs: AttributeSet) :
                     return true
                 }
                 resetPullBookmarkGesture()
+                if (isReadAloudDragging) {
+                    // Scrubbing settles exactly where the finger stopped; do not fling afterward.
+                    pageDelegate?.abortAnim()
+                    finishReadAloudDrag(cancelled = false)
+                    pressOnTextSelected = false
+                    return true
+                }
                 if (!pageDelegate!!.isMoved && !isMove) {
                     if (selectedOnDown) {
                         // 点击取消选择, 拖动过则保留选区
@@ -438,6 +476,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                if (isReadAloudDragging) {
+                    pageDelegate?.abortAnim()
+                    finishReadAloudDrag(cancelled = true)
+                }
                 curPage.cancelHighlightTap()
                 dismissTextMagnifier()
                 removeCallbacks(longPressRunnable)
@@ -573,10 +615,14 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     fun cancelTouchGesturesOnContentUpdate() {
         if (isPageDragging) return
+        if (isReadAloudDragging && aloudTouchOwned && aloudGestureBook == ReadBook.book?.bookUrl) return
         cancelTouchGestures()
     }
 
     internal fun cancelNonPdfGestures() {
+        finishReadAloudDrag(cancelled = true)
+        aloudTouchOwned = false
+        hideAloudBar()
         // 之后的触摸事件都会被忽略，翻页拖动需立即复位，否则会停在半页且按键翻页失效
         if (isPageDragging) {
             pageDelegate?.isCancel = true
@@ -669,6 +715,216 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
     fun markReadPositionChanged() {
         readPositionVersion.markChanged()
+    }
+
+    private fun beginReadAloudDrag() {
+        if (!AppConfig.readAloudDragSeek || !BaseReadAloudService.isRun ||
+            isAutoPage || isLongScreenShot() || isReadAloudDragging || aloudTarget == null
+        ) return
+        val bookUrl = ReadBook.book?.bookUrl ?: return
+        val chapter = ReadBook.curTextChapter?.takeIf { it.isCompleted } ?: return
+        val playing = !BaseReadAloudService.pause
+        if (!dragSeek.begin(bookUrl, playing)) return
+        aloudPreviewChapter = chapter
+        aloudPreviewPage = curPage.textPage.index
+        aloudPreviewTurned = false
+        ReadAloud.detachReadAloudFollow()
+        if (playing) ReadAloud.pause(context)
+    }
+
+    private fun cachedAloudChapter(index: Int): TextChapter? =
+        listOfNotNull(ReadBook.prevTextChapter, ReadBook.curTextChapter, ReadBook.nextTextChapter)
+            .firstOrNull { it.chapter.index == index }
+
+    /** Preview pages without changing the service's book position until the finger is released. */
+    private fun turnAloudPreview(direction: Int): Boolean {
+        val chapter = aloudPreviewChapter ?: return false
+        var nextChapter = chapter
+        var nextPage = aloudPreviewPage + direction
+        if (nextPage !in 0 until chapter.pageSize) {
+            nextChapter = cachedAloudChapter(chapter.chapter.index + direction)
+                ?.takeIf { it.isCompleted && it.pageSize > 0 } ?: return false
+            nextPage = if (direction > 0) 0 else nextChapter.pageSize - 1
+        }
+        if (nextChapter.getPage(nextPage)?.lines?.any { it.paragraphNum > 0 } != true) return false
+        curPage.textPage.removePageAloudSpan()
+        aloudPreviewChapter = nextChapter
+        aloudPreviewPage = nextPage
+        aloudPreviewTurned = true
+        upContent(resetPageOffset = true)
+        aloudTargets = curPage.getReadAloudDragTargets()
+        AppLog.put("听书相对滑动预览：chapter=${nextChapter.chapter.index} page=$nextPage direction=$direction")
+        return aloudTargets.isNotEmpty()
+    }
+
+    private fun updateRelativeAloudDrag(fingerY: Float) {
+        if (!isReadAloudDragging || aloudTargets.isEmpty()) return
+        val first = aloudTargets.minOf { it.top }
+        val last = aloudTargets.maxOf { it.bottom }
+        val threshold = 16f * resources.displayMetrics.density
+        aloudRelativePosition.move(fingerY)
+        val direction = aloudRelativePosition.edge(first, last, threshold)
+        if (direction != 0) {
+            val excess = if (direction > 0) aloudRelativePosition.y - last - threshold
+                else first - threshold - aloudRelativePosition.y
+            if (turnAloudPreview(direction)) {
+                val newFirst = aloudTargets.minOf { it.top }
+                val newLast = aloudTargets.maxOf { it.bottom }
+                // Rebase the bar only; the finger can stay in the middle of the screen.
+                aloudRelativePosition.rebase(
+                    (if (direction > 0) newFirst + excess else newLast - excess)
+                        .coerceIn(newFirst, newLast))
+            } else {
+                aloudRelativePosition.rebase(if (direction > 0) last else first)
+            }
+        }
+        aloudBarY = aloudRelativePosition.y.coerceIn(
+            aloudTargets.minOf { it.top }, aloudTargets.maxOf { it.bottom })
+        aloudBarAlpha = 1f
+        aloudTarget = ReadAloudDragSeekSession.targetAt(aloudTargets, aloudBarY)
+        val target = aloudTarget
+        val page = curPage.textPage
+        if (target != null && target.chapter == page.chapterIndex) {
+            val firstLine = page.lines.firstOrNull { it.paragraphNum == target.paragraph }
+            if (firstLine != null) {
+                page.upPageAloudSpan(firstLine.pagePosition)
+                curPage.invalidateContentView()
+            }
+        }
+        invalidate()
+    }
+
+    private fun hideAloudBar() {
+        aloudBarFade?.cancel()
+        aloudBarFade = null
+        aloudBarAlpha = 0f
+        invalidate()
+    }
+
+    private fun handleAloudTouch(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                cancelNonPdfGestures()
+                pageDelegate?.abortAnim()
+                if (isAutoPage) callBack.autoPageStop()
+                cancelSelect()
+                aloudTouchOwned = true
+                aloudGestureBook = ReadBook.book?.bookUrl
+                aloudDirection = ReadAloudDragSeekSession.Direction.PENDING
+                aloudTargets = curPage.getReadAloudDragTargets()
+                aloudTarget = ReadAloudDragSeekSession.anchor(aloudTargets,
+                    ReadAloud.readAloudChapterIndex, ReadAloud.readAloudChapterStart)
+                val anchor = aloudTarget
+                if (anchor != null) {
+                    aloudRelativePosition.begin((anchor.top + anchor.bottom) / 2f, event.y)
+                }
+                setStartPoint(event.x, event.y, false)
+                callBack.screenOffTimerStart()
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!aloudTouchOwned) return true
+                if (!isListeningNavigationLocked) {
+                    finishReadAloudDrag(cancelled = true)
+                    hideAloudBar()
+                    aloudDirection = ReadAloudDragSeekSession.Direction.BLOCKED
+                    return true
+                }
+                if (aloudDirection == ReadAloudDragSeekSession.Direction.PENDING) {
+                    aloudDirection = ReadAloudDragSeekSession.direction(
+                        event.x - startX, event.y - startY, slopSquare)
+                    if (aloudDirection == ReadAloudDragSeekSession.Direction.VERTICAL) beginReadAloudDrag()
+                }
+                if (aloudDirection == ReadAloudDragSeekSession.Direction.VERTICAL && isReadAloudDragging) {
+                    updateRelativeAloudDrag(event.y)
+                }
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                finishReadAloudDrag(cancelled = true)
+                hideAloudBar()
+                aloudDirection = ReadAloudDragSeekSession.Direction.BLOCKED
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (!aloudTouchOwned) return true
+                if (event.actionMasked == MotionEvent.ACTION_UP && isReadAloudDragging) {
+                    updateRelativeAloudDrag(event.y)
+                }
+                aloudTouchOwned = false
+                val tap = aloudDirection == ReadAloudDragSeekSession.Direction.PENDING
+                finishReadAloudDrag(cancelled = event.actionMasked == MotionEvent.ACTION_CANCEL)
+                if (aloudBarAlpha > 0f) {
+                    aloudBarFade = ValueAnimator.ofFloat(aloudBarAlpha, 0f).apply {
+                        duration = 180L
+                        addUpdateListener { aloudBarAlpha = it.animatedValue as Float; invalidate() }
+                        start()
+                    }
+                }
+                if (tap && event.actionMasked == MotionEvent.ACTION_UP && isListeningNavigationLocked) {
+                    callBack.showActionMenu()
+                }
+                callBack.screenOffTimerStart()
+            }
+        }
+        return true
+    }
+
+    private fun finishReadAloudDrag(cancelled: Boolean) {
+        if (!dragSeek.isActive) return
+        val target = aloudTarget
+        val chapter = target?.let { cachedAloudChapter(it.chapter) }
+        val paragraph = if (!cancelled && chapter?.isCompleted == true && target != null)
+            chapter.getParagraphs(false).firstOrNull {
+            it.realNum == target.paragraph && it.text.isNotBlank()
+        } else null
+        // A paragraph spanning pages must not pull a completed edge turn back to the previous page.
+        val firstVisiblePosition = aloudTargets.filter {
+            it.chapter == target?.chapter && it.paragraph == target?.paragraph
+        }.minOfOrNull { it.position } ?: paragraph?.chapterPosition ?: 0
+        val seekPosition = ReadAloudDragSeekSession.seekPosition(
+            paragraph?.chapterPosition ?: 0, firstVisiblePosition, aloudPreviewTurned)
+        val page = paragraph?.let { chapter?.getPageIndexByCharIndex(seekPosition) } ?: -1
+        val result = dragSeek.finish(ReadBook.book?.bookUrl, BaseReadAloudService.isRun,
+            cancelled, paragraph != null && chapter != null && page >= 0)
+        val turned = aloudPreviewTurned
+        if (result.action != ReadAloudDragSeekSession.Action.SEEK) {
+            curPage.textPage.removePageAloudSpan()
+        }
+        aloudPreviewChapter = null
+        aloudPreviewTurned = false
+        if (result.action == ReadAloudDragSeekSession.Action.NONE) {
+            if (turned) upContent()
+            return
+        }
+        if (result.action == ReadAloudDragSeekSession.Action.RESUME) {
+            if (turned) upContent()
+            ReadAloud.restoreReadAloudFollow()
+            if (result.play) ReadAloud.resume(context)
+            return
+        }
+        if (paragraph == null || chapter == null) return
+        val targetChapter = chapter.chapter.index
+        if (targetChapter != ReadBook.durChapterIndex) {
+            val moved = if (targetChapter == ReadBook.durChapterIndex + 1) {
+                ReadBook.moveToNextChapter(upContent = false, upContentInPlace = false)
+            } else if (targetChapter == ReadBook.durChapterIndex - 1) {
+                ReadBook.moveToPrevChapter(upContent = false, upContentInPlace = false)
+            } else false
+            if (!moved) {
+                upContent()
+                ReadAloud.restoreReadAloudFollow()
+                if (result.play) ReadAloud.resume(context)
+                return
+            }
+        }
+        val resetOffset = curPage.textPage.chapterIndex != targetChapter || curPage.textPage.index != page
+        ReadBook.setPageIndex(page)
+        ReadBook.durChapterPos = seekPosition
+        markReadPositionChanged()
+        upContent(resetPageOffset = resetOffset)
+        AppLog.put("听书滑动定位：chapter=${ReadBook.durChapterIndex} " +
+            "paragraph=${paragraph.realNum} position=$seekPosition play=${result.play}")
+        ReadAloud.play(context, play = result.play, pageIndex = page,
+            startPos = seekPosition - chapter.getReadLength(page),
+            rewindToSentenceStart = false)
     }
 
     /**
@@ -1002,7 +1258,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 curPage.setContent(
                     pageFactory.curPage,
                     resetPageOffset,
-                    replacePreview?.chapterPosition
+                    aloudPreviewChapter?.getReadLength(aloudPreviewPage)
+                        ?: replacePreview?.chapterPosition
                         ?: replacePreviewRestorePosition
                         ?: ReadBook.durChapterPos,
                 )
@@ -1204,7 +1461,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     override val pageIndex: Int
-        get() = replacePreview?.let {
+        get() = if (aloudPreviewChapter != null) aloudPreviewPage else replacePreview?.let {
             it.previewChapter.getPageIndexByCharIndex(it.chapterPosition)
         } ?: ReadBook.durPageIndex
 
@@ -1213,19 +1470,21 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
     override val currentChapter: TextChapter?
         get() {
-            return replacePreview?.previewChapter
+            return aloudPreviewChapter ?: replacePreview?.previewChapter
                 ?: if (callBack.isInitFinish) ReadBook.textChapter(0) else null
         }
 
     override val nextChapter: TextChapter?
         get() {
             if (replacePreview != null) return null
+            aloudPreviewChapter?.let { return cachedAloudChapter(it.chapter.index + 1) }
             return if (callBack.isInitFinish) ReadBook.textChapter(1) else null
         }
 
     override val prevChapter: TextChapter?
         get() {
             if (replacePreview != null) return null
+            aloudPreviewChapter?.let { return cachedAloudChapter(it.chapter.index - 1) }
             return if (callBack.isInitFinish) ReadBook.textChapter(-1) else null
         }
 

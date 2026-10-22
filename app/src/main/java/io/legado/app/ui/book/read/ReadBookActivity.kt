@@ -404,6 +404,10 @@ class ReadBookActivity : BaseReadBookActivity(),
                 toastOnUi(R.string.read_aloud_pause)
                 return@addCallback
             }
+            if (BaseReadAloudService.isRun) {
+                ReadAloud.stop(this@ReadBookActivity)
+                return@addCallback
+            }
             if (isAutoPage) {
                 autoPageStop()
                 return@addCallback
@@ -1446,6 +1450,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 鼠标滚轮翻页
      */
     private fun mouseWheelPage(direction: PageDirection, distance: Float) {
+        if (binding.readView.isListeningNavigationLocked) return
         if (menuLayoutIsVisible || !AppConfig.mouseWheelPage) {
             return
         }
@@ -1462,6 +1467,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 音量键翻页
      */
     private fun volumeKeyPage(direction: PageDirection, longPress: Boolean): Boolean {
+        if (binding.readView.isListeningNavigationLocked) return false
         if (!AppConfig.volumeKeyPage) {
             return false
         }
@@ -1473,6 +1479,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun handleKeyPage(direction: PageDirection, longPress: Boolean) {
+        if (binding.readView.isListeningNavigationLocked) return
         if (AppConfig.keyPageOnLongPress || direction == PageDirection.NONE) {
             keyPage(direction)
         } else {
@@ -1506,6 +1513,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun keyPage(direction: PageDirection) {
+        if (binding.readView.isListeningNavigationLocked) return
         binding.readView.cancelTouchGestures()
         binding.readView.cancelSelect()
         binding.readView.pageDelegate?.isCancel = false
@@ -1651,7 +1659,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun restoreAloudFollowOnVisiblePage() {
-        if (!BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
+        if (binding.readView.isReadAloudDragging || BaseReadAloudService.isPositionChangePending || !BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
             !getPrefBoolean(PreferKey.readAloudControlsRealtime, true)
         ) return
         val chapterStart = ReadAloud.readAloudChapterStart
@@ -1780,7 +1788,14 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun showActionMenu() {
         when {
-            BaseReadAloudService.isRun -> showReadAloudDialog()
+            BaseReadAloudService.isRun -> {
+                if (supportFragmentManager.findFragmentByTag("listenTapMenu") == null) {
+                    ReadAloud.pause(this)
+                    ReadAloudDialog().apply {
+                        arguments = Bundle().apply { putBoolean("tapToResume", true) }
+                    }.show(supportFragmentManager, "listenTapMenu")
+                }
+            }
             isAutoPage -> showDialogFragment<AutoReadDialog>()
             isShowingSearchResult -> binding.searchMenu.runMenuIn()
             else -> binding.readMenu.runMenuIn()
@@ -2692,7 +2707,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             menuHiding -> bottomDialog > 0 || binding.searchMenu.bottomMenuVisible
             else -> menuLayoutIsVisible
         }
-        aloudControls.update(menuVisible)
+        aloudControls.update(menuVisible || binding.readView.isReadAloudDragging || BaseReadAloudService.isPositionChangePending)
     }
 
     override fun onLayoutPageCompleted(index: Int, page: TextPage) {
@@ -3037,7 +3052,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             updateReadAloudFloatBar()
         }
         observeEvent<Int>(EventBus.ALOUD_STATE) {
-            if (it == Status.STOP || it == Status.PAUSE) {
+            if ((it == Status.STOP || it == Status.PAUSE) && !readView.isReadAloudDragging && !BaseReadAloudService.isPositionChangePending) {
                 ReadBook.curTextChapter?.let { textChapter ->
                     val page = textChapter.getPageByReadPos(ReadBook.durChapterPos)
                     if (page != null) {
@@ -3069,7 +3084,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                         val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
                         val page = textChapter.getPage(pageIndex)
                         page?.upPageAloudSpan(aloudSpanStart)
-                        if (readView.isTouching && readView.curPage.textPage === page) {
+                        if (readView.curPage.textPage === page) {
                             // Same-page speech ranges must not cancel the user's pending swipe.
                             readView.curPage.invalidateContentView()
                             readView.submitRenderTask()
