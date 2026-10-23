@@ -96,7 +96,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(112, database.openHelper.writableDatabase.version)
+                assertEquals(113, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))
@@ -119,7 +119,7 @@ class ReadRecordAuthorIdentityTest {
     }
 
     @Test
-    fun migrate109To112PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
+    fun migrate109To113PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
         val name = "read-record-index-migration-${UUID.randomUUID()}"
         val records = (0 until 6375).map { index ->
             ReadRecord(deviceId = "phone", bookName = "History $index", author = "Author $index",
@@ -174,7 +174,7 @@ class ReadRecordAuthorIdentityTest {
                 }, Executor { it.run() }).build()
             try {
                 val sqlite = database.openHelper.writableDatabase
-                assertEquals(112, sqlite.version)
+                assertEquals(113, sqlite.version)
                 assertEquals(records.toSet(), database.readRecordDao.all.toSet())
                 for (search in listOf(false, true)) {
                     val start = android.os.SystemClock.elapsedRealtime()
@@ -197,7 +197,7 @@ class ReadRecordAuthorIdentityTest {
     }
 
     @Test
-    fun migrate111To112KeepsPhysicalIdentityAndUsesTheResolvedAuthorForDisplay() {
+    fun migrate111To113KeepsPhysicalIdentityAndUsesTheResolvedAuthorForDisplay() {
         val name = "read-record-display-migration-${UUID.randomUUID()}"
         try {
             helper.createDatabase(name, 111).use { legacy ->
@@ -209,7 +209,7 @@ class ReadRecordAuthorIdentityTest {
             val database = Room.databaseBuilder(context, AppDatabase::class.java, name)
                 .addMigrations(*DatabaseMigrations.migrations).build()
             try {
-                assertEquals(112, database.openHelper.writableDatabase.version)
+                assertEquals(113, database.openHelper.writableDatabase.version)
                 val records = database.readRecordDao.all.associateBy { it.deviceId }
                 assertEquals(ReadRecord(deviceId = "phone", bookName = "Same", readTime = 700,
                     lastRead = 50, lastChapterIndex = 4, lastChapterPos = 17,
@@ -222,6 +222,76 @@ class ReadRecordAuthorIdentityTest {
                 assertEquals(setOf("Resolved author", "Known author"),
                     database.readRecordDao.allShow.map { it.author }.toSet())
             } finally { database.close() }
+        } finally { context.deleteDatabase(name) }
+    }
+
+    @Test
+    fun migrateReleased112PreservesRecordsAndInitializesDisplayMetadata() {
+        verify112Upgrade(hasDisplayMetadata = false)
+    }
+
+    @Test
+    fun migrateBeta112PreservesExistingDisplayMetadata() {
+        verify112Upgrade(hasDisplayMetadata = true)
+    }
+
+    private fun verify112Upgrade(hasDisplayMetadata: Boolean) {
+        val name = "read-record-112-upgrade-${UUID.randomUUID()}"
+        val records = listOf(
+            ReadRecord(deviceId = "phone", bookName = "Same", readTime = 410, lastRead = 51,
+                lastChapterTitle = "Unknown chapter", lastChapterIndex = 4, lastChapterPos = 17,
+                coverUrl = "/saved/unknown.png", resolvedAuthor = "Resolved author"),
+            ReadRecord(deviceId = "tablet", bookName = "Same", author = "Known author",
+                readTime = 730, lastRead = 82, lastChapterTitle = "Known chapter", lastChapterIndex = 8,
+                lastChapterPos = 21, coverUrl = "/saved/known.png"),
+            ReadRecord(deviceId = "old-device", bookName = "Same", author = combinedAuthor,
+                readTime = 120, lastRead = 31),
+            ReadRecord(deviceId = "phone", bookName = "Unknown", readTime = 90, lastRead = 15),
+        )
+        val expected = if (hasDisplayMetadata) records.map {
+            it.copy(displayBookName = "Edited ${it.bookName}", displayAuthor = "", metadataEditedAt = 123)
+        } else records
+        try {
+            helper.createDatabase(name, 112).use { legacy ->
+                if (hasDisplayMetadata) {
+                    val fixture = InstrumentationRegistry.getInstrumentation().context.assets
+                        .open("database-112-metadata.sql").bufferedReader().use { it.readText() }
+                    fixture.split(';').filter { it.isNotBlank() }.forEach { legacy.execSQL(it) }
+                } else {
+                    // Match the installed database identity reported by the crashing release.
+                    legacy.execSQL("UPDATE room_master_table SET identity_hash = '88a51416ac7690430e2134e12a86138a' WHERE id = 42")
+                }
+                records.forEach { record ->
+                    legacy.execSQL("""INSERT INTO readRecord (deviceId, bookName, author, readTime, lastRead,
+                        lastChapterTitle, lastChapterIndex, lastChapterPos, coverUrl, resolvedAuthor)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", arrayOf<Any?>(record.deviceId,
+                        record.bookName, record.author, record.readTime, record.lastRead, record.lastChapterTitle,
+                        record.lastChapterIndex, record.lastChapterPos, record.coverUrl, record.resolvedAuthor))
+                }
+                if (hasDisplayMetadata) {
+                    legacy.execSQL("UPDATE readRecord SET displayBookName = 'Edited ' || bookName, displayAuthor = '', metadataEditedAt = 123")
+                }
+                legacy.execSQL("INSERT INTO book_memos VALUES ('saved-book', 'Keep my note', 99)")
+                assertEquals(112, legacy.version)
+            }
+            // Use the production builder's migration list, then reopen to verify the stored identity.
+            repeat(2) {
+                val database = Room.databaseBuilder(context, AppDatabase::class.java, name)
+                    .addMigrations(*DatabaseMigrations.migrations).build()
+                try {
+                    val sqlite = database.openHelper.writableDatabase
+                    assertEquals(113, sqlite.version)
+                    assertEquals(expected.toSet(), database.readRecordDao.all.toSet())
+                    assertEquals(1350L, database.readRecordDao.allTime)
+                    assertEquals(expected.map { it.displayBookName }.toSet(),
+                        database.readRecordDao.allShow.map { it.bookName }.toSet())
+                    sqlite.query("SELECT content, updatedAt FROM book_memos WHERE bookUrl = 'saved-book'").use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                        assertEquals("Keep my note", cursor.getString(0))
+                        assertEquals(99L, cursor.getLong(1))
+                    }
+                } finally { database.close() }
+            }
         } finally { context.deleteDatabase(name) }
     }
 

@@ -24,8 +24,33 @@ object DatabaseMigrations {
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_100_101, migration_104_105, migration_105_106, migration_106_107,
-            migration_107_108, migration_108_109, migration_109_110,
+            migration_107_108, migration_108_109, migration_109_110, migration_112_113,
         )
+    }
+
+    private val migration_112_113 = object : Migration(112, 113) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // 3.26102103 shipped the display columns without advancing version 112.
+            val hasDisplayMetadata = db.query("PRAGMA table_info(readRecord)").use { cursor ->
+                val nameIndex = cursor.getColumnIndexOrThrow("name")
+                var found = false
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(nameIndex) == "displayBookName") found = true
+                }
+                found
+            }
+            if (!hasDisplayMetadata) {
+                db.execSQL("ALTER TABLE readRecord ADD COLUMN displayBookName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE readRecord ADD COLUMN displayAuthor TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE readRecord ADD COLUMN metadataEditedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("""UPDATE readRecord SET displayBookName = bookName,
+                    displayAuthor = CASE WHEN author = '' THEN coalesce(resolvedAuthor, '') ELSE author END""")
+            }
+            db.execSQL("DROP INDEX IF EXISTS index_readRecord_snapshot")
+            db.execSQL("""CREATE INDEX index_readRecord_snapshot ON readRecord
+                (displayBookName ASC, displayAuthor ASC, lastRead DESC, deviceId ASC, bookName ASC, author ASC)""")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_readRecord_bookName_author ON readRecord(bookName, author)")
+        }
     }
 
     private val migration_109_110 = object : Migration(109, 110) {
@@ -559,14 +584,6 @@ object DatabaseMigrations {
                 ) = 1
                 """.trimIndent()
             )
-        }
-    }
-
-    @Suppress("ClassName")
-    class Migration_111_112 : AutoMigrationSpec {
-        override fun onPostMigrate(db: SupportSQLiteDatabase) {
-            db.execSQL("""update readRecord set displayBookName = bookName,
-                displayAuthor = case when author = '' then coalesce(resolvedAuthor, '') else author end""")
         }
     }
 

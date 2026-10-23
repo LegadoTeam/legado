@@ -1381,6 +1381,10 @@
     <string name="webdav_device_name">设备名称</string>
     <string name="webdav_book_auto_restore_t">恢复缺失的本地书</string>
     <string name="webdav_book_auto_restore_s">本地书文件缺失时，从 WebDAV 的 books 目录恢复同名文件</string>
+    <string name="webdav_backup_keep_count_t">WebDAV 备份保留数量</string>
+    <string name="webdav_backup_keep_count_s">WebDAV 上保留最近几份备份；填 0 表示不自动清理（默认），填 1 则只保留最新一份</string>
+    <string name="webdav_book_auto_upload_t">导入后自动上传本地书</string>
+    <string name="webdav_book_auto_upload_s">导入本地书籍后自动上传到 WebDAV 的 books 目录，便于其它设备直接读取</string>
     <string name="web_service_wake_lock">WebService唤醒锁</string>
     <string name="web_service_wake_lock_summary">开启web服务的时候启用唤醒锁,有些手机开启唤醒锁会被杀后台</string>
     <string name="read_aloud_wake_lock">朗读服务唤醒锁</string>

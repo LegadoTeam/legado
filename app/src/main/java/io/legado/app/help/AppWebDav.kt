@@ -202,6 +202,48 @@ object AppWebDav {
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
         val putUrl = "$rootWebDavUrl$fileName"
         WebDav(putUrl, authorization).upload(Backup.zipFilePath)
+        // 上传成功后清理同一设备的历史备份，只保留刚上传的这份
+        kotlin.runCatching {
+            pruneOldBackups(authorization, fileName)
+        }.onFailure {
+            currentCoroutineContext().ensureActive()
+            AppLog.put("清理旧备份失败\n${it.localizedMessage}", it)
+        }
+    }
+
+    /**
+     * 清理 WebDAV 上的历史备份，只保留最近 [AppConfig.webDavBackupKeepCount] 份。
+     *
+     * 阅读的备份名是 `backup<yyyy-MM-dd>-<deviceName>.zip`，每备份一次就新建一个文件，
+     * 不同日期的不会互相覆盖，于是长期使用会不断累积（实测 4 个多月攒了 17 个）。
+     *
+     * 保留份数由「WebDAV 备份保留数量」设置控制，**默认 0 表示不自动清理**，
+     * 需要用户显式填正整数才生效（填 1 即只保留最新一份）。
+     * 默认不清理是为了避免存量用户升级后，历史备份在下一次备份时被一次性删掉。
+     *
+     * 顺序上先上传成功再清理，最坏情况只是多留一份（下次备份会再清），不会丢数据。
+     * 失败只记日志，不影响备份本身。
+     */
+    private suspend fun pruneOldBackups(authorization: Authorization, currentFileName: String) {
+        val keep = AppConfig.webDavBackupKeepCount
+        if (keep <= 0) return
+        val all = WebDav(rootWebDavUrl, authorization).listFiles()
+            .filter { !it.isDir && it.displayName.startsWith("backup") && it.displayName.endsWith(".zip") }
+            .sortedByDescending { it.displayName }
+        // 先把本次刚上传的文件排除，再决定要删哪些。
+        //
+        // 不能直接 `all.drop(keep)`：服务器 PROPFIND 可能尚未列出刚上传的文件
+        // （缓存/最终一致性），此时 all 里根本没有 currentFileName，
+        // drop(keep) 会把旧备份当成「最新 N 份」保留下来，一份都不删，
+        // 表现就是「设置填了 1，却还是两份」。
+        // 排除 currentFileName 后，本次上传的文件无论如何都不会被删，
+        // 剩余名额固定为 keep - 1 份历史备份。
+        val others = all.filter { it.displayName != currentFileName }
+        others.drop((keep - 1).coerceAtLeast(0)).forEach { file ->
+            kotlin.runCatching {
+                WebDav(file.path, authorization).delete()
+            }
+        }
     }
 
     /**

@@ -28,6 +28,7 @@ import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.has
 import io.legado.app.utils.isMainThread
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.intellij.lang.annotations.Language
 
@@ -202,6 +203,10 @@ interface BaseSource : JsExtensions {
                 GSON.fromJsonObject<Map<String, String>>(json).getOrNull()?.let { map ->
                     putAll(map)
                 }
+            } catch (e: CancellationException) {
+                // Leaving the reader cancels the in-flight source request. Do not turn
+                // that normal lifecycle cancellation into a user-visible header error.
+                throw e
             } catch (e: Exception) {
                 AppLog.put("执行请求头规则出错\n$e", e)
             }

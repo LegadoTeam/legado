@@ -1386,6 +1386,10 @@
     <string name="webdav_device_name">Device name</string>
     <string name="webdav_book_auto_restore_t">Restore missing local books</string>
     <string name="webdav_book_auto_restore_s">Restore an exact-name match from the WebDAV books directory when a local book file is missing</string>
+    <string name="webdav_backup_keep_count_t">WebDAV backups to keep</string>
+    <string name="webdav_backup_keep_count_s">How many recent WebDAV backups to keep. 0 means never clean up (default); 1 keeps only the newest</string>
+    <string name="webdav_book_auto_upload_t">Upload local books after import</string>
+    <string name="webdav_book_auto_upload_s">Upload imported local books to the WebDAV books directory so other devices can read them directly</string>
     <string name="web_service_wake_lock">WebService Wake up Lock</string>
     <string name="web_service_wake_lock_summary">The wake-up lock is enabled when the web service is enabled, and some phones will be killed when the wake-up lock is enabled.</string>
     <string name="read_aloud_wake_lock">Read aloud service wake-up lock</string>

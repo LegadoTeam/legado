@@ -18,6 +18,7 @@ import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.TocEmptyException
 import io.legado.app.help.AppWebDav
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.addType
@@ -28,6 +29,7 @@ import io.legado.app.help.book.getLocalUri
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isArchive
 import io.legado.app.help.book.isEpub
+import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isMobi
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isUmd
@@ -419,6 +421,7 @@ object LocalBook {
         } else {
             books.add(importFile(uri))
         }
+        autoUploadToWebDav(books)
         return books
     }
 
@@ -447,7 +450,38 @@ object LocalBook {
             throw firstError
                 ?: NoStackTraceException("ImportFiles Error:\nAll input files occur error")
         }
+        autoUploadToWebDav(importedBooks)
         return importedUris to importedBooks
+    }
+
+    /**
+     * 导入完成后自动把书籍文件补传到 WebDAV 的 books 目录。
+     *
+     * 官方只提供「书详情 → ⁝ → 上传 WebDav」这个**手动**入口，而「备份」只打包
+     * bookshelf.json 等 16 个 json/xml 元数据、**完全不含书文件本身**。
+     * 结果是 A 机新加的书，B 机通过备份同步后只有书架条目没有文件，
+     * 打开时只能提示「选择文件」。
+     *
+     * 这里在本地导入成功后自动补传一次。约束：
+     * - 受「导入后自动上传本地书」开关控制（AppConfig.webDavBookAutoUpload），**默认关闭**
+     * - 未配置 WebDAV 时直接跳过（defaultBookWebDav 为 null）
+     * - 只处理本地书（isLocal 对 localTag 与 webDavTag 都返回 true，
+     *   所以 upload 把 origin 改成 webDavTag 之后依然认作本地书，阅读不受影响）
+     * - 任何失败只记日志，绝不向上抛，不能影响导入本身
+     */
+    private fun autoUploadToWebDav(books: List<Book>) {
+        if (books.isEmpty()) return
+        if (!AppConfig.webDavBookAutoUpload) return
+        val bookWebDav = AppWebDav.defaultBookWebDav ?: return
+        Coroutine.async {
+            books.forEach { book ->
+                if (book.isLocal) {
+                    bookWebDav.upload(book)
+                }
+            }
+        }.onError {
+            AppLog.put("自动上传书籍到 WebDav 失败\n${it.localizedMessage}", it)
+        }
     }
 
     /**
