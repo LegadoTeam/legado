@@ -30,11 +30,15 @@ class ReaderIdentityTest {
         val updateSource = repoFile(
             "app/src/main/java/io/legado/app/help/update/AppUpdateGitHub.kt"
         ).readText()
+        val releaseSource = repoFile(
+            "app/src/main/java/io/legado/app/help/update/AppReleaseInfo.kt"
+        ).readText()
         val defaultStrings = repoFile("app/src/main/res/values/strings.xml").readText()
         val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
 
         assertTrue(updateSource.contains("yuanxiaoaihezhou/Reader"))
-        assertTrue(updateSource.contains("startsWith(\"reader_\""))
+        assertTrue(updateSource.contains("AppConst.betaUpdateVariant"))
+        assertTrue(releaseSource.contains("startsWith(\"reader_\", ignoreCase = true)"))
         assertTrue(defaultStrings.contains("<string name=\"app_name\">Reader</string>"))
         assertTrue(zhStrings.contains("<string name=\"app_name\">阅读</string>"))
     }
@@ -56,9 +60,13 @@ class ReaderIdentityTest {
 
         assertTrue(testWorkflow.contains("github.repository == 'LegadoTeam/legado'"))
         assertTrue(testWorkflow.contains("-type f -name 'reader_*.apk'"))
-        assertTrue(releaseWorkflow.contains("name: reader_app_${'$'}{{ env.VERSION }}"))
-        assertTrue(releaseWorkflow.contains("files: ${'$'}{{ github.workspace }}/apk/reader_app_*.apk"))
-        assertTrue(testReleaseWorkflow.contains("if: ${'$'}{{ needs.prepare.outputs.sign == 'yes' }}"))
+        assertTrue(testWorkflow.contains("-PreaderReleaseA=true"))
+        assertFalse(testWorkflow.contains("readerApplicationIdSuffix"))
+        assertFalse(testWorkflow.contains("readerAppNameA"))
+        assertTrue(releaseWorkflow.contains("reader-version.sh"))
+        assertTrue(releaseWorkflow.contains("-PreaderReleaseA=true"))
+        assertTrue(releaseWorkflow.contains("--latest"))
+        assertTrue(testReleaseWorkflow.contains("needs.credentials.outputs.available == 'true'"))
         assertTrue(testReleaseWorkflow.contains("<!-- reader-version-code:%s -->"))
     }
 

@@ -380,7 +380,7 @@ class AppUpdateSelectorTest {
     fun betaUpdateUsesTheRawGithubAssetInBrowserMode() {
         val release = release("reader_app_3.26082118_release.apk")
 
-        val update = release.toUpdateInfo(isBeta = true)
+        val update = release.copy(isPreRelease = true).toUpdateInfo()
 
         assertEquals(release.downloadUrl, update.downloadUrl)
         assertNull(update.backupDownloadUrl)

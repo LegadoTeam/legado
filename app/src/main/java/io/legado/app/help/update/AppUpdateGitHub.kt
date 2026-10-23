@@ -19,7 +19,8 @@ import splitties.init.appCtx
 object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
 
     private val checkVariant: AppVariant
-        get() = AppConst.appInfo.appVariant.takeUnless { it == AppVariant.UNKNOWN }
+        get() = AppConst.betaUpdateVariant
+            ?: AppConst.appInfo.appVariant.takeUnless { it == AppVariant.UNKNOWN }
             ?: AppVariant.BETA_RELEASE
 
     private suspend fun getReleases(channel: UpdateChannel): List<AppReleaseInfo> {

@@ -12,7 +12,7 @@ class TestReleaseWorkflowTest {
     fun `master pushes publish immutable Reader beta releases`() {
         assertTrue(workflow.contains("branches: [ master ]"))
         assertTrue(workflow.contains("reader-version.sh"))
-        assertTrue(workflow.contains("gh release create \"$TAG\""))
+        assertTrue(workflow.contains("gh release create \"${'$'}TAG\""))
         assertTrue(workflow.contains("--prerelease"))
         assertTrue(workflow.contains("reader-version-code:"))
         assertFalse(workflow.contains("tag: beta"))

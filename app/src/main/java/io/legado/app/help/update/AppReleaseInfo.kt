@@ -97,7 +97,9 @@ data class Asset(
     }
 }
 
-private val readerSemVerPattern = Regex("""\d+\.\d+\.\d+(?:-beta\.\d+)?""")
+private val readerTagSemVerPattern = Regex("""^v(\d+\.\d+\.\d+(?:-beta\.\d+)?)$""")
+private val readerAssetSemVerPattern =
+    Regex("""(?:^|[/_])reader_(\d+\.\d+\.\d+(?:-beta\.\d+)?)(?:_|\.apk$)""")
 private val versionPattern = Regex("""\d+(?:\.\d+)+""")
 private val legacyDottedVersionPattern = Regex("""^3\.(\d{2})\.(\d{6,})$""")
 private val compactVersionPattern = Regex("""^3\.(\d{8,})$""")
@@ -119,8 +121,8 @@ internal fun parseReleaseVersionName(
     releaseTag: String,
     assetName: String
 ): String {
-    val readerVersion = readerSemVerPattern.find(releaseTag)?.value
-        ?: readerSemVerPattern.find(assetName)?.value
+    val readerVersion = readerTagSemVerPattern.matchEntire(releaseTag)?.groupValues?.get(1)
+        ?: readerAssetSemVerPattern.find(assetName)?.groupValues?.get(1)
     if (readerVersion != null) return readerVersion
     val versionName = versionPattern.find(releaseTag)?.value
         ?: versionPattern.find(assetName)?.value
