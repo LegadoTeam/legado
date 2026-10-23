@@ -48,6 +48,7 @@ if (readerVersionCodeOverride != null) {
     versionCodeValue = readerVersionCodeOverride
 }
 def name = "reader"
+def readerVersion = version
 def readerApplicationId = "io.github.yuanxiaoaihezhou.reader"
 def armOnly = project.findProperty("armOnly")?.toBoolean() ?: false
 
