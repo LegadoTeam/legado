@@ -125,15 +125,6 @@ android {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
                 signingConfig = signingConfigs.myConfig
             }
-            if (readerApplicationIdSuffix) {
-                if (project.findProperty("readerReleaseA")?.toString()?.toBoolean()) {
-                applicationIdSuffix '.releaseA'
-            }
-            }
-            manifestPlaceholders.put(
-                    "app_name",
-                    readerAppNameA ? "@string/app_name_a" : "@string/app_name"
-            )
             if (project.findProperty("readerReleaseA")?.toString()?.toBoolean()) {
                 applicationIdSuffix '.releaseA'
                 manifestPlaceholders.put("app_name", "@string/app_name_a")
