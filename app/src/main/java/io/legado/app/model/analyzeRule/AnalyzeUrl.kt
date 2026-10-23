@@ -38,6 +38,7 @@ import io.legado.app.help.http.newCallStrResponse
 import io.legado.app.help.http.postForm
 import io.legado.app.help.http.postJson
 import io.legado.app.help.http.postMultipart
+import io.legado.app.lib.cronet.CronetRequestConfig
 import io.legado.app.help.source.getShareScope
 import io.legado.app.help.source.getSharedGlobalStateKey
 import io.legado.app.model.Debug
@@ -140,7 +141,6 @@ class AnalyzeUrl(
     private var proxy: String? = null
     private var readTimeoutMs: Long? = readTimeout
     private var callTimeoutMs: Long? = callTimeout
-    private var urlTimeoutConfigured: Boolean = false
     private var followRedirects: Boolean? = null
     private var retry: Int = 0
     private var useWebView: Boolean = false
@@ -309,7 +309,6 @@ class AnalyzeUrl(
                 bodyJs = option.getBodyJs()
                 option.getTimeout()?.let {
                     readTimeoutMs = it
-                    urlTimeoutConfigured = true
                 }
                 followRedirects = option.getFollowRedirects()
                 dnsIp = option.getDnsIp()
@@ -540,6 +539,7 @@ class AnalyzeUrl(
                             } else {
                                 postJson(body)
                             }
+                            applyCronetRequestConfig()
                         }
                         throwIfDownloadRateLimited(res.raw)
                         if (shouldReturnRedirectBeforeWebView(followRedirects, res.raw.code)) {
@@ -591,6 +591,7 @@ class AnalyzeUrl(
 
                         else -> get(urlNoQuery, encodedQuery)
                     }
+                    applyCronetRequestConfig()
                 }.let {
                     val isXml = it.raw.body.contentType()?.toString()
                         ?.matches(AppPattern.xmlContentTypeRegex) == true
@@ -665,6 +666,7 @@ class AnalyzeUrl(
 
                     else -> get(urlNoQuery, encodedQuery)
                 }
+                applyCronetRequestConfig()
             }
             throwIfDownloadRateLimited(response)
             return response
@@ -704,9 +706,16 @@ class AnalyzeUrl(
             urlNoQuery.toHttpUrlOrNull()?.host
                 ?: throw IllegalArgumentException("dnsIp requires a valid HTTP URL")
         }
+        val cronetRequestConfig = buildCronetRequestConfig(
+            followRedirects = followRedirects,
+            targetHost = targetHost,
+            dnsAddresses = dnsAddresses,
+        )
         val cronetInterceptor = if (
-            urlTimeoutConfigured || followRedirects != null || dnsAddresses != null
+            shouldBypassCronetForDns(dnsAddresses, cronetRequestConfig)
         ) {
+            // HostResolverRules can safely represent one fixed IP. Keep OkHttp's
+            // multi-address DNS failover semantics when dnsIp contains multiple IPs.
             Cronet.interceptor
         } else {
             null
@@ -720,6 +729,21 @@ class AnalyzeUrl(
             dnsAddresses = dnsAddresses,
             interceptorToRemove = cronetInterceptor,
         )
+    }
+
+    private fun Request.Builder.applyCronetRequestConfig() {
+        val dnsAddresses = dnsIp?.let(::parseDnsIpAddresses)
+        val targetHost = dnsAddresses?.let {
+            urlNoQuery.toHttpUrlOrNull()?.host
+                ?: throw IllegalArgumentException("dnsIp requires a valid HTTP URL")
+        }
+        buildCronetRequestConfig(
+            followRedirects = followRedirects,
+            targetHost = targetHost,
+            dnsAddresses = dnsAddresses,
+        )?.let {
+            tag(CronetRequestConfig::class.java, it)
+        }
     }
 
     private fun extractHostFromUrl(url: String): String? {
@@ -795,6 +819,7 @@ class AnalyzeUrl(
                 }
             }
             postMultipart(type, bodyMap)
+            applyCronetRequestConfig()
         }
     }
 

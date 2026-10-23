@@ -14,7 +14,6 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.internal.http.receiveHeaders
 import org.chromium.net.UrlRequest
-import org.chromium.net.UrlResponseInfo
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -30,7 +29,7 @@ class CronetCoroutineInterceptor(private val cookieJar: CookieJar) : Interceptor
         val original: Request = chain.request()
         if (!AppConfig.isCronet) return chain.proceed(original)
         // Cronet is the selected transport. Do not silently switch to OkHttp.
-        if (getCronetEngineOrNull() == null) {
+        if (!isCronetAvailable()) {
             throw cronetUnavailableException("Cronet engine is unavailable")
         }
         return try {
@@ -94,12 +93,6 @@ class CronetCoroutineInterceptor(private val cookieJar: CookieJar) : Interceptor
                 override fun onSuccess(response: Response) {
                     coroutine.resume(response)
                 }
-
-                override fun onCanceled(request: UrlRequest?, info: UrlResponseInfo?) {
-                    super.onCanceled(request, info)
-                    coroutine.cancel()
-                }
-
 
             }
 
