@@ -126,7 +126,9 @@ android {
                 signingConfig = signingConfigs.myConfig
             }
             if (readerApplicationIdSuffix) {
-                applicationIdSuffix readerApplicationIdSuffix
+                if (project.findProperty("readerReleaseA")?.toString()?.toBoolean()) {
+                applicationIdSuffix '.releaseA'
+            }
             }
             manifestPlaceholders.put(
                     "app_name",
@@ -167,7 +169,7 @@ android {
     room {
         schemaDirectory "$projectDir/schemas"
     }
-    // 设定Room的KSP参数
+    // 璁惧畾Room鐨凨SP鍙傛暟
     ksp {
         arg("room.incremental", "true")
         arg("room.expandProjection", "true")
@@ -221,7 +223,7 @@ android {
             //options.compilerArgs << "-Xlint:unchecked"
         }
     }
-    lint { //忽略string翻译缺失，后面需要翻译时去掉，todo
+    lint { //蹇界暐string缈昏瘧缂哄け锛屽悗闈㈤渶瑕佺炕璇戞椂鍘绘帀锛宼odo
         disable 'MissingTranslation'
     }
 }
@@ -236,17 +238,17 @@ dependencies {
     //kotlin
     //noinspection GradleDependency,DifferentStdlibGradleVersion
     implementation(libs.kotlin.stdlib)
-    //Kotlin反射
+    //Kotlin鍙嶅皠
     //noinspection GradleDependency,DifferentStdlibGradleVersion
     //implementation(libs.kotlin.reflect)
 
 
-    //协程
+    //鍗忕▼
     //def coroutines_version = '1.7.3'
     implementation(libs.bundles.coroutines)
 
 
-    //图像处理库Toolkit
+    //鍥惧儚澶勭悊搴揟oolkit
     implementation(libs.renderscript.intrinsics.replacement.toolkit)
 
     //androidX
@@ -287,7 +289,7 @@ dependencies {
     implementation(libs.gsyVideoPlayer.exo2) {
         exclude(group: 'androidx.media3', module: 'media3-cast')
     }
-    //弹幕
+    //寮瑰箷
     implementation (libs.danmakuFlameMaster)
 
     //Splitties
@@ -295,7 +297,7 @@ dependencies {
     implementation(libs.splitties.systemservices)
     implementation(libs.splitties.views)
 
-    //room sql语句不高亮解决方法https://issuetracker.google.com/issues/234612964#comment6
+    //room sql璇彞涓嶉珮浜В鍐虫柟娉昲ttps://issuetracker.google.com/issues/234612964#comment6
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     //kapt("androidx.room:room-compiler:$room_version")
@@ -305,7 +307,7 @@ dependencies {
     //liveEventBus
     implementation(libs.liveeventbus)
 
-    //规则相关
+    //瑙勫垯鐩稿叧
     implementation(libs.jsoup)
     implementation(libs.json.path)
     implementation(libs.jsoupxpath)
@@ -314,7 +316,7 @@ dependencies {
 
     //JS rhino
 
-    //网络
+    //缃戠粶
     implementation(libs.okhttp)
     implementation(libs.brotli.dec)
     implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar'],
@@ -348,14 +350,14 @@ dependencies {
         exclude group: 'org.jetbrains.kotlin', module: 'kotlin-reflect'
     }
 
-    //二维码
+    //浜岀淮鐮?
     //noinspection GradleDependency
     implementation(libs.zxing.lite)
 
-    //颜色选择
+    //棰滆壊閫夋嫨
     implementation(libs.colorpicker)
 
-    //压缩解压
+    //鍘嬬缉瑙ｅ帇
     implementation libs.libarchive
 
     //apache
@@ -367,10 +369,10 @@ dependencies {
     implementation(libs.markwon.ext.tables)
     implementation(libs.markwon.html)
 
-    //转换繁体
+    //杞崲绻佷綋
     implementation(libs.quick.chinese.transfer.core)
 
-    //加解密类库,有些书源使用
+    //鍔犺В瀵嗙被搴?鏈変簺涔︽簮浣跨敤
     //noinspection GradleDependency,GradlePackageUpdate
     implementation(libs.hutool.crypto)
     implementation(libs.bouncycastle.provider)
@@ -382,14 +384,14 @@ dependencies {
 
     implementation libs.glide.recyclerview
 
-    //LeakCanary, 内存泄露检测
+    //LeakCanary, 鍐呭瓨娉勯湶妫€娴?
     //debugImplementation('com.squareup.leakcanary:leakcanary-android:2.7')
 
-    //com.github.AmrDeveloper:CodeView代码编辑已集成到应用内
-    //epubLib集成到应用内
-    // 椒盐歌词
+    //com.github.AmrDeveloper:CodeView浠ｇ爜缂栬緫宸查泦鎴愬埌搴旂敤鍐?
+    //epubLib闆嗘垚鍒板簲鐢ㄥ唴
+    // 妞掔洂姝岃瘝
     implementation(libs.lyricViewx)
-    // sora-editor代码编辑器,更丰富的编辑功能
+    // sora-editor浠ｇ爜缂栬緫鍣?鏇翠赴瀵岀殑缂栬緫鍔熻兘
     implementation(platform(libs.soraEditor.bom))
     implementation(libs.soraEditor.core)
     implementation(libs.soraEditor.language.textmate)
