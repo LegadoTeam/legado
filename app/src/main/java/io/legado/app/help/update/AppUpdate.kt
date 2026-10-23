@@ -5,12 +5,13 @@ import kotlinx.coroutines.CoroutineScope
 
 object AppUpdate {
 
-    val gitHubUpdate: AppUpdateInterface by lazy {
-        AppUpdateGitHub
-    }
+    val gitHubUpdate: AppUpdateInterface by lazy { AppUpdateGitHub }
+
+    fun check(scope: CoroutineScope, channel: UpdateChannel): Coroutine<UpdateInfo> =
+        AppUpdateGitHub.check(scope, channel)
 
     fun checkBeta(scope: CoroutineScope): Coroutine<UpdateInfo> =
-        AppUpdateGitHub.checkBeta(scope)
+        check(scope, UpdateChannel.LATEST)
 
     data class UpdateInfo(
         val tagName: String,
@@ -26,9 +27,6 @@ object AppUpdate {
     )
 
     interface AppUpdateInterface {
-
         fun check(scope: CoroutineScope): Coroutine<UpdateInfo>
-
     }
-
 }

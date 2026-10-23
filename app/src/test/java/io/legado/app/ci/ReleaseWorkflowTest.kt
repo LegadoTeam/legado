@@ -1,43 +1,25 @@
 package io.legado.app.ci
 
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 class ReleaseWorkflowTest {
+    private val workflow = repoFile(".github/workflows/release.yml").readText().replace("\r\n", "\n")
 
-    private val workflowText by lazy {
+    @Test
+    fun `stable release is manual and requires stable release train`() {
+        assertTrue(workflow.contains("workflow_dispatch:"))
+        assertTrue(workflow.contains("channel=stable"))
+        assertTrue(workflow.contains("reader-version.sh"))
+        assertTrue(workflow.contains("--latest"))
+        assertTrue(workflow.contains("reader-version-code:"))
+    }
+
+    private fun repoFile(path: String): File {
         val userDir = requireNotNull(System.getProperty("user.dir"))
-        generateSequence(File(userDir)) {
-            it.parentFile
-        }.map {
-            File(it, ".github/workflows/release.yml")
-        }.first { it.isFile }
-            .readText()
-            .replace("\r\n", "\n")
-    }
-
-    @Test
-    fun `release checkout fetches full history for version code`() {
-        val buildSteps = workflowText
-            .substringAfter("\n  build:\n")
-            .substringAfter("    steps:\n")
-        val nextStepIndex = buildSteps.indexOf("\n\n      - ")
-        assertTrue(nextStepIndex > 0)
-        val checkoutStep = buildSteps.substring(0, nextStepIndex)
-
-        assertTrue(checkoutStep.contains("- uses: actions/checkout@"))
-        assertTrue(checkoutStep.contains("fetch-depth: 0"))
-    }
-
-    @Test
-    fun `release matrix only builds existing product flavors`() {
-        val matrix = workflowText
-            .substringAfter("    strategy:\n")
-            .substringBefore("      fail-fast:")
-
-        assertTrue(matrix.contains("product: [ app ]"))
-        assertFalse(matrix.contains("google"))
+        val root = generateSequence(File(userDir)) { it.parentFile }
+            .first { File(it, "app/src/main").isDirectory }
+        return File(root, path)
     }
 }

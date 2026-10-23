@@ -75,6 +75,11 @@ class OtherConfigFragment : PreferenceFragment(),
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         putPrefBoolean(PreferKey.processText, isProcessTextEnabled())
         addPreferencesFromResource(R.xml.pref_config_other)
+        findPreference<ListPreference>(PreferKey.updateChannel)?.let { preference ->
+            if (preference.value.isNullOrBlank()) {
+                preference.value = AppConfig.updateChannel.preferenceValue
+            }
+        }
         upPreferenceSummary(PreferKey.userAgent, AppConfig.userAgent)
         upPreferenceSummary(PreferKey.preDownloadNum, AppConfig.preDownloadNum.toString())
         upPreferenceSummary(PreferKey.threadCount, AppConfig.threadCount.toString())

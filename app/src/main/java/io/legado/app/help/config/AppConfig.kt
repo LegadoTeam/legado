@@ -1,10 +1,12 @@
 package io.legado.app.help.config
 
+import io.legado.app.constant.AppConst
+import io.legado.app.help.update.UpdateChannel
+
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import android.os.Build
 import io.legado.app.BuildConfig
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.help.book.ResourceThemeGeneration
@@ -812,6 +814,17 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val defaultHomePage get() = appCtx.getPrefString(PreferKey.defaultHomePage, "bookshelf")
 
     val updateToVariant get() = appCtx.getPrefString(PreferKey.updateToVariant, "default_version")
+
+    var updateChannel: UpdateChannel
+        get() {
+            appCtx.getPrefString(PreferKey.updateChannel)?.let { saved ->
+                return UpdateChannel.resolve(saved, AppConst.appInfo.versionName)
+            }
+            return UpdateChannel.defaultForVersion(AppConst.appInfo.versionName).also { default ->
+                appCtx.putPrefString(PreferKey.updateChannel, default.preferenceValue)
+            }
+        }
+        set(value) = appCtx.putPrefString(PreferKey.updateChannel, value.preferenceValue)
 
     val streamReadAloudAudio get() = appCtx.getPrefBoolean(PreferKey.streamReadAloudAudio, false)
 

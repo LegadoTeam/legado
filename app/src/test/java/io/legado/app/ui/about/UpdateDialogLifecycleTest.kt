@@ -111,8 +111,9 @@ class UpdateDialogLifecycleTest {
         val shared = projectFile(
             "src/main/java/io/legado/app/ui/about/CheckAppUpdate.kt"
         ).readText()
-        assertTrue(shared.contains("AppUpdate.checkBeta(lifecycleScope)"))
-        assertTrue(shared.contains("AppUpdate.gitHubUpdate.check(lifecycleScope)"))
+        assertTrue(shared.contains("AppUpdate.check(lifecycleScope, channel)"))
+        assertTrue(shared.contains("UpdateChannel.LATEST"))
+        assertTrue(shared.contains("AppConfig.updateChannel"))
         assertTrue(shared.contains("appCtx.toastOnUi(it.localizedMessage)"))
         assertFalse(shared.contains("getString(R.string.check_update)"))
         assertFalse(shared.contains("getString(R.string.check_beta_update)"))

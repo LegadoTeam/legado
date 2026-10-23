@@ -247,6 +247,7 @@ object PreferKey {
     const val recordHeapDump = "recordHeapDump"
     const val optimizeRender = "optimizeRender"
     const val updateToVariant = "updateToVariant"
+    const val updateChannel = "updateChannel"
     const val streamReadAloudAudio = "streamReadAloudAudio"
     const val audioSkipOpenCredits = "audioSkipOpenCredits"
     const val audioSkipCloseCredits = "audioSkipCloseCredits"

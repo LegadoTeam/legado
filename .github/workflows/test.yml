@@ -133,16 +133,14 @@ jobs:
           set -o pipefail
           build_log="$RUNNER_TEMP/gradle-build.log"
           echo "当前版本号: $VERSION"
-          sed -i "s/^def version = .*/def version = \"$VERSION\"/" "$GITHUB_WORKSPACE/app/build.gradle"
 
-          gradle_variant_args=()
+          gradle_variant_args=(-PreaderVersionName="$VERSION")
           if [ "$type" == "release" ]; then
             typeName="release"
           else
             typeName="releaseA"
             gradle_variant_args+=(
-              -PreaderApplicationIdSuffix=.releaseA
-              -PreaderAppNameA=true
+              -PreaderReleaseA=true
             )
           fi
 

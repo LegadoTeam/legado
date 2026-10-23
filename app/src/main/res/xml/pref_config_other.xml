@@ -178,16 +178,14 @@
             android:key="showAddToShelfAlert"
             android:summary="@string/show_add_to_shelf_alert_summary"
             android:title="@string/show_add_to_shelf_alert_title" />
-
-<!--        <io.legado.app.lib.prefs.NameListPreference-->
-<!--            android:defaultValue="default_version"-->
-<!--            android:key="updateToVariant"-->
-<!--            android:summary="@string/update_to_variant_summary"-->
-<!--            android:title="@string/update_to_variant_title"-->
-<!--            app:allowDividerAbove="false"-->
-<!--            app:allowDividerBelow="false"-->
-<!--            app:entries="@array/default_app_variant"-->
-<!--            app:entryValues="@array/default_app_variant_value" />-->
+        <io.legado.app.lib.prefs.NameListPreference
+            android:key="updateChannel"
+            android:summary="@string/update_channel_summary"
+            android:title="@string/update_channel_title"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:entries="@array/reader_update_channel"
+            app:entryValues="@array/reader_update_channel_value" />
 
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"

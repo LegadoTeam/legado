@@ -1,9 +1,8 @@
-name: Test Release
+name: Reader Beta Release
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
   workflow_dispatch:
     inputs:
       commit_sha:
@@ -12,311 +11,168 @@ on:
         type: string
 
 concurrency:
-  group: test-release
+  group: reader-beta-release
   cancel-in-progress: false
-  queue: max
 
 permissions:
   contents: read
 
 jobs:
-
   prepare:
-    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.set-ver.outputs.version }}
-      versionCode: ${{ steps.set-ver.outputs.versionCode }}
-      label: ${{ steps.set-ver.outputs.label }}
-      commit: ${{ steps.set-ver.outputs.commit }}
-      lanzou: ${{ steps.check.outputs.lanzou }}
-      sign: ${{ steps.check.outputs.sign }}
+      version: ${{ steps.version.outputs.version }}
+      versionCode: ${{ steps.version.outputs.versionCode }}
+      tag: ${{ steps.version.outputs.tag }}
+      channel: ${{ steps.version.outputs.channel }}
+      commit: ${{ steps.ref.outputs.commit }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          fetch-tags: true
           ref: ${{ inputs.commit_sha || github.sha }}
-
-      - id: set-ver
+      - id: ref
         env:
           COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
-          GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ ! "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || \
-            ! git merge-base --is-ancestor "$COMMIT_SHA" origin/master; then
-            echo "Commit must belong to master: $COMMIT_SHA"
+          git fetch origin master --tags
+          if ! git merge-base --is-ancestor "$COMMIT_SHA" origin/master; then
+            echo "Commit must belong to master: $COMMIT_SHA" >&2
             exit 1
           fi
-          commit_epoch=$(git show -s --format=%ct "$COMMIT_SHA")
-          version="3.$(TZ=Asia/Shanghai date -d "@$commit_epoch" +%y%m%d%H)"
-          base_commit=$(sed -n "s/^def versionCodeBaseCommit = '\([^']*\)'.*/\1/p" app/build.gradle)
-          base_code=$(awk '/^def versionCodeAtBase = / { print $4 }' app/build.gradle)
-          if [[ ! "$base_commit" =~ ^[0-9a-f]{40}$ ]] || \
-            [[ ! "$base_code" =~ ^[0-9]+$ ]]; then
-            echo "Unable to read version-code base from app/build.gradle"
-            exit 1
-          fi
-          commit_count=$(git rev-list "${base_commit}..HEAD" --count --no-merges)
-          version_code=$((base_code + commit_count))
-          current_beta_code=$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/beta" \
-              --jq '.assets[].name' 2>/dev/null \
-              | sed -nE 's/.*[_\.-][vV][cC]([0-9]+)([_\.-].*)?$/\1/p' \
-              | sort -nr \
-              | head -n 1
-          )
-          if [[ -z "$current_beta_code" ]]; then
-            current_beta_code=$(
-              gh api "repos/${GITHUB_REPOSITORY}/releases/tags/beta" \
-                --jq '.body' 2>/dev/null \
-                | sed -nE 's/.*(reader|legado)-version-code:([0-9]+).*/\2/p' \
-                | head -n 1
-            )
-          fi
-          if [[ "$current_beta_code" =~ ^[0-9]+$ ]] && \
-            (( version_code < current_beta_code )); then
-            echo "Refusing beta version-code downgrade: $version_code < $current_beta_code"
-            exit 1
-          fi
-          branch="${GITHUB_REF_NAME//[^[:alnum:]._-]/_}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "versionCode=$version_code" >> "$GITHUB_OUTPUT"
-          echo "label=${branch}_${COMMIT_SHA:0:7}" >> "$GITHUB_OUTPUT"
           echo "commit=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+      - id: version
+        run: |
+          chmod +x .github/scripts/reader-version.sh
+          while IFS='=' read -r key value; do
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done < <(bash .github/scripts/reader-version.sh)
 
+  credentials:
+    needs: prepare
+    if: needs.prepare.outputs.channel == 'beta'
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
       - id: check
         env:
-          LANZOU_ID: ${{ secrets.LANZOU_ID }}
-          LANZOU_PSD: ${{ secrets.LANZOU_PSD }}
-          LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
           RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
-          if [ -n "$LANZOU_ID" ] && [ -n "$LANZOU_PSD" ] && [ -n "$LANZOU_FOLDER_ID" ]; then
-            echo "lanzou=yes" >> "$GITHUB_OUTPUT"
-          fi
-          if [ -n "$RELEASE_KEY_STORE" ] && [ -n "$RELEASE_KEY_ALIAS" ] && \
-            [ -n "$RELEASE_KEY_PASSWORD" ] && [ -n "$RELEASE_STORE_PASSWORD" ]; then
-            echo "sign=yes" >> "$GITHUB_OUTPUT"
+          if [[ -n "$RELEASE_KEY_STORE" && -n "$RELEASE_KEY_ALIAS" && \
+                -n "$RELEASE_KEY_PASSWORD" && -n "$RELEASE_STORE_PASSWORD" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Reader release signing secrets are not configured; beta build/publish will be skipped."
+            echo "Reader signing secrets are incomplete; beta publication is skipped."
+            echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
   build:
-    needs: prepare
-    if: ${{ needs.prepare.outputs.sign == 'yes' }}
+    needs: [prepare, credentials]
+    if: needs.prepare.outputs.channel == 'beta' && needs.credentials.outputs.available == 'true'
     strategy:
-      matrix:
-        product: [app]
-        type: [release, releaseA]
       fail-fast: false
+      matrix:
+        releaseA: [false, true]
     runs-on: ubuntu-latest
     env:
-      product: ${{ matrix.product }}
-      type: ${{ matrix.type }}
       VERSION: ${{ needs.prepare.outputs.version }}
+      VERSION_CODE: ${{ needs.prepare.outputs.versionCode }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.commit }}
-
-      - name: Setup JDK 21
-        uses: actions/setup-java@v6
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
-
-      - name: Prepare Assets
-        run: echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
-
-      - name: Release APK Sign
+      - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Prepare signing
         env:
           RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
-          printf '%s' "$RELEASE_KEY_STORE" | base64 --decode \
-            > "$GITHUB_WORKSPACE/app/reader.jks"
+          printf '%s' "$RELEASE_KEY_STORE" | base64 --decode > app/reader.jks
           {
-            printf '%s\n' "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
-            printf '%s\n' "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
             echo "RELEASE_STORE_FILE=./reader.jks"
             echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
-          } >> "$GITHUB_WORKSPACE/gradle.properties"
-
-      - name: Build With Gradle
+            echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+            echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
+          } >> gradle.properties
+      - name: Build Reader APKs
+        shell: bash
         run: |
-          sed -i "s/^def version = .*/def version = \"$VERSION\"/" \
-            "$GITHUB_WORKSPACE/app/build.gradle"
-
-          gradle_variant_args=()
-          if [ "$type" = "release" ]; then
-            typeName="release"
-          else
-            typeName="releaseA"
-            gradle_variant_args+=(
-              -PreaderApplicationIdSuffix=.releaseA
-              -PreaderAppNameA=true
-            )
+          set -euo pipefail
+          echo "" > app/src/main/assets/18PlusList.txt
+          extra=(-PreaderVersionName="$VERSION" -PreaderVersionCode="$VERSION_CODE")
+          variant="release"
+          if [[ "${{ matrix.releaseA }}" == "true" ]]; then
+            extra+=(-PreaderReleaseA=true)
+            variant="releaseA"
           fi
-
-          chmod +x gradlew
-          ./gradlew :$product:assembleRelease -ParmOnly=true "${gradle_variant_args[@]}" \
-            --build-cache --parallel --daemon --warning-mode all
-          mkdir -p "$GITHUB_WORKSPACE/apk"
-          bash "$GITHUB_WORKSPACE/.github/scripts/collect-apks.sh" \
-            "$GITHUB_WORKSPACE/app/build/outputs/apk" \
-            "$GITHUB_WORKSPACE/apk" \
-            "$product" "$VERSION" "$typeName" arm
-
-          ./gradlew :$product:assembleRelease "${gradle_variant_args[@]}" \
-            --build-cache --parallel --daemon --warning-mode all
-          bash "$GITHUB_WORKSPACE/.github/scripts/collect-apks.sh" \
-            "$GITHUB_WORKSPACE/app/build/outputs/apk" \
-            "$GITHUB_WORKSPACE/apk" \
-            "$product" "$VERSION" "$typeName" universal
-
-      - name: Check Build Result
-        run: |
-          expected_packages=(arm universal)
-          mapfile -d '' apks < <(find "$GITHUB_WORKSPACE/apk" -maxdepth 1 \
-            -type f -name 'reader_*.apk' -print0)
-          if [[ ${#apks[@]} -ne ${#expected_packages[@]} ]]; then
-            echo "Expected ${#expected_packages[@]} APKs, found ${#apks[@]}"
-            exit 1
-          fi
-
-          declare -A verified=()
-          for apk in "${apks[@]}"; do
-            file_name=$(basename "$apk")
-            case "$file_name" in
-              *_universal_*) package_kind=universal ;;
-              *) package_kind=arm ;;
-            esac
-            if [[ -n "${verified[$package_kind]:-}" ]]; then
-              echo "Multiple APKs detected for $package_kind"
-              exit 1
-            fi
-
-            packaged_abis=$(unzip -Z1 "$apk" \
-              | sed -n 's#^lib/\([^/]*\)/.*#\1#p' \
-              | sort -u \
-              | paste -sd ' ' -)
-            if [[ "$package_kind" = "universal" ]]; then
-              expected_native_abis="arm64-v8a armeabi-v7a x86 x86_64"
-            else
-              expected_native_abis="arm64-v8a armeabi-v7a"
-            fi
-            if [[ "$packaged_abis" != "$expected_native_abis" ]]; then
-              echo "$package_kind APK contains unexpected native ABIs: $packaged_abis"
-              exit 1
-            fi
-            verified[$package_kind]=$apk
-          done
-
-          for package_kind in "${expected_packages[@]}"; do
-            if [[ -z "${verified[$package_kind]:-}" ]]; then
-              echo "Missing APK for $package_kind"
-              exit 1
-            fi
-          done
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v7
+          mkdir -p out
+          ./gradlew :app:assembleRelease -ParmOnly=true "${extra[@]}" --build-cache --parallel --warning-mode all
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n 1)
+          cp "$apk" "out/reader_${VERSION}_${variant}.apk"
+          rm -rf app/build/outputs/apk
+          ./gradlew :app:assembleRelease "${extra[@]}" --build-cache --parallel --warning-mode all
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n 1)
+          cp "$apk" "out/reader_${VERSION}_universal_${variant}.apk"
+      - uses: actions/upload-artifact@v7
         with:
-          name: reader.test.${{ env.type }}
+          name: reader-${{ env.VERSION }}-${{ matrix.releaseA && 'releaseA' || 'release' }}
           if-no-files-found: error
-          path: ${{ github.workspace }}/apk/*.apk
+          path: out/*.apk
 
   publish:
     needs: [prepare, build]
+    if: needs.prepare.outputs.channel == 'beta'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       VERSION_CODE: ${{ needs.prepare.outputs.versionCode }}
-      RELEASE_LABEL: ${{ needs.prepare.outputs.label }}
-      ylogin: ${{ secrets.LANZOU_ID }}
-      phpdisk_info: ${{ secrets.LANZOU_PSD }}
-      LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
-      LANZOU_URL: ${{ secrets.LANZOU_URL }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      COMMIT_SHA: ${{ needs.prepare.outputs.commit }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.commit }}
-
       - uses: actions/download-artifact@v8
         with:
-          path: apk/
-
-      - name: Prepare APKs
-        working-directory: apk/
+          path: artifacts
+      - name: Prepare assets and notes
         run: |
-          mv */*.apk .
-          rm -rf -- */
-          for file in *.apk; do
-            mv -- "$file" "${file%.apk}_vc${VERSION_CODE}.apk"
-          done
-
-      - name: Prepare Release Notes
-        run: |
+          mkdir -p apk
+          find artifacts -type f -name '*.apk' -exec cp {} apk/ \;
+          built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           {
             printf '<!-- reader-version-code:%s -->\n' "$VERSION_CODE"
-            printf '此版本为提交测试版，可能存在不稳定情况，升级前请备份数据。\n\n'
-            bash .github/scripts/extract-latest-update.sh \
-              app/src/main/assets/updateLog.md
-          } > "$GITHUB_WORKSPACE/release-notes.md"
-
-      - name: Update Beta Tag
-        run: |
-          git tag --force beta "$(git rev-parse HEAD)"
-          git push origin refs/tags/beta --force
-
-      - name: Publish Beta Release
-        uses: ncipollo/release-action@v1
-        with:
-          name: reader_app_${{ env.VERSION }}
-          tag: beta
-          bodyFile: ${{ github.workspace }}/release-notes.md
-          prerelease: true
-          makeLatest: false
-          allowUpdates: true
-          omitBodyDuringUpdate: true
-          removeArtifacts: true
-          artifactErrorsFailBuild: true
-          artifacts: ${{ github.workspace }}/apk/*.apk
-
-      - name: Update Beta Release Notes
+            printf 'Reader %s\n\n' "$VERSION"
+            printf 'Build: %s  \nCommit: `%s`  \nBuilt: %s\n\n' "$VERSION_CODE" "${COMMIT_SHA:0:7}" "$built"
+            printf '此版本为自动测试版，升级前请备份数据。\n'
+          } > release-notes.md
+      - name: Publish immutable beta release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release edit beta \
-            --repo "$GITHUB_REPOSITORY" \
-            --notes-file "$GITHUB_WORKSPACE/release-notes.md"
-
-      - name: Prepare Lanzou APKs
-        if: ${{ needs.prepare.outputs.lanzou == 'yes' }}
-        working-directory: apk/
-        run: |
-          bash "$GITHUB_WORKSPACE/.github/scripts/remove-universal-apks.sh" \
-            "$GITHUB_WORKSPACE/apk"
-          for file in *.apk; do
-            mv -- "$file" "${file%.apk}_测试版_${RELEASE_LABEL}.apk"
-          done
-
-      - name: Upload To Lanzou
-        if: ${{ needs.prepare.outputs.lanzou == 'yes' }}
-        run: |
-          python3 "$GITHUB_WORKSPACE/.github/scripts/lzy_web.py" \
-            "$GITHUB_WORKSPACE/apk" "$LANZOU_FOLDER_ID"
-          echo "[$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M:%S')] 分享链接: $LANZOU_URL"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            existing=$(gh release view "$TAG" --json targetCommitish --jq '.targetCommitish')
+            if [[ "$existing" != "$COMMIT_SHA" && "$existing" != "${COMMIT_SHA:0:7}" ]]; then
+              echo "Tag $TAG already belongs to another commit: $existing" >&2
+              exit 1
+            fi
+            gh release upload "$TAG" apk/*.apk --clobber
+            gh release edit "$TAG" --title "Reader $VERSION" --notes-file release-notes.md --prerelease
+          else
+            gh release create "$TAG" apk/*.apk --target "$COMMIT_SHA" --title "Reader $VERSION" --notes-file release-notes.md --prerelease
+          fi

@@ -190,6 +190,16 @@
 	</string-array>
 
 
+	<string-array name="reader_update_channel">
+		<item>@string/update_channel_stable</item>
+		<item>@string/update_channel_latest</item>
+	</string-array>
+
+	<string-array name="reader_update_channel_value">
+		<item>stable</item>
+		<item>latest</item>
+	</string-array>
+
 	<string-array name="default_app_variant">
 		<item>@string/default_version</item>
 		<item>@string/beta_release_version</item>

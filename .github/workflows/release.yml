@@ -1,172 +1,134 @@
-name: Release Build
+name: Reader Stable Release
 
 on:
-#  push:
-#    branches:
-#      - master
-#    paths:
-#      - 'CHANGELOG.md'
   workflow_dispatch:
+
+concurrency:
+  group: reader-stable-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     outputs:
-      version: ${{ steps.set-ver.outputs.version }}
-      play: ${{ steps.check.outputs.play }}
-      sign: ${{ steps.check.outputs.sign }}
+      version: ${{ steps.version.outputs.version }}
+      versionCode: ${{ steps.version.outputs.versionCode }}
+      tag: ${{ steps.version.outputs.tag }}
+      channel: ${{ steps.version.outputs.channel }}
     steps:
-      - id: set-ver
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: master
+      - id: version
         run: |
-          echo "version=$(date -d "8 hour" -u +3.%y.%m%d%H)" >> $GITHUB_OUTPUT
-      - id: check
+          git fetch origin master --tags
+          chmod +x .github/scripts/reader-version.sh
+          while IFS='=' read -r key value; do
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done < <(bash .github/scripts/reader-version.sh)
+          [[ "$(sed -n 's/^channel=//p' reader-version.properties)" == "stable" ]] || {
+            echo "Set channel=stable in reader-version.properties and merge that PR before publishing stable." >&2
+            exit 1
+          }
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        releaseA: [false, true]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      VERSION_CODE: ${{ needs.prepare.outputs.versionCode }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: master
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Prepare signing
         env:
           RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
-          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         run: |
-          if [ -n "$RELEASE_KEY_STORE" ] && [ -n "$RELEASE_KEY_ALIAS" ] && \
-            [ -n "$RELEASE_KEY_PASSWORD" ] && [ -n "$RELEASE_STORE_PASSWORD" ]; then
-            echo "sign=yes" >> "$GITHUB_OUTPUT"
+          for name in RELEASE_KEY_STORE RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD RELEASE_STORE_PASSWORD; do
+            [[ -n "${!name}" ]] || { echo "Missing required secret: $name" >&2; exit 1; }
+          done
+          printf '%s' "$RELEASE_KEY_STORE" | base64 --decode > app/reader.jks
+          {
+            echo "RELEASE_STORE_FILE=./reader.jks"
+            echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
+            echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+            echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
+          } >> gradle.properties
+      - name: Build Reader APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "" > app/src/main/assets/18PlusList.txt
+          extra=(-PreaderVersionName="$VERSION" -PreaderVersionCode="$VERSION_CODE")
+          variant="release"
+          if [[ "${{ matrix.releaseA }}" == "true" ]]; then
+            extra+=(-PreaderReleaseA=true)
+            variant="releaseA"
           fi
-          if [ -n "$SERVICE_ACCOUNT_JSON" ]; then
-            echo "play=yes" >> "$GITHUB_OUTPUT"
-          fi
+          mkdir -p out
+          ./gradlew :app:assembleRelease -ParmOnly=true "${extra[@]}" --build-cache --parallel --warning-mode all
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n 1)
+          cp "$apk" "out/reader_${VERSION}_${variant}.apk"
+          rm -rf app/build/outputs/apk
+          ./gradlew :app:assembleRelease "${extra[@]}" --build-cache --parallel --warning-mode all
+          apk=$(find app/build/outputs/apk -type f -name '*.apk' | head -n 1)
+          cp "$apk" "out/reader_${VERSION}_universal_${variant}.apk"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: reader-stable-${{ matrix.releaseA && 'releaseA' || 'release' }}
+          if-no-files-found: error
+          path: out/*.apk
 
-  build:
-    needs: prepare
-    if: ${{ needs.prepare.outputs.sign == 'yes' }}
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-    strategy:
-      matrix:
-        product: [ app ]
-      fail-fast: false
-    runs-on: ubuntu-latest
     env:
-      product: ${{ matrix.product }}
       VERSION: ${{ needs.prepare.outputs.version }}
-      play: ${{ needs.prepare.outputs.play }}
+      VERSION_CODE: ${{ needs.prepare.outputs.versionCode }}
+      TAG: ${{ needs.prepare.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v6
+          ref: master
+      - uses: actions/download-artifact@v8
         with:
-          distribution: 'temurin'
-          java-version: 21
-
-      - name: Release Apk Sign
-        run: |
-          # not use this output
-          # echo "KeyStore=yes" >> $GITHUB_OUTPUT
-          echo -e "\n" >> gradle.properties
-          echo RELEASE_KEY_ALIAS='${{ secrets.RELEASE_KEY_ALIAS }}' >> gradle.properties
-          echo RELEASE_KEY_PASSWORD='${{ secrets.RELEASE_KEY_PASSWORD }}' >> gradle.properties
-          echo RELEASE_STORE_PASSWORD='${{ secrets.RELEASE_STORE_PASSWORD }}' >> gradle.properties
-          echo RELEASE_STORE_FILE='./key.jks' >> gradle.properties
-          echo ${{ secrets.RELEASE_KEY_STORE }} | base64 --decode > $GITHUB_WORKSPACE/app/key.jks
-
-      - name: Unify Version Name
-        run: |
-          echo "统一版本号"
-          sed "/^def version =/c def version = \"${{ env.VERSION }}\"" $GITHUB_WORKSPACE/app/build.gradle  -i
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
-
-      - name: Build With Gradle
-        run: |
-          echo "开始进行${{ env.product }}构建"
-          chmod +x gradlew
-          if [[ "${{ env.product }}" == "app" ]]; then
-            ./gradlew assemble${{ env.product }}release -ParmOnly=true --build-cache --parallel --daemon --warning-mode all
-            mkdir -p ${{ github.workspace }}/apk/
-            bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
-              $GITHUB_WORKSPACE/app/build/outputs/apk \
-              $GITHUB_WORKSPACE/apk \
-              ${{ env.product }} \
-              ${{ env.VERSION }} \
-              "" \
-              arm
-          fi
-          ./gradlew assemble${{ env.product }}release --build-cache --parallel --daemon --warning-mode all
-
-      - name: Organize the Files
-        run: |
-          mkdir -p ${{ github.workspace }}/apk/
-          if [[ "${{ env.product }}" == "app" ]]; then
-            bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
-              $GITHUB_WORKSPACE/app/build/outputs/apk \
-              $GITHUB_WORKSPACE/apk \
-              ${{ env.product }} \
-              ${{ env.VERSION }} \
-              "" \
-              universal
-          else
-            cp -rf ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk ${{ github.workspace }}/apk/
-          fi
-          
-      - name: Upload App To Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: reader_${{ env.product }}
-          path: ${{ github.workspace }}/apk/*.apk
-
-      - name: Release
-        if: ${{ env.product == 'app' }}
-        uses: softprops/action-gh-release@v3
-        with:
-          name: reader_app_${{ env.VERSION }}
-          tag_name: ${{ env.VERSION }}
-          body_path: ${{ github.workspace }}/CHANGELOG.md
-          draft: false
-          prerelease: false
-          files: ${{ github.workspace }}/apk/reader_app_*.apk
+          path: artifacts
+      - name: Publish stable release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Prepare For GooglePlay
-        if: env.product == 'google' && env.play == 'yes'
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p ReleaseNotes
-          ln -s ${{ github.workspace }}/CHANGELOG.md ReleaseNotes/whatsnew-en-US
-          ln -s ${{ github.workspace }}/CHANGELOG.md ReleaseNotes/whatsnew-zh-CN
-
-      - name: Release To GooglePlay
-        if: env.product == 'google' && env.play == 'yes'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
-          packageName: io.legado.play
-          releaseFiles: ${{ github.workspace }}/apk/reader_google_*.apk
-          track: production
-          whatsNewDirectory: ${{ github.workspace }}/ReleaseNotes
-
-      - name: Push Assets To "release" Branch
-        if: ${{ github.actor == 'gedoor' }}
-        run: |
-          cd $GITHUB_WORKSPACE/apk/
-          git init
-          git checkout -b release
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote add origin "https://${{ github.actor }}:${{ secrets.ACTIONS_TOKEN }}@github.com/${{ github.actor }}/release"
-          git add *.apk
-          git commit -m "${{ env.VERSION }}"
-          git push -f -u origin release
-          
-      - name: Purge Jsdelivr Cache
-        if: ${{ github.actor == 'gedoor' }}
-        run: |
-          result=$(curl -s https://purge.jsdelivr.net/gh/${{ github.actor }}/release@release/)
-          if echo $result |grep -q 'success.*true'; then
-            echo "jsdelivr缓存更新成功"
-          else
-            echo $result
+          mkdir -p apk
+          find artifacts -type f -name '*.apk' -exec cp {} apk/ \;
+          built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          {
+            printf '<!-- reader-version-code:%s -->\n' "$VERSION_CODE"
+            printf 'Reader %s\n\n' "$VERSION"
+            printf 'Build: %s  \nCommit: `%s`  \nBuilt: %s\n' "$VERSION_CODE" "$(git rev-parse --short=7 HEAD)" "$built"
+          } > release-notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Stable release already exists: $TAG" >&2
+            exit 1
           fi
+          gh release create "$TAG" apk/*.apk --target "$(git rev-parse HEAD)" --title "Reader $VERSION" --notes-file release-notes.md --latest
