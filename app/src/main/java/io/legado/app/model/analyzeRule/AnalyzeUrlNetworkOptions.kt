@@ -1,5 +1,6 @@
 package io.legado.app.model.analyzeRule
 
+import io.legado.app.lib.cronet.CronetRequestConfig
 import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -68,6 +69,28 @@ internal fun validateDnsIpProxyCompatibility(proxy: String?, dnsIp: String?) {
         "dnsIp cannot be used together with a proxy"
     }
 }
+
+internal fun buildCronetRequestConfig(
+    followRedirects: Boolean?,
+    targetHost: String?,
+    dnsAddresses: List<InetAddress>?,
+): CronetRequestConfig? {
+    val dnsAddress = dnsAddresses?.singleOrNull()?.hostAddress
+    if (followRedirects == null && dnsAddress == null) return null
+    return CronetRequestConfig(
+        followRedirects = followRedirects,
+        dnsHost = dnsAddress?.let {
+            require(!targetHost.isNullOrBlank()) { "dnsIp requires a valid HTTP host" }
+            targetHost
+        },
+        dnsAddress = dnsAddress,
+    )
+}
+
+internal fun shouldBypassCronetForDns(
+    dnsAddresses: List<InetAddress>?,
+    cronetRequestConfig: CronetRequestConfig?,
+): Boolean = dnsAddresses != null && cronetRequestConfig?.dnsAddress == null
 
 internal fun shouldReturnRedirectBeforeWebView(
     followRedirects: Boolean?,

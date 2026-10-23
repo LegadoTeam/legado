@@ -27,7 +27,7 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
         val original: Request = chain.request()
         if (!AppConfig.isCronet) return chain.proceed(original)
         // Cronet is the selected transport. Do not silently switch to OkHttp.
-        if (getCronetEngineOrNull() == null) {
+        if (!isCronetAvailable()) {
             throw cronetUnavailableException("Cronet engine is unavailable")
         }
         val cronetException: Throwable

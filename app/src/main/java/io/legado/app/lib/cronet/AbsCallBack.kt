@@ -57,6 +57,7 @@ abstract class AbsCallBack(
     private val urlResponseInfoChain = arrayListOf<UrlResponseInfo>()
     private var cancelJob: Coroutine<*>? = null
     private var followRedirect = false
+    private var returnRedirectResponse = false
     private var enableCookieJar = false
     private var redirectRequest: Request? = null
 
@@ -105,28 +106,39 @@ abstract class AbsCallBack(
         }
         followCount += 1
         urlResponseInfoChain.add(info)
-        val client = okHttpClient
+        val requestConfig = originalRequest.tag(CronetRequestConfig::class.java)
+        val followRedirects = requestConfig?.followRedirects ?: okHttpClient.followRedirects
+        val followSslRedirects =
+            requestConfig?.followRedirects ?: okHttpClient.followSslRedirects
         if (originalRequest.url.isHttps
             && newLocationUrl.startsWith("http://")
-            && client.followSslRedirects
+            && followSslRedirects
         ) {
             followRedirect = true
         } else if (!originalRequest.url.isHttps
             && newLocationUrl.startsWith("https://")
-            && client.followSslRedirects
+            && followSslRedirects
         ) {
             followRedirect = true
-        } else if (okHttpClient.followRedirects) {
+        } else if (followRedirects) {
             followRedirect = true
         }
 
+        val response = toResponse(
+            originalRequest,
+            info,
+            urlResponseInfoChain.dropLast(1),
+        )
+        if (enableCookieJar) {
+            CookieManager.saveResponse(response)
+        }
+
         if (!followRedirect) {
-            onError(IOException("Too many redirect"))
+            // Match OkHttp's followRedirects(false): return the 3xx response to the caller.
+            mResponse = response
+            returnRedirectResponse = true
+            onSuccess(response)
         } else {
-            val response = toResponse(originalRequest, info, urlResponseInfoChain)
-            if (enableCookieJar) {
-                CookieManager.saveResponse(response)
-            }
             redirectRequest = buildRedirectRequest(response, originalRequest.method, newLocationUrl)
         }
         request.cancel()
@@ -209,6 +221,12 @@ abstract class AbsCallBack(
             // Subsequent redirects must inherit this hop, including removed credentials/body.
             originalRequest = newRequest
             buildRequest(newRequest, this)?.start()
+            return
+        }
+        if (returnRedirectResponse) {
+            returnRedirectResponse = false
+            cancelJob?.cancel()
+            eventListener?.callEnd(mCall)
             return
         }
         canceled.set(true)

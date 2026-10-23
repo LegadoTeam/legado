@@ -133,6 +133,35 @@ class AnalyzeUrlNetworkOptionsTest {
     }
 
     @Test
+    fun singleDnsOverrideCanStayOnCronetAndPreservesRedirectPolicy() {
+        val dnsAddress = address(1, 1, 1, 1)
+        val config = buildCronetRequestConfig(
+            followRedirects = false,
+            targetHost = "target.example",
+            dnsAddresses = listOf(dnsAddress),
+        )
+
+        assertEquals(false, config?.followRedirects)
+        assertEquals("target.example", config?.dnsHost)
+        assertEquals("1.1.1.1", config?.dnsAddress)
+        assertFalse(shouldBypassCronetForDns(listOf(dnsAddress), config))
+    }
+
+    @Test
+    fun multipleDnsOverridesKeepOkHttpFailover() {
+        val addresses = listOf(address(1, 1, 1, 1), address(8, 8, 8, 8))
+        val config = buildCronetRequestConfig(
+            followRedirects = true,
+            targetHost = "target.example",
+            dnsAddresses = addresses,
+        )
+
+        assertEquals(true, config?.followRedirects)
+        assertNull(config?.dnsAddress)
+        assertTrue(shouldBypassCronetForDns(addresses, config))
+    }
+
+    @Test
     fun rejectsDnsOverrideTogetherWithProxy() {
         validateDnsIpProxyCompatibility(null, "1.1.1.1")
         validateDnsIpProxyCompatibility("http://proxy.example:8080", null)
@@ -177,7 +206,7 @@ class AnalyzeUrlNetworkOptionsTest {
     }
 
     @Test
-    fun explicitCallTimeoutWinsAndUrlTimeoutCanRemoveInterceptor() {
+    fun explicitCallTimeoutWinsWithoutRemovingCronetInterceptor() {
         val marker = Interceptor { chain -> chain.proceed(chain.request()) }
         val baseClient = OkHttpClient.Builder().addInterceptor(marker).build()
 
@@ -188,22 +217,12 @@ class AnalyzeUrlNetworkOptionsTest {
             followRedirects = null,
             targetHost = null,
             dnsAddresses = null,
-            interceptorToRemove = marker,
+            interceptorToRemove = null,
         )
 
         assertEquals(40_000, configured.readTimeoutMillis)
         assertEquals(10_000, configured.callTimeoutMillis)
-        assertFalse(configured.interceptors.contains(marker))
-        val constructorConfigured = buildRequestClient(
-            baseClient = baseClient,
-            readTimeoutMillis = 40_000,
-            callTimeoutMillis = 10_000,
-            followRedirects = null,
-            targetHost = null,
-            dnsAddresses = null,
-            interceptorToRemove = null,
-        )
-        assertTrue(constructorConfigured.interceptors.contains(marker))
+        assertTrue(configured.interceptors.contains(marker))
         assertSame(baseClient, buildRequestClient(baseClient, null, null, null, null, null))
         assertEquals(80_000L, derivedCallTimeoutMillis(40_000))
         assertEquals(Int.MAX_VALUE.toLong(), derivedCallTimeoutMillis(Int.MAX_VALUE.toLong()))
