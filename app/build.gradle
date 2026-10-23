@@ -15,31 +15,39 @@ plugins {
 apply from: 'download.gradle'
 apply from: 'cronet-loader.gradle'
 
-static def releaseTime() {
-    return new Date().format("yyMMddHH", TimeZone.getTimeZone("GMT+8"))
+def readerVersionProperties = new Properties()
+def readerVersionFile = rootProject.file("reader-version.properties")
+if (readerVersionFile.exists()) {
+    readerVersionFile.withInputStream { readerVersionProperties.load(it) }
 }
-
-def name = "reader"
-def version = "3." + releaseTime()
-def readerVersion = version + "-reader"
-def readerApplicationId = "io.github.yuanxiaoaihezhou.reader"
-def readerApplicationIdSuffix = project.findProperty("readerApplicationIdSuffix")?.toString()?.trim()
-def readerAppNameA = project.findProperty("readerAppNameA")?.toBoolean() ?: false
-def versionCodeValue = 30000
-// Preserve the published code at this point, then ignore GitHub wrapper merge commits.
-def versionCodeBaseCommit = '9639f027fbc8cfdf57ce136a9e0c98829a235aef'
-def versionCodeAtBase = 37540
+def readerBaseVersion = readerVersionProperties.getProperty("baseVersion", "1.0.0")
+def readerReleaseChannel = readerVersionProperties.getProperty("channel", "beta")
+def versionCodeBaseCommit = readerVersionProperties.getProperty(
+        "versionCodeBaseCommit",
+        "a0c2fecbcffe59c918175fd23fa922a7ae9bd2bd"
+)
+def versionCodeBaseValue = readerVersionProperties.getProperty("versionCodeBaseValue", "38520").toInteger()
+def versionCodeValue = versionCodeBaseValue + 1
 try {
     def gitCount = providers.exec {
-        commandLine 'git', 'rev-list', "${versionCodeBaseCommit}..HEAD", '--count', '--no-merges'
+        commandLine 'git', 'rev-list', "${versionCodeBaseCommit}..HEAD", '--first-parent', '--count'
         ignoreExitValue = true
     }.standardOutput.asText.get().trim()
     if (gitCount) {
-        versionCodeValue = versionCodeAtBase + Integer.parseInt(gitCount)
+        versionCodeValue = versionCodeBaseValue + Integer.parseInt(gitCount)
     }
 } catch (ignored) {
     // Keep source archives buildable when Git is unavailable.
 }
+def version = project.findProperty("readerVersionName")?.toString()
+        ?: (readerReleaseChannel == "stable"
+        ? readerBaseVersion
+        : "${readerBaseVersion}-beta.0")
+def readerVersionCodeOverride = project.findProperty("readerVersionCode")?.toString()?.toInteger()
+if (readerVersionCodeOverride != null) {
+    versionCodeValue = readerVersionCodeOverride
+}
+def name = "reader"
 def armOnly = project.findProperty("armOnly")?.toBoolean() ?: false
 
 android {
@@ -122,6 +130,12 @@ android {
                     "app_name",
                     readerAppNameA ? "@string/app_name_a" : "@string/app_name"
             )
+            if (project.findProperty("readerReleaseA")?.toString()?.toBoolean()) {
+                applicationIdSuffix '.releaseA'
+                manifestPlaceholders.put("app_name", "@string/app_name_a")
+            } else {
+                manifestPlaceholders.put("app_name", "@string/app_name")
+            }
 
             minifyEnabled true
             shrinkResources = true

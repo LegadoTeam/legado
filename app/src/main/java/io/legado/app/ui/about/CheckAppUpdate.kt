@@ -2,7 +2,9 @@ package io.legado.app.ui.about
 
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.update.AppUpdate
+import io.legado.app.help.update.UpdateChannel
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
@@ -12,9 +14,8 @@ import splitties.init.appCtx
 fun Fragment.checkAppUpdate(beta: Boolean = false) {
     val waitDialog = WaitDialog(requireContext())
     waitDialog.show()
-    val request = if (beta) AppUpdate.checkBeta(lifecycleScope)
-        else AppUpdate.gitHubUpdate.check(lifecycleScope)
-    request.onSuccess {
+    val channel = if (beta) UpdateChannel.LATEST else AppConfig.updateChannel
+    AppUpdate.check(lifecycleScope, channel).onSuccess {
         if (isAdded && !childFragmentManager.isStateSaved) showDialogFragment(UpdateDialog(it))
     }.onError {
         appCtx.toastOnUi(it.localizedMessage)

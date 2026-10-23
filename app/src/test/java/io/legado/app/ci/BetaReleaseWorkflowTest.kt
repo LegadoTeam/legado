@@ -1,38 +1,26 @@
 package io.legado.app.ci
 
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 class BetaReleaseWorkflowTest {
+    private val workflow = repoFile(".github/workflows/BetaRelease.yml").readText()
 
-    private val workflowText by lazy {
+    @Test
+    fun `legacy beta workflow is retained only as a manual compatibility notice`() {
+        assertTrue(workflow.contains("workflow_dispatch:"))
+        assertTrue(workflow.contains("TestRelease.yml"))
+        assertTrue(workflow.contains("reader_*.apk"))
+        assertFalse(workflow.contains("tag: beta"))
+        assertFalse(workflow.contains("branches: [ master ]"))
+    }
+
+    private fun repoFile(path: String): File {
         val userDir = requireNotNull(System.getProperty("user.dir"))
-        val workflowFile = generateSequence(File(userDir)) {
-            it.parentFile
-        }.map {
-            File(it, ".github/workflows/BetaRelease.yml")
-        }.first { it.isFile }
-        workflowFile
-            .readText()
-            .replace("\r\n", "\n")
-    }
-
-    @Test
-    fun `beta release only exposes the manual trigger`() {
-        val triggerBlock = workflowText
-            .substringAfter("on:\n")
-            .substringBefore("\nconcurrency:")
-
-        assertEquals("workflow_dispatch:", triggerBlock.trim())
-    }
-
-    @Test
-    fun `beta release keeps the merge commit guard`() {
-        val expected = "if: " + "$" +
-                "{{ !startsWith(github.event.head_commit.message, 'Merge pull request') }}"
-
-        assertTrue(workflowText.contains(expected))
+        val root = generateSequence(File(userDir)) { it.parentFile }
+            .first { File(it, "app/src/main").isDirectory }
+        return File(root, path)
     }
 }

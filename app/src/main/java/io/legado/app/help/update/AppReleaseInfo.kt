@@ -14,7 +14,8 @@ data class AppReleaseInfo(
     val assetUrl: String,
     val versionName: String,
     val size: Long = 0L,
-    val versionCode: Long = 0L
+    val versionCode: Long = 0L,
+    val isPreRelease: Boolean = false
 )
 
 enum class AppVariant {
@@ -42,7 +43,15 @@ data class GithubRelease(
         assets ?: throw NoStackTraceException("获取新版本出错")
         return assets
             .filter { it.isValid }
-            .map { it.assetToAppReleaseInfo(isPreRelease, body.orEmpty(), tagName) }
+            .filter { it.name.startsWith("reader_", ignoreCase = true) }
+            .map {
+                it.assetToAppReleaseInfo(
+                    isPreRelease,
+                    body.orEmpty(),
+                    tagName,
+                    parseReleaseVersionCode(body)
+                )
+            }
     }
 }
 @Keep
@@ -67,7 +76,8 @@ data class Asset(
     fun assetToAppReleaseInfo(
         preRelease: Boolean,
         note: String,
-        releaseTag: String = ""
+        releaseTag: String = "",
+        releaseVersionCode: Long = 0L
     ): AppReleaseInfo {
         val instant = Instant.parse(createdAt)
         val timestamp: Long = instant.toEpochMilli()
@@ -81,11 +91,13 @@ data class Asset(
             assetUrl = url,
             versionName = parseReleaseVersionName(releaseTag, name),
             size = size,
-            versionCode = parseAssetVersionCode(name)
+            versionCode = releaseVersionCode.takeIf { it > 0L } ?: parseAssetVersionCode(name),
+            isPreRelease = preRelease
         )
     }
 }
 
+private val readerSemVerPattern = Regex("""\d+\.\d+\.\d+(?:-beta\.\d+)?""")
 private val versionPattern = Regex("""\d+(?:\.\d+)+""")
 private val legacyDottedVersionPattern = Regex("""^3\.(\d{2})\.(\d{6,})$""")
 private val compactVersionPattern = Regex("""^3\.(\d{8,})$""")
@@ -107,6 +119,9 @@ internal fun parseReleaseVersionName(
     releaseTag: String,
     assetName: String
 ): String {
+    val readerVersion = readerSemVerPattern.find(releaseTag)?.value
+        ?: readerSemVerPattern.find(assetName)?.value
+    if (readerVersion != null) return readerVersion
     val versionName = versionPattern.find(releaseTag)?.value
         ?: versionPattern.find(assetName)?.value
         ?: return ""
@@ -133,3 +148,9 @@ internal fun normalizeLegadoVersionName(versionName: String): String {
 }
 
 
+
+private val releaseVersionCodePattern =
+    Regex("""<!--\s*reader-version-code:(\d+)\s*-->""", RegexOption.IGNORE_CASE)
+
+internal fun parseReleaseVersionCode(body: String?): Long =
+    body?.let { releaseVersionCodePattern.find(it)?.groupValues?.get(1)?.toLongOrNull() } ?: 0L

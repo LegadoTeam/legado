@@ -1862,4 +1862,11 @@
     <string name="content_search_scope_up">From here up</string>
     <string name="content_search_anchor_unavailable">The reading position could not be located after text processing. Return to the reader and try again, or choose Whole book.</string>
     <string name="content_search_result_unavailable">This result could not be located reliably in the displayed text. Check text replacement and title settings, then search again.</string>
+
+    <string name="update_channel_title">Update channel</string>
+    <string name="update_channel_summary">Stable receives official releases only; Latest receives the newest Reader release, including beta builds</string>
+    <string name="update_channel_stable">Stable</string>
+    <string name="update_channel_latest">Latest (including beta)</string>
+    <string name="latest_version">Already on the latest version for this channel</string>
+    <string name="update_no_compatible_apk">A newer release exists, but it has no APK compatible with this device</string>
 </resources>

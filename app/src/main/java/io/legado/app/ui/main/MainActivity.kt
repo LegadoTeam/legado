@@ -307,7 +307,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         if (LocalConfig.versionCode == appInfo.versionCode) {
             if (AppConfig.autoUpdateVariant) {
                 if (LocalConfig.lastCheckUpdate + 24.hours.inWholeMilliseconds < System.currentTimeMillis()) {
-                    AppUpdate.gitHubUpdate.check(lifecycleScope)
+                    AppUpdate.check(lifecycleScope, AppConfig.updateChannel)
                         .onSuccess {
                             if (isIgnoredAppUpdate(it.tagName, LocalConfig.ignoreUpdateVersion)) {
                                 return@onSuccess
