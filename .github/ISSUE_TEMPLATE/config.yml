@@ -3,6 +3,6 @@ contact_links:
   - name: 简繁转化
     url: https://github.com/liuyueyi/quick-chinese-transfer/issues/new
     about: 简繁转化问题请优先到quick-chinese-transfer反馈
-  - name: 常见问题 / Wiki
+  - name: 上游 Legado 常见问题 / Wiki
     url: https://github.com/gedoor/legado/wiki
-    about: Read wiki if your are new here.
+    about: Reader 暂沿用 Legado 上游 Wiki 作为兼容功能参考。

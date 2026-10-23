@@ -18,13 +18,15 @@ import splitties.init.appCtx
 @Suppress("unused")
 object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
 
+    private const val repository = "yuanxiaoaihezhou/Reader"
+
     private val checkVariant: AppVariant
         get() = AppConst.appInfo.appVariant.takeUnless { it == AppVariant.UNKNOWN }
             ?: AppVariant.OFFICIAL
 
     private suspend fun getLatestRelease(): List<AppReleaseInfo> {
         val lastReleaseUrl =
-            "https://api.github.com/repos/LegadoTeam/legado/releases?per_page=30"
+            "https://api.github.com/repos/$repository/releases?per_page=30"
         val res = okHttpClient.newCallResponse {
             url(lastReleaseUrl)
         }
@@ -41,12 +43,13 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
         return releases
             .filterNot { it.isPreRelease }
             .flatMap { it.gitReleaseToAppReleaseInfo() }
+            .filter { it.name.startsWith("reader_", ignoreCase = true) }
             .sortedByDescending { it.createdAt }
     }
 
     private suspend fun getBetaRelease(): List<AppReleaseInfo> {
         val res = okHttpClient.newCallResponse {
-            url("https://api.github.com/repos/LegadoTeam/legado/releases/tags/beta")
+            url("https://api.github.com/repos/$repository/releases/tags/beta")
         }
         if (!res.isSuccessful) {
             throw NoStackTraceException(
@@ -58,7 +61,9 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
             throw NoStackTraceException(appCtx.getString(R.string.check_beta_update_failed))
         }
         return runCatching {
-            GSON.fromJson(body, GithubRelease::class.java).gitReleaseToAppReleaseInfo()
+            GSON.fromJson(body, GithubRelease::class.java)
+                .gitReleaseToAppReleaseInfo()
+                .filter { it.name.startsWith("reader_", ignoreCase = true) }
         }.getOrElse {
             throw NoStackTraceException(
                 appCtx.getString(R.string.check_beta_update_failed) + " " + it.localizedMessage

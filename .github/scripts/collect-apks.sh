@@ -35,7 +35,7 @@ case "$package_kind" in
     ;;
 esac
 
-target_name="legado_${product}_${version}${marker}"
+target_name="reader_${product}_${version}${marker}"
 if [[ -n "$variant" ]]; then
   target_name="${target_name}_${variant}"
 fi

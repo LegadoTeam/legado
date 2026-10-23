@@ -3,6 +3,18 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <io.legado.app.lib.prefs.Preference
+        android:key="reader_source"
+        android:summary="@string/reader_source_summary"
+        android:title="@string/reader_source"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.Preference
+        android:key="upstream_project"
+        android:summary="@string/upstream_project_summary"
+        android:title="@string/upstream_project"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.Preference
         android:key="contributors"
         android:summary="@string/contributors_summary"
         android:title="@string/contributors"

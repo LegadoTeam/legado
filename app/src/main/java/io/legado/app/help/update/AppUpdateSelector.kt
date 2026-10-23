@@ -94,32 +94,21 @@ internal fun isUniversalPackageName(fileName: String): Boolean {
         fileName.contains("_._")
 }
 
-internal fun resolveAppUpdateDownloadUrl(fileName: String, githubUrl: String): String {
-    return if (fileName.contains("_._")) {
-        githubUrl
-    } else {
-        "https://cdn.mgz.la/app/$fileName"
-    }
-}
+@Suppress("UNUSED_PARAMETER")
+internal fun resolveAppUpdateDownloadUrl(fileName: String, githubUrl: String): String = githubUrl
 
-internal fun resolveAppUpdateMirrorUrl(fileName: String, primaryUrl: String): String? {
-    if (fileName.contains("_._")) return null
-    return "https://cdn.gigu.edu.kg/app/$fileName".takeUnless { it == primaryUrl }
-}
+@Suppress("UNUSED_PARAMETER")
+internal fun resolveAppUpdateMirrorUrl(fileName: String, primaryUrl: String): String? = null
 
+@Suppress("UNUSED_PARAMETER")
 internal fun resolveAppUpdateAlternateMirrorUrl(
     fileName: String,
     primaryUrl: String,
     mirrorUrl: String?
-): String? {
-    if (fileName.contains("_._")) return null
-    return "https://cdn.mgz.edu.kg/app/$fileName".takeUnless {
-        it == primaryUrl || it == mirrorUrl
-    }
-}
+): String? = null
 
-internal fun resolveAppUpdateBackupUrl(primaryUrl: String, githubUrl: String): String? =
-    githubUrl.takeUnless { it == primaryUrl }
+@Suppress("UNUSED_PARAMETER")
+internal fun resolveAppUpdateBackupUrl(primaryUrl: String, githubUrl: String): String? = null
 
 internal fun isIgnoredAppUpdate(versionName: String, ignoredVersion: String?): Boolean =
     versionName == ignoredVersion

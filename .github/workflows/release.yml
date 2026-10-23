@@ -21,17 +21,24 @@ jobs:
         run: |
           echo "version=$(date -d "8 hour" -u +3.%y.%m%d%H)" >> $GITHUB_OUTPUT
       - id: check
+        env:
+          RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
         run: |
-          if [ ! -z "${{ secrets.RELEASE_KEY_STORE }}" ]; then
-            echo "sign=yes" >> $GITHUB_OUTPUT
+          if [ -n "$RELEASE_KEY_STORE" ] && [ -n "$RELEASE_KEY_ALIAS" ] && \
+            [ -n "$RELEASE_KEY_PASSWORD" ] && [ -n "$RELEASE_STORE_PASSWORD" ]; then
+            echo "sign=yes" >> "$GITHUB_OUTPUT"
           fi
-          if [ ! -z "${{ secrets.SERVICE_ACCOUNT_JSON }}" ]; then
-            echo "play=yes" >> $GITHUB_OUTPUT
+          if [ -n "$SERVICE_ACCOUNT_JSON" ]; then
+            echo "play=yes" >> "$GITHUB_OUTPUT"
           fi
 
   build:
     needs: prepare
-    if: ${{ needs.prepare.outputs.sign }}
+    if: ${{ needs.prepare.outputs.sign == 'yes' }}
     permissions:
       contents: write
     strategy:
@@ -108,19 +115,19 @@ jobs:
       - name: Upload App To Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: legado_${{ env.product }}
+          name: reader_${{ env.product }}
           path: ${{ github.workspace }}/apk/*.apk
 
       - name: Release
         if: ${{ env.product == 'app' }}
         uses: softprops/action-gh-release@v3
         with:
-          name: legado_app_${{ env.VERSION }}
+          name: reader_app_${{ env.VERSION }}
           tag_name: ${{ env.VERSION }}
           body_path: ${{ github.workspace }}/CHANGELOG.md
           draft: false
           prerelease: false
-          files: ${{ github.workspace }}/apk/legado_app_*.apk
+          files: ${{ github.workspace }}/apk/reader_app_*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
@@ -137,7 +144,7 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           packageName: io.legado.play
-          releaseFiles: ${{ github.workspace }}/apk/legado_google_*.apk
+          releaseFiles: ${{ github.workspace }}/apk/reader_google_*.apk
           track: production
           whatsNewDirectory: ${{ github.workspace }}/ReleaseNotes
 

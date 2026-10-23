@@ -7,38 +7,22 @@ import org.junit.Test
 
 class BetaUpdateCompatibilityTest {
 
-    private val betaSignature =
-        "E2400519DF26F329EFC3FA1288DB46E8A23C6AEEB14B5378AD80CA9F8136C146"
-
     @Test
-    fun betaSignatureAndExactPackageSelectTheMatchingVariant() {
+    fun readerPackageSelectsTheMatchingBetaVariant() {
         assertEquals(
             AppVariant.BETA_RELEASE,
-            resolveBetaUpdateVariant("com.legado.app.release", listOf(betaSignature))
+            resolveBetaUpdateVariant("io.github.yuanxiaoaihezhou.reader")
         )
         assertEquals(
             AppVariant.BETA_RELEASEA,
-            resolveBetaUpdateVariant("com.legado.app.releaseA", listOf(betaSignature))
+            resolveBetaUpdateVariant("io.github.yuanxiaoaihezhou.reader.releaseA")
         )
     }
 
     @Test
-    fun incompatibleSignaturesAndPackagesAreRejected() {
-        assertNull(
-            resolveBetaUpdateVariant("com.legado.app.release", listOf("different"))
-        )
-        assertNull(
-            resolveBetaUpdateVariant("com.legado.app.debug", listOf(betaSignature))
-        )
-        assertNull(
-            resolveBetaUpdateVariant("com.legado.app.releaseA.extra", listOf(betaSignature))
-        )
-        assertNull(resolveBetaUpdateVariant("com.legado.app.release", emptyList()))
-        assertNull(
-            resolveBetaUpdateVariant(
-                "com.legado.app.release",
-                listOf(betaSignature, betaSignature)
-            )
-        )
+    fun unrelatedPackagesAreRejected() {
+        assertNull(resolveBetaUpdateVariant("io.github.yuanxiaoaihezhou.reader.debug"))
+        assertNull(resolveBetaUpdateVariant("io.github.yuanxiaoaihezhou.reader.releaseA.extra"))
+        assertNull(resolveBetaUpdateVariant("com.legado.app.release"))
     }
 }

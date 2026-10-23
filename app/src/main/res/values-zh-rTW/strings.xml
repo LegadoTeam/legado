@@ -97,12 +97,12 @@
     <string name="offline_cache_t">離線快取</string>
     <string name="offline_cache_s">快取選擇的章節到本機</string>
     <string name="change_origin">換源</string>
-    <string name="about_description">
-        \u3000\u3000這是一款使用Kotlin全新開發的開源的閱讀軟體，歡迎您的加入。
-    </string>
-    <string name="app_share_description">
-        閱讀3.0下載網址：\nhttps://github.com/LegadoTeam/legado/releases
-    </string>
+    <string name="about_description">Reader（閱讀）是基於 Legado 開源專案二次開發的獨立版本，並非 Legado 官方發行版，繼續遵循 GNU GPL v3.0。</string>
+    <string name="app_share_description">Reader（閱讀）下載網址：\nhttps://github.com/yuanxiaoaihezhou/Reader/releases\n上游 Legado：https://github.com/LegadoTeam/legado</string>
+    <string name="reader_source">Reader 原始碼</string>
+    <string name="reader_source_summary">yuanxiaoaihezhou/Reader</string>
+    <string name="upstream_project">Legado 上游專案</string>
+    <string name="upstream_project_summary">LegadoTeam/legado</string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">後臺校驗書源</string>
     <string name="ps_background_verification">打開後可以在校驗書源時自由操作</string>

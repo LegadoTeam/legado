@@ -6,7 +6,7 @@ fixture_dir="$(mktemp -d)"
 fixture_pid=""
 cleanup() {
   adb logcat -d > app/build/cronet-runtime/logcat.txt || true
-  adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime app/build/cronet-runtime/rss || true
+  adb pull /sdcard/Android/data/io.github.yuanxiaoaihezhou.reader/files/cronet-runtime app/build/cronet-runtime/rss || true
   if [[ -n "$fixture_pid" ]]; then kill "$fixture_pid" 2>/dev/null || true; fi
   adb reverse --remove tcp:19443 || true
   adb reverse --remove tcp:19444 || true
@@ -68,12 +68,12 @@ with zipfile.ZipFile(sys.argv[1]) as apk:
 print(f'APK size: {Path(sys.argv[1]).stat().st_size} bytes')
 PY
 adb install -r -t "${apks[0]}"
-adb shell pm clear com.legado.app.release
-adb shell mkdir -p /sdcard/Android/data/com.legado.app.release/files
-adb push "$fixture_dir/rss-seek.mp4" /sdcard/Android/data/com.legado.app.release/files/rss-seek.mp4
+adb shell pm clear io.github.yuanxiaoaihezhou.reader
+adb shell mkdir -p /sdcard/Android/data/io.github.yuanxiaoaihezhou.reader/files
+adb push "$fixture_dir/rss-seek.mp4" /sdcard/Android/data/io.github.yuanxiaoaihezhou.reader/files/rss-seek.mp4
 adb logcat -c
 timeout 300 adb shell am instrument -w -r -e fixtureCa "$fixture_ca" \
-  com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
+  io.github.yuanxiaoaihezhou.reader/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
   | tee app/build/cronet-runtime/result.txt
 grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/result.txt
 grep -Fq 'productionClientToggle=off,on,off,on' app/build/cronet-runtime/result.txt
@@ -81,18 +81,18 @@ grep -Fq 'INSTRUMENTATION_CODE: -1' app/build/cronet-runtime/result.txt
 grep -Fq 'cachedBefore=false' app/build/cronet-runtime/result.txt
 grep -Fq 'webDav=authenticated,encoded-paths,cronet-first,on-off-on' app/build/cronet-runtime/result.txt
 grep -Fq 'loadFailureRecovery=true; componentFiles=1' app/build/cronet-runtime/result.txt
-adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime/storage.txt \
+adb pull /sdcard/Android/data/io.github.yuanxiaoaihezhou.reader/files/cronet-runtime/storage.txt \
   app/build/cronet-runtime/cold-storage.txt
-adb shell am force-stop com.legado.app.release
+adb shell am force-stop io.github.yuanxiaoaihezhou.reader
 timeout 300 adb shell am instrument -w -r -e fixtureCa "$fixture_ca" \
-  com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
+  io.github.yuanxiaoaihezhou.reader/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
   | tee app/build/cronet-runtime/cached-result.txt
 grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'productionClientToggle=off,on,off,on' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'INSTRUMENTATION_CODE: -1' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'cachedBefore=true' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'webDav=authenticated,encoded-paths,cronet-first,on-off-on' app/build/cronet-runtime/cached-result.txt
-adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime/storage.txt \
+adb pull /sdcard/Android/data/io.github.yuanxiaoaihezhou.reader/files/cronet-runtime/storage.txt \
   app/build/cronet-runtime/cached-storage.txt
 python3 - <<'PY'
 from pathlib import Path

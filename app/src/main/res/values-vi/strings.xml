@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--App-->
-    <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
-    <string name="receiving_shared_label">Legado·Tìm kiếm</string>
-    <string name="receiving_shared_import_label">Legado·Nhập</string>
-    <string name="tip_perm_request_storage">Legado cần quyền truy cập bộ nhớ để tìm và đọc sách. Vui lòng vào "Cài đặt ứng dụng" để cấp "Quyền truy cập bộ nhớ".</string>
+    <string name="app_name">Reader</string>
+    <string name="app_name_a">Reader·A</string>
+    <string name="receiving_shared_label">Reader·Tìm kiếm</string>
+    <string name="receiving_shared_import_label">Reader·Nhập</string>
+    <string name="tip_perm_request_storage">Reader cần quyền truy cập bộ nhớ để tìm và đọc sách. Vui lòng vào "Cài đặt ứng dụng" để cấp "Quyền truy cập bộ nhớ".</string>
 
     <!--Other-->
     <string name="menu_backup">Sao lưu</string>
@@ -97,8 +97,8 @@
     <string name="offline_cache_t">Bộ đệm ngoại tuyến</string>
     <string name="offline_cache_s">Lưu trữ các chương đã chọn vào bộ nhớ đệm</string>
     <string name="change_origin">Đổi nguồn</string>
-    <string name="about_description">Đây là một phần mềm đọc mã nguồn mở được phát triển mới bằng Kotlin, chào mừng bạn tham gia.</string>
-    <string name="app_share_description">Link tải Legado (YueDu 3.0):\n https://github.com/LegadoTeam/legado/releases</string>
+    <string name="about_description">Reader là phiên bản phát triển độc lập dựa trên dự án mã nguồn mở Legado. Đây không phải bản phát hành chính thức của Legado và tiếp tục tuân theo GNU GPL v3.0.</string>
+    <string name="app_share_description">Tải Reader：\nhttps://github.com/yuanxiaoaihezhou/Reader/releases\nDự án Legado gốc：https://github.com/LegadoTeam/legado</string>
     <string name="version_name">Phiên bản %s</string>
     <string name="pt_background_verification">Xác minh trong nền</string>
     <string name="ps_background_verification">Bạn có thể thao tác tự do khi đang xác minh nguồn sách</string>
@@ -653,7 +653,7 @@
     <string name="app_folder_picker">Bộ chọn thư mục ứng dụng</string>
     <string name="app_file_picker">Bộ chọn tệp ứng dụng</string>
     <string name="a10_permission_toast">Android 10+ không thể đọc và ghi tệp do hạn chế quyền</string>
-    <string name="add_to_text_context_menu_s">Nhấn giữ để hiển thị Legado·Tìm kiếm trong menu thao tác</string>
+    <string name="add_to_text_context_menu_s">Nhấn giữ để hiển thị Reader·Tìm kiếm trong menu thao tác</string>
     <string name="add_to_text_context_menu_t">Thao tác văn bản hiển thị Tìm kiếm</string>
     <string name="record_log">Ghi nhật ký</string>
     <string name="log">Nhật ký</string>
@@ -696,7 +696,7 @@
     <string name="btn_default_s">Mặc định</string>
     <string name="main_menu">Menu chính</string>
     <string name="request_permission">Chạm để cấp quyền</string>
-    <string name="tip_local_perm_request_storage">Legado cần quyền truy cập bộ nhớ, vui lòng chạm vào nút "Cấp quyền" bên dưới, hoặc vào "Cài đặt"-"Quyền ứng dụng"-để mở quyền yêu cầu. Nếu quyền vẫn không hoạt động, vui lòng chạm vào "Chọn thư mục" ở góc trên bên phải để sử dụng bộ chọn thư mục hệ thống.</string>
+    <string name="tip_local_perm_request_storage">Reader cần quyền truy cập bộ nhớ, vui lòng chạm vào nút "Cấp quyền" bên dưới, hoặc vào "Cài đặt"-"Quyền ứng dụng"-để mở quyền yêu cầu. Nếu quyền vẫn không hoạt động, vui lòng chạm vào "Chọn thư mục" ở góc trên bên phải để sử dụng bộ chọn thư mục hệ thống.</string>
     <string name="alouding_disable">Không thể đọc văn bản đã chọn ở chế độ đọc toàn văn</string>
     <string name="read_body_to_lh">Mở rộng đến phần cắt</string>
     <string name="toc_updateing">Đang cập nhật chương</string>
