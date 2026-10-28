@@ -15,9 +15,9 @@ import io.legado.app.utils.fromJsonArray
     primaryKeys = ["deviceId", "bookName", "author"],
     indices = [Index(
         name = "index_readRecord_snapshot",
-        value = ["displayBookName", "displayAuthor", "lastRead", "deviceId", "bookName", "author"],
-        orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC],
-    ), Index(value = ["bookName", "author"])],
+        value = ["bookName", "author", "lastRead", "deviceId", "resolvedAuthor"],
+        orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC, Index.Order.ASC],
+    )],
 )
 data class ReadRecord(
     var deviceId: String = "",
@@ -40,21 +40,7 @@ data class ReadRecord(
     var coverUrl: String? = null,
     /** Keep the original blank-author account stable when restoring older backups. */
     var resolvedAuthor: String? = null,
-    @ColumnInfo(defaultValue = "''")
-    var displayBookName: String = bookName,
-    @ColumnInfo(defaultValue = "''")
-    var displayAuthor: String = if (author.isEmpty()) resolvedAuthor.orEmpty() else author,
-    @ColumnInfo(defaultValue = "0")
-    var metadataEditedAt: Long = 0L,
 )
-
-/** Older JSON has no display fields; physical keys remain the restore/elapsed-time identity. */
-internal fun ReadRecord.withDisplayMetadata(metadata: ReadRecord? = null): ReadRecord {
-    val selected = metadata?.takeIf { it.metadataEditedAt > 0 && it.metadataEditedAt >= metadataEditedAt } ?: this
-    return if (selected.metadataEditedAt > 0) copy(displayBookName = selected.displayBookName,
-        displayAuthor = selected.displayAuthor, metadataEditedAt = selected.metadataEditedAt)
-    else copy(displayBookName = bookName, displayAuthor = if (author.isEmpty()) resolvedAuthor.orEmpty() else author)
-}
 
 fun ReadRecord.updateSnapshot(
     book: Book,
@@ -83,7 +69,7 @@ fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
                 readTime = (current?.readTime ?: 0L) + elapsed.coerceAtLeast(0L),
             )
         }
-        saved = saved.copy(resolvedAuthor = current?.resolvedAuthor ?: saved.resolvedAuthor).withDisplayMetadata(current)
+        saved = saved.copy(resolvedAuthor = current?.resolvedAuthor ?: saved.resolvedAuthor)
         appDb.readRecordDao.insert(saved)
     }
     ReadRecordCoverCache.request(saved.copy(), snapshotBook?.getCoverSourceOrigin())

@@ -705,7 +705,6 @@
     <string name="restore_default">Restore default</string>
     <string name="reset_region_padding_confirm">Restore default paddings of %s?</string>
     <string name="lock_left_right_padding">Sync left and right padding</string>
-    <string name="lock_top_bottom_padding">Sync top and bottom padding</string>
     <string name="set_download_per">Custom cache path requires Storage permission</string>
     <string name="black">Black</string>
     <string name="content_empty">No content</string>
@@ -759,6 +758,8 @@
     <string name="timer_m">%d min</string>
     <string name="brightness_auto">Auto-Brightness %s</string>
     <string name="read_aloud_by_page">Speak by pages</string>
+    <string name="read_aloud_drag_seek">Drag the listening position bar</string>
+    <string name="read_aloud_drag_seek_summary">Swipe anywhere in the text to move the bar relative to the current spoken position. Crossing the top or bottom previews the adjacent page. Release to speak the target paragraph. Paused speech stays paused; tap for the menu.</string>
     <string name="read_aloud_follow_manual_page">Follow manual page turns</string>
     <string name="read_aloud_follow_manual_page_summary">Restart speaking from the newly displayed page after a manual page turn; when disabled, speaking continues from its original position</string>
     <string name="speak_engine">Speak Engine</string>
@@ -1381,10 +1382,6 @@
     <string name="webdav_device_name">Device name</string>
     <string name="webdav_book_auto_restore_t">Restore missing local books</string>
     <string name="webdav_book_auto_restore_s">Restore an exact-name match from the WebDAV books directory when a local book file is missing</string>
-    <string name="webdav_backup_keep_count_t">WebDAV backups to keep</string>
-    <string name="webdav_backup_keep_count_s">How many recent WebDAV backups to keep. 0 means never clean up (default); 1 keeps only the newest</string>
-    <string name="webdav_book_auto_upload_t">Upload local books after import</string>
-    <string name="webdav_book_auto_upload_s">Upload imported local books to the WebDAV books directory so other devices can read them directly</string>
     <string name="web_service_wake_lock">WebService Wake up Lock</string>
     <string name="web_service_wake_lock_summary">The wake-up lock is enabled when the web service is enabled, and some phones will be killed when the wake-up lock is enabled.</string>
     <string name="read_aloud_wake_lock">Read aloud service wake-up lock</string>
@@ -1845,20 +1842,6 @@
     <string name="view_in_code_editor">View in editor</string>
     <string name="code_editor_result_error">Could not read the editor result. The preview has been kept.</string>
     <string name="reimport_book_source">Reimport this book’s source</string>
-    <string name="book_metadata_sync">Sync book details</string>
-    <string name="book_metadata_sync_summary">When a title or author is edited, update its bookmarks and reading history.</string>
-    <string name="book_metadata_sync_always">Sync</string>
-    <string name="book_metadata_sync_never">Do not sync</string>
-    <string name="book_metadata_sync_ask">Ask every time</string>
-    <string name="book_metadata_sync_question">Update the title and author in the related bookmarks and reading history?</string>
-    <string name="read_record_edit">Edit reading history</string>
-    <string name="read_record_edit_summary">Only the displayed title and author change. Matching records are shown together; reading duration stays unchanged.</string>
     <string name="customize_my">Customize My page</string>
     <string name="my_more_items">Move selected items to More</string>
-    <string name="show_source_bookshelf_count">Show bookshelf count</string>
-    <string name="content_search_scope_all">Whole book</string>
-    <string name="content_search_scope_down">From here down</string>
-    <string name="content_search_scope_up">From here up</string>
-    <string name="content_search_anchor_unavailable">The reading position could not be located after text processing. Return to the reader and try again, or choose Whole book.</string>
-    <string name="content_search_result_unavailable">This result could not be located reliably in the displayed text. Check text replacement and title settings, then search again.</string>
 </resources>

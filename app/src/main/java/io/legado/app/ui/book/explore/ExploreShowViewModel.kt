@@ -61,7 +61,6 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     private var initialized = false
     private var categoriesLoading = false
     private var categoriesPending = false
-    private val categoriesCallbacks = mutableListOf<() -> Unit>()
     private var firstLoadedPage = 1
     private val paginationState = ExplorePaginationState()
     private val booksLock = Any()
@@ -116,13 +115,8 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
                 ?: error(context.getString(R.string.error_no_source))
         }.onSuccess {
             bookSource = it
-            if (intent.getBooleanExtra("showExploreCategories", false) &&
-                AppConfig.showExploreCategories
-            ) {
-                loadCategories { explore() }
-            } else {
-                explore()
-            }
+            explore()
+            if (AppConfig.showExploreCategories) loadCategories()
         }.onError {
             errorLiveData.value = it.stackTraceStr
         }
@@ -136,20 +130,13 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         outState.putInt("explorePage", pageLiveData.value ?: firstLoadedPage)
     }
 
-    fun loadCategories(onLoaded: (() -> Unit)? = null) {
+    fun loadCategories() {
         val source = bookSource ?: return
         if (paginationState.isLoading) {
             categoriesPending = true
             return
         }
-        if (categoriesLoading) {
-            onLoaded?.let { categoriesCallbacks += it }
-            return
-        }
-        if (categoriesData.value != null) {
-            onLoaded?.invoke()
-            return
-        }
+        if (categoriesLoading || categoriesData.value != null) return
         categoriesLoading = true
         execute { source.exploreKinds() }.onSuccess { kinds ->
             categoriesData.value = kinds.filter {
@@ -158,11 +145,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
             }
         }.onError {
             context.toastOnUi(it.localizedMessage)
-        }.onFinally {
-            categoriesLoading = false
-            onLoaded?.invoke()
-            categoriesCallbacks.toList().also { categoriesCallbacks.clear() }.forEach { it() }
-        }
+        }.onFinally { categoriesLoading = false }
     }
 
     internal fun switchCategory(category: ExploreCategory) {

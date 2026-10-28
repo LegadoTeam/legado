@@ -456,11 +456,7 @@ object Restore {
             }?.runCatching {
                 FileUtils.delete(ReadBookConfig.shareConfigFilePath)
                 copyTo(File(ReadBookConfig.shareConfigFilePath))
-                // The restored readStyleSelect preference is applied below.
-                // Normalize only after that preference is available so a
-                // previous device's selected style cannot overwrite every
-                // style's underline settings during restore.
-                ReadBookConfig.initShareConfig(normalizeUnderline = false)
+                ReadBookConfig.initShareConfig()
             }?.onFailure {
                 AppLog.put("恢复阅读界面出错\n${it.localizedMessage}", it)
             }
@@ -605,9 +601,6 @@ object Restore {
             hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
             hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
             autoReadSpeed = appCtx.getPrefInt(PreferKey.autoReadSpeed, 46)
-        }
-        if (!BackupConfig.ignoreReadConfig) {
-            ReadBookConfig.normalizeUnderlineConfigAfterRestore()
         }
         val coverRestoreResult =
             restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "covers")

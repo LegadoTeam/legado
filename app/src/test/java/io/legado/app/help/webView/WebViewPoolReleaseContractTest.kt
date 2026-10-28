@@ -87,16 +87,6 @@ class WebViewPoolReleaseContractTest {
         assertTrue(globalTimerCalls.toString(), globalTimerCalls.isEmpty())
     }
 
-    @Test
-    fun `background acquisition avoids webviews that were attached to a window`() {
-        val acquire = source.substringAfter("fun acquire(context: Context")
-            .substringBefore("// 释放WebView回池")
-
-        assertTrue(acquire.contains("forBackground: Boolean = false"))
-        assertTrue(acquire.contains("hasBeenAttachedToWindow"))
-        assertTrue(acquire.contains("createNewWebView()"))
-    }
-
     private fun section(startMarker: String, endMarker: String): String {
         val start = source.indexOf(startMarker)
         val end = source.indexOf(endMarker, start)

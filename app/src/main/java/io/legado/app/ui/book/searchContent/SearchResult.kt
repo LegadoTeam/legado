@@ -15,8 +15,7 @@ data class SearchResult(
     val pageIndex: Int = 0,
     val queryIndexInResult: Int = 0,
     val queryIndexInChapter: Int = 0,
-    val isRegex: Boolean = false,
-    val contentAnchor: ContentSearchAnchor? = null,
+    val isRegex: Boolean = false
 ) {
     fun getHtmlCompat(textColor: String, accentColor: String): Spanned {
         if (query.isNotBlank()) {

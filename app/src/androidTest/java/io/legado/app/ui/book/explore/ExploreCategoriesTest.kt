@@ -2,8 +2,6 @@ package io.legado.app.ui.book.explore
 
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
@@ -46,7 +44,6 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class ExploreCategoriesTest {
@@ -59,16 +56,8 @@ class ExploreCategoriesTest {
     private val slowStarted = CountDownLatch(1)
     private val releaseSlow = CountDownLatch(1)
     private val slowFinished = CountDownLatch(1)
-    private val initialRequestCount = AtomicInteger()
-    private val releaseInitial = CountDownLatch(1)
-    @Volatile
-    private var blockInitial = false
     private val server = object : NanoHTTPD("127.0.0.1", 0) {
         override fun serve(session: IHTTPSession): Response {
-            if (session.uri == "/category/0" && blockInitial) {
-                initialRequestCount.incrementAndGet()
-                releaseInitial.await(20, TimeUnit.SECONDS)
-            }
             if (session.uri == "/category/1") {
                 slowStarted.countDown()
                 releaseSlow.await(20, TimeUnit.SECONDS)
@@ -113,8 +102,6 @@ class ExploreCategoriesTest {
     @After
     fun tearDown() {
         releaseSlow.countDown()
-        releaseInitial.countDown()
-        blockInitial = false
         scenario?.close()
         server.stop()
         if (::source.isInitialized) {
@@ -309,12 +296,6 @@ class ExploreCategoriesTest {
         scenario!!.onActivity { rows(it)[0].getTabAt(1)!!.select() }
         assertTrue("Slow category request started", slowStarted.await(15, TimeUnit.SECONDS))
         scenario!!.onActivity { rows(it)[1].getTabAt(0)!!.select() }
-        awaitActivity {
-            rows(it).map { tabs -> tabs.selectedTabPosition } == listOf(-1, 0, -1) &&
-                rows(it).flatMap { tabs -> (0 until tabs.tabCount).mapNotNull { tabs.getTabAt(it)?.view } }
-                    .count { view -> view.isSelected || view.isActivated } == 1 &&
-                rows(it).map(::indicatorVisible) == listOf(false, true, false)
-        }
         awaitActivity { it.model.getLoadedBooks().firstOrNull()?.name?.startsWith("Category 8") == true }
         releaseSlow.countDown()
         assertTrue(slowFinished.await(15, TimeUnit.SECONDS))
@@ -333,94 +314,20 @@ class ExploreCategoriesTest {
             assertEquals(40, it.model.getLoadedBooks().size)
             assertEquals(40, (it.ui.recyclerView.adapter as ExploreShowAdapter).getActualItemCount())
             assertEquals(listOf(-1, 0, -1), rows(it).map { tabs -> tabs.selectedTabPosition })
-            assertEquals(1, rows(it).flatMap { tabs ->
-                (0 until tabs.tabCount).mapNotNull { tabs.getTabAt(it)?.view }
-            }.count { view -> view.isSelected || view.isActivated })
-            assertEquals(listOf(false, true, false), rows(it).map(::indicatorVisible))
         }
         screenshot("explore-category-restored")
     }
 
-    @Test
-    fun categorySwitchKeepsOnlyTheLastRowSelected() {
-        scenario!!.onActivity { toggleCategories(it) }
-        awaitActivity { it.ui.categoriesContainer.childCount == 3 }
-        fun awaitSelectedRow(row: Int) = awaitActivity {
-            rows(it).map { tabs -> tabs.selectedTabPosition } ==
-                List(3) { index -> if (index == row) 0 else -1 } &&
-                rows(it).flatMap { tabs -> (0 until tabs.tabCount).mapNotNull { tabs.getTabAt(it)?.view } }
-                    .count { view -> view.isSelected || view.isActivated } == 1 &&
-                rows(it).map(::indicatorVisible) == List(3) { index -> index == row }
-        }
-        awaitSelectedRow(0)
-        for (row in listOf(1, 2, 0)) {
-            scenario!!.onActivity { rows(it)[row].getTabAt(0)!!.view.performClick() }
-            awaitSelectedRow(row)
-        }
-        scenario!!.onActivity {
-            rows(it)[1].getTabAt(0)!!.view.performClick()
-            rows(it)[2].getTabAt(0)!!.view.performClick()
-        }
-        awaitSelectedRow(2)
-        screenshot("explore-category-single-indicator")
-    }
-
-    @Test
-    fun categoriesRenderBeforeInitialExploreCompletes() {
-        scenario!!.close()
-        scenario = null
-        AppConfig.showExploreCategories = true
-        blockInitial = true
-        launch()
-        assertTrue("Initial explore request started", awaitCondition {
-            initialRequestCount.get() > 0
-        })
-        awaitActivity { it.ui.categoriesContainer.isVisible }
-        releaseInitial.countDown()
-        awaitActivity { it.model.getLoadedBooks().size == 20 }
-    }
-
-    @Test
-    fun nonDiscoveryEntryHidesCategoryControls() {
-        scenario!!.close()
-        scenario = null
-        AppConfig.showExploreCategories = true
-        launch(discovery = false)
-        awaitActivity { it.model.getLoadedBooks().size == 20 }
-        scenario!!.onActivity {
-            assertFalse(it.ui.categoriesContainer.isVisible)
-            assertTrue(it.ui.titleBar.menu.findItem(R.id.menu_show_explore_categories) == null)
-        }
-    }
-
-    private fun launch(discovery: Boolean = true) {
+    private fun launch() {
         scenario = ActivityScenario.launch(Intent(context, ExploreShowActivity::class.java).apply {
             putExtra("sourceUrl", source.bookSourceUrl)
             putExtra("exploreName", "Category 0")
             putExtra("exploreUrl", categoryUrl(0))
-            putExtra("showExploreCategories", discovery)
         })
     }
 
     private fun rows(activity: ExploreShowActivity) =
         activity.ui.categoriesContainer.children.map { it as TabLayout }.toList()
-
-    private fun indicatorVisible(tabs: TabLayout): Boolean {
-        val strip = tabs.getChildAt(0)
-        if (strip.width == 0 || strip.height == 0) return false
-        val bitmap = Bitmap.createBitmap(strip.width, strip.height, Bitmap.Config.ARGB_8888)
-        try {
-            val canvas = Canvas(bitmap)
-            strip.draw(canvas) // Let TabLayout resolve the indicator's drawing bounds.
-            bitmap.eraseColor(Color.TRANSPARENT)
-            tabs.getTabSelectedIndicator().draw(canvas)
-            val pixels = IntArray(bitmap.width * bitmap.height)
-            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-            return pixels.any { Color.alpha(it) != 0 }
-        } finally {
-            bitmap.recycle()
-        }
-    }
 
     private fun toggleCategories(activity: ExploreShowActivity) {
         assertTrue("Category menu action is installed", activity.ui.titleBar.menu
@@ -451,15 +358,6 @@ class ExploreCategoriesTest {
                 "rows=${it.ui.categoriesContainer.childCount}, enabled=${AppConfig.showExploreCategories}"
         }
         throw AssertionError("Timed out: $state")
-    }
-
-    private fun awaitCondition(condition: () -> Boolean): Boolean {
-        val deadline = SystemClock.uptimeMillis() + 15000
-        do {
-            if (condition()) return true
-            SystemClock.sleep(50)
-        } while (SystemClock.uptimeMillis() < deadline)
-        return false
     }
 
     private fun screenshot(name: String) {

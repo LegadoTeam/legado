@@ -57,10 +57,6 @@ interface BookmarkDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg bookmark: Bookmark)
 
-    @Query("""update bookmarks set bookName = :newName, bookAuthor = :newAuthor
-        where bookName = :oldName and bookAuthor = :oldAuthor""")
-    fun renameBook(oldName: String, oldAuthor: String, newName: String, newAuthor: String)
-
     @Update
     fun update(bookmark: Bookmark)
 

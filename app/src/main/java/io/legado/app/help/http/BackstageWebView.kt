@@ -151,7 +151,7 @@ class BackstageWebView(
         requestConfig: WebViewRequestConfig,
         navigationContext: CoroutineContext
     ): WebView {
-        val pooledWebView = WebViewPool.acquire(appCtx, forBackground = true)
+        val pooledWebView = WebViewPool.acquire(appCtx)
         this.pooledWebView = pooledWebView
         val webView = pooledWebView.realWebView
         webView.onResume() //缓存库拿的需要激活

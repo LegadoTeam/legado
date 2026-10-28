@@ -1,0 +1,9 @@
+allprojects {
+    afterEvaluate {
+        if (plugins.hasPlugin('com.android.application')) {
+            android.defaultConfig.versionCode = 30009
+            android.defaultConfig.versionName = '3.261028-adaptive9'
+            android.defaultConfig.minSdk = 26
+        }
+    }
+}

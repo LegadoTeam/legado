@@ -10,7 +10,6 @@ import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssReadRecord
 import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.ContentEmptyException
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.rss.Rss
 import io.legado.app.ui.video.VideoPlayerActivity
 import io.legado.app.ui.widget.dialog.PhotoDialog
@@ -48,9 +47,7 @@ object ReadRss {
 
     fun readRss(fragment: Fragment, rssArticle: RssArticle,rssSource: RssSource? = null) {
         val rssReadRecord = rssArticle.toRecord()
-        if (AppConfig.enableRssReadRecord) {
-            appDb.rssReadRecordDao.insertRecord(rssReadRecord)
-        }
+        appDb.rssReadRecordDao.insertRecord(rssReadRecord)
         val type = rssArticle.type
         if (type == 0) {
             //web网页

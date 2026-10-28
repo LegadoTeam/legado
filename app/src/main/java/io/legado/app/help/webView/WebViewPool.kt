@@ -42,14 +42,10 @@ object WebViewPool {
 
     // 获取一个WebView
     @Synchronized
-    fun acquire(context: Context, forBackground: Boolean = false): PooledWebView {
-        val pooledWebView = when {
-            forBackground -> idlePool.indexOfFirst {
-                !it.realWebView.hasBeenAttachedToWindow
-            }.takeIf { it >= 0 }?.let(idlePool::removeAt)
-            !forBackground && idlePool.isNotEmpty() -> idlePool.pop() // 复用闲置实例
-            else -> null
-        } ?: run {
+    fun acquire(context: Context): PooledWebView {
+        val pooledWebView = if (idlePool.isNotEmpty()) {
+            idlePool.pop() // 复用闲置实例
+        } else {
             if (needInitialize) {
                 needInitialize = false
                 startCleanupTimer()

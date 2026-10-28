@@ -13,7 +13,6 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssReadRecord
 import io.legado.app.data.entities.RssSource
 import io.legado.app.help.JsExtensions
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadBook
 import io.legado.app.model.VideoPlay
@@ -204,9 +203,7 @@ open class RssJsExtensions(
                         origin = sourceUrl,
                         readTime = System.currentTimeMillis()
                     )
-                    if (AppConfig.enableRssReadRecord) {
-                        appDb.rssReadRecordDao.insertRecord(rssReadRecord) //留下历史记录
-                    }
+                    appDb.rssReadRecordDao.insertRecord(rssReadRecord) //留下历史记录
                     withContext(Main) {
                         ReadRssActivity.start(
                             activity,

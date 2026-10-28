@@ -7,8 +7,6 @@ import android.os.Parcelable
 import android.util.AttributeSet
 import android.util.SparseArray
 import android.view.LayoutInflater
-import android.view.MotionEvent
-import android.view.View
 import android.widget.FrameLayout
 import android.widget.SeekBar
 import androidx.appcompat.widget.TooltipCompat
@@ -29,14 +27,6 @@ class DetailSeekBar @JvmOverloads constructor(
     private var binding: ViewDetailSeekBarBinding =
         ViewDetailSeekBarBinding.inflate(LayoutInflater.from(context), this, true)
     private val isBottomBackground: Boolean
-    private val repeatOnLongPress: Boolean
-    private val repeatStops = mutableListOf<() -> Unit>()
-
-    var repeatIntervalMillis: Long = 100L
-        set(value) {
-            stopRepeating()
-            field = value.coerceAtLeast(1L)
-        }
 
     var valueFormat: ((progress: Int) -> String)? = null
     var onChanged: ((progress: Int) -> Unit)? = null
@@ -59,14 +49,6 @@ class DetailSeekBar @JvmOverloads constructor(
         val typedArray = context.obtainStyledAttributes(attrs, R.styleable.DetailSeekBar)
         isBottomBackground =
             typedArray.getBoolean(R.styleable.DetailSeekBar_isBottomBackground, false)
-        repeatOnLongPress =
-            typedArray.getBoolean(R.styleable.DetailSeekBar_repeatOnLongPress, false)
-        val buttonSize = typedArray.getDimensionPixelSize(R.styleable.DetailSeekBar_adjustButtonSize, 0)
-        if (buttonSize > 0) {
-            setAdjustButtonSize(buttonSize, typedArray.getDimensionPixelSize(
-                R.styleable.DetailSeekBar_adjustButtonIconSize, buttonSize
-            ))
-        }
         val title = typedArray.getText(R.styleable.DetailSeekBar_title)
         binding.tvSeekTitle.apply {
             text = title
@@ -82,71 +64,15 @@ class DetailSeekBar @JvmOverloads constructor(
             binding.ivSeekReduce.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
             binding.tvSeekValue.setTextColor(textColor)
         }
-        bindAdjustButton(binding.ivSeekPlus, 1)
-        bindAdjustButton(binding.ivSeekReduce, -1)
-        binding.seekBar.setOnSeekBarChangeListener(this)
-    }
-
-    fun setAdjustButtonSize(size: Int, iconSize: Int = size) {
-        stopRepeating()
-        listOf(binding.ivSeekPlus, binding.ivSeekReduce).forEach { button ->
-            button.layoutParams = button.layoutParams.apply {
-                width = size
-                height = size
-            }
-            val space = (size - iconSize).coerceAtLeast(0)
-            val start = space / 2
-            button.setPadding(start, start, space - start, space - start)
-        }
-    }
-
-    private fun stopRepeating() {
-        repeatStops.forEach { it.invoke() }
-    }
-
-    override fun onDetachedFromWindow() {
-        stopRepeating()
-        super.onDetachedFromWindow()
-    }
-
-    private fun bindAdjustButton(button: View, delta: Int) {
-        fun adjust() {
-            binding.seekBar.progressAdd(delta)
+        binding.ivSeekPlus.setOnClickListener {
+            binding.seekBar.progressAdd(1)
             onChanged?.invoke(binding.seekBar.progress)
         }
-
-        button.setOnClickListener { adjust() }
-        if (!repeatOnLongPress) return
-
-        var pressed = false
-        val repeat = object : Runnable {
-            override fun run() {
-                if (!pressed) return
-                adjust()
-                button.postDelayed(this, repeatIntervalMillis)
-            }
+        binding.ivSeekReduce.setOnClickListener {
+            binding.seekBar.progressAdd(-1)
+            onChanged?.invoke(binding.seekBar.progress)
         }
-        val stop: () -> Unit = {
-            pressed = false
-            button.removeCallbacks(repeat)
-        }
-        repeatStops += {
-            stop()
-            button.cancelLongPress()
-        }
-        button.setOnLongClickListener {
-            button.postDelayed(repeat, FIRST_REPEAT_DELAY_MILLIS)
-            true
-        }
-        button.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> pressed = true
-                // View handles its own long-press/tap callbacks after this listener. Cancelling
-                // them here clears PREPRESSED and loses quick taps inside scrolling containers.
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stop()
-            }
-            false
-        }
+        binding.seekBar.setOnSeekBarChangeListener(this)
     }
 
     override fun dispatchSaveInstanceState(container: SparseArray<Parcelable>) {
@@ -198,7 +124,6 @@ class DetailSeekBar @JvmOverloads constructor(
     }
 
     private companion object {
-        const val FIRST_REPEAT_DELAY_MILLIS = 100L
         const val STATE_SUPER = "superState"
         const val STATE_PROGRESS = "progress"
     }

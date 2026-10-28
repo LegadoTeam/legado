@@ -300,7 +300,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             putExtra("exploreName", title)
             putExtra("sourceUrl", sourceUrl)
             putExtra("exploreUrl", exploreUrl)
-            putExtra("showExploreCategories", true)
         }
     }
 

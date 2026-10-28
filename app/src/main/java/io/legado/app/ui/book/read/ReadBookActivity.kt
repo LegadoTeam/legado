@@ -116,8 +116,6 @@ import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.searchContent.SearchContentActivity
-import io.legado.app.ui.book.searchContent.ContentSearchAnchor
-import io.legado.app.ui.book.searchContent.ContentSearchAnchorException
 import io.legado.app.ui.book.searchContent.SearchResult
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
@@ -164,7 +162,6 @@ import io.legado.app.utils.throttle
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.visible
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
@@ -275,9 +272,6 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var backupJob: Job? = null
     private var bookmarkJob: Job? = null
     private var replacePreviewJob: Job? = null
-    private var openSearchJob: Job? = null
-    private var searchJumpJob: Job? = null
-    private var searchJumpGeneration = 0L
     private var replacePreviewGeneration = 0L
     private val bookmarkToggleMutex = Mutex()
     private var bookmarkTogglePending = false
@@ -383,7 +377,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             backToSpeakingPosition()
         }
         binding.readAloudFloatBarContainer.llReadFromHere.setOnClickListener {
-            ReadBook.readAloud()
+            readAloudFromVisiblePosition()
         }
         window.setBackgroundDrawable(null)
         upScreenTimeOut()
@@ -400,8 +394,11 @@ class ReadBookActivity : BaseReadBookActivity(),
                 return@addCallback
             }
             if (BaseReadAloudService.isPlay()) {
-                ReadAloud.pause(this@ReadBookActivity)
-                toastOnUi(R.string.read_aloud_pause)
+                showActionMenu()
+                return@addCallback
+            }
+            if (BaseReadAloudService.isRun) {
+                ReadAloud.stop(this@ReadBookActivity)
                 return@addCallback
             }
             if (isAutoPage) {
@@ -1446,6 +1443,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 鼠标滚轮翻页
      */
     private fun mouseWheelPage(direction: PageDirection, distance: Float) {
+        if (binding.readView.isListeningNavigationLocked) return
         if (menuLayoutIsVisible || !AppConfig.mouseWheelPage) {
             return
         }
@@ -1462,6 +1460,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 音量键翻页
      */
     private fun volumeKeyPage(direction: PageDirection, longPress: Boolean): Boolean {
+        if (binding.readView.isListeningNavigationLocked) return false
         if (!AppConfig.volumeKeyPage) {
             return false
         }
@@ -1473,6 +1472,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun handleKeyPage(direction: PageDirection, longPress: Boolean) {
+        if (binding.readView.isListeningNavigationLocked) return
         if (AppConfig.keyPageOnLongPress || direction == PageDirection.NONE) {
             keyPage(direction)
         } else {
@@ -1506,6 +1506,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun keyPage(direction: PageDirection) {
+        if (binding.readView.isListeningNavigationLocked) return
         binding.readView.cancelTouchGestures()
         binding.readView.cancelSelect()
         binding.readView.pageDelegate?.isCancel = false
@@ -1651,7 +1652,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun restoreAloudFollowOnVisiblePage() {
-        if (!BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
+        if (binding.readView.isReadAloudDragging || BaseReadAloudService.isPositionChangePending || !BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
             !getPrefBoolean(PreferKey.readAloudControlsRealtime, true)
         ) return
         val chapterStart = ReadAloud.readAloudChapterStart
@@ -1695,10 +1696,11 @@ class ReadBookActivity : BaseReadBookActivity(),
         if (!BaseReadAloudService.isRun) return
         val speakingChapterIndex = ReadAloud.readAloudChapterIndex
         // 优先用观察到的进度; 回退到服务里存活的朗读位置(Activity 重建后进度事件可能尚未到达)
-        val chapterStart = lastReadAloudChapterStart.takeIf {
-            lastReadAloudChapterIndex == speakingChapterIndex && it >= 0
-        }
-            ?: ReadAloud.readAloudChapterStart
+        handler.removeCallbacks(restoreAloudFollowRunnable)
+        binding.readView.cancelTouchGestures()
+        val chapterStart = ReadAloud.readAloudChapterStart.takeIf { it >= 0 }
+            ?: lastReadAloudChapterStart.takeIf { lastReadAloudChapterIndex == speakingChapterIndex }
+            ?: return
         when {
             speakingChapterIndex >= 0 && speakingChapterIndex != ReadBook.durChapterIndex -> {
                 // 跨章：打开朗读所在章节并精确定位到朗读字符位置。
@@ -1729,13 +1731,43 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun upTextChapterAloudSpan(chapterStart: Int) {
         if (chapterStart < 0) return
         val textChapter = ReadBook.curTextChapter ?: return
-        lifecycleScope.launch(IO) {
+        lifecycleScope.launch(Main.immediate) {
+            if (ReadBook.curTextChapter !== textChapter) return@launch
             ReadBook.durChapterPos = chapterStart
-            val pageIndex = ReadBook.durPageIndex
-            val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
-            textChapter.getPage(pageIndex)?.upPageAloudSpan(aloudSpanStart)
-            upContent()
+            val pageIndex = textChapter.getPageIndexByCharIndex(chapterStart)
+            if (pageIndex < 0) return@launch
+            ReadBook.setPageIndex(pageIndex)
+            ReadBook.durChapterPos = chapterStart
+            ReadAloud.restoreReadAloudFollow()
+            textChapter.getPage(pageIndex)?.upPageAloudSpan(chapterStart - textChapter.getReadLength(pageIndex))
+            upContent(resetPageOffset = true)
         }
+    }
+
+    private fun readAloudFromVisiblePosition() {
+        val (chapterIndex, line) = binding.readView.getReadAloudPos() ?: return
+        val bookUrl = ReadBook.book?.bookUrl ?: return
+        val position = line.chapterPosition
+        handler.removeCallbacks(restoreAloudFollowRunnable)
+        ReadAloud.detachReadAloudFollow()
+        binding.readView.cancelTouchGestures()
+        fun start() {
+            if (ReadBook.book?.bookUrl != bookUrl) return
+            val chapter = ReadBook.curTextChapter?.takeIf {
+                it.chapter.index == chapterIndex && it.isCompleted
+            } ?: return
+            val page = chapter.getPageIndexByCharIndex(position)
+            if (page < 0) return
+            ReadBook.setPageIndex(page)
+            ReadBook.durChapterPos = position
+            ReadAloud.restoreReadAloudFollow()
+            upContent(resetPageOffset = true)
+            ReadAloud.play(this, pageIndex = page,
+                startPos = (position - chapter.getReadLength(page)).coerceAtLeast(0),
+                rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
+        }
+        if (ReadBook.durChapterIndex == chapterIndex) start()
+        else ReadBook.openChapter(chapterIndex, position, false) { start() }
     }
 
     override val oldBook: Book?
@@ -1780,7 +1812,14 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun showActionMenu() {
         when {
-            BaseReadAloudService.isRun -> showReadAloudDialog()
+            BaseReadAloudService.isRun -> {
+                if (supportFragmentManager.findFragmentByTag("listenTapMenu") == null) {
+                    ReadAloud.pause(this)
+                    ReadAloudDialog().apply {
+                        arguments = Bundle().apply { putBoolean("tapToResume", true) }
+                    }.show(supportFragmentManager, "listenTapMenu")
+                }
+            }
             isAutoPage -> showDialogFragment<AutoReadDialog>()
             isShowingSearchResult -> binding.searchMenu.runMenuIn()
             else -> binding.readMenu.runMenuIn()
@@ -1856,32 +1895,13 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun openSearchActivity(searchWord: String?) {
         val book = ReadBook.book ?: return
-        binding.readView.updateScrollReadPosition()
-        val chapterIndex = ReadBook.durChapterIndex
-        val chapterPosition = ReadBook.durChapterPos
-        val chapter = ReadBook.curTextChapter?.takeIf {
-            it.isCompleted && it.chapter.bookUrl == book.bookUrl && it.chapter.index == chapterIndex
-        }
-        val query = searchWord ?: viewModel.searchContentQuery
-        val results = viewModel.searchResultList?.takeIf { it.firstOrNull()?.query == query }
-        val resultIndex = viewModel.searchResultIndex
-        openSearchJob?.cancel()
-        openSearchJob = lifecycleScope.launch {
-            val anchor = withContext(Default) {
-                chapter?.let {
-                    ContentSearchAnchor.capture(
-                        chapterIndex, it.getContent(), it.layoutTitleLength, chapterPosition,
-                    )
-                }
-            }
-            searchContentActivity.launch {
-                putExtra("bookUrl", book.bookUrl)
-                putExtra("searchChapterIndex", chapterIndex)
-                putExtra("searchAnchorKey", IntentData.put(anchor))
-                putExtra("searchWord", query)
-                putExtra("searchResultIndex", resultIndex)
-                results?.let {
-                    IntentData.put("searchResultList", it)
+        searchContentActivity.launch {
+            putExtra("bookUrl", book.bookUrl)
+            putExtra("searchWord", searchWord ?: viewModel.searchContentQuery)
+            putExtra("searchResultIndex", viewModel.searchResultIndex)
+            viewModel.searchResultList?.first()?.let {
+                if (it.query == viewModel.searchContentQuery) {
+                    IntentData.put("searchResultList", viewModel.searchResultList)
                 }
             }
         }
@@ -1931,8 +1951,6 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     // 退出全文搜索
     override fun exitSearchMenu() {
-        searchJumpGeneration++
-        searchJumpJob?.cancel()
         if (isShowingSearchResult) {
             isShowingSearchResult = false
             binding.searchMenu.invalidate()
@@ -2692,7 +2710,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             menuHiding -> bottomDialog > 0 || binding.searchMenu.bottomMenuVisible
             else -> menuLayoutIsVisible
         }
-        aloudControls.update(menuVisible)
+        aloudControls.update(menuVisible || binding.readView.isReadAloudDragging || BaseReadAloudService.isPositionChangePending)
     }
 
     override fun onLayoutPageCompleted(index: Int, page: TextPage) {
@@ -2702,56 +2720,39 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     /* 全文搜索跳转 */
     private fun skipToSearch(searchResult: SearchResult) {
-        val generation = ++searchJumpGeneration
-        searchJumpJob?.cancel()
         if (searchResult.chapterIndex != ReadBook.durChapterIndex) {
             viewModel.openChapter(searchResult.chapterIndex) {
-                if (generation == searchJumpGeneration) jumpToPosition(searchResult, generation)
+                jumpToPosition(searchResult)
             }
         } else {
-            jumpToPosition(searchResult, generation)
+            jumpToPosition(searchResult)
         }
     }
 
-    private fun jumpToPosition(searchResult: SearchResult, generation: Long) {
+    private fun jumpToPosition(searchResult: SearchResult) {
         val curTextChapter = ReadBook.curTextChapter ?: return
-        searchJumpJob?.cancel()
-        searchJumpJob = lifecycleScope.launch {
-            binding.searchMenu.updateSearchInfo()
-            val searchResultPositions = try {
-                withContext(Default) {
-                    viewModel.searchResultPositions(curTextChapter, searchResult)
-                }
-            } catch (_: ContentSearchAnchorException) {
-                toastOnUi(R.string.content_search_result_unavailable)
-                return@launch
-            }
-            if (generation != searchJumpGeneration || ReadBook.curTextChapter !== curTextChapter) return@launch
-            val (pageIndex, lineIndex, charIndex, addLine, charIndex2) = searchResultPositions
-            ReadBook.skipToPage(pageIndex) {
-                if (generation != searchJumpGeneration || ReadBook.curTextChapter !== curTextChapter) return@skipToPage
-                if (searchResultPositions[5] <= 0) {
-                    binding.readView.cancelSelect(true)
-                    return@skipToPage
-                }
-                isSelectingSearchResult = true
-                binding.readView.curPage.selectStartMoveIndex(0, lineIndex, charIndex)
-                when (addLine) {
-                    0 -> binding.readView.curPage.selectEndMoveIndex(
-                        0,
-                        lineIndex,
-                        charIndex + searchResultPositions[5] - 1
-                    )
+        binding.searchMenu.updateSearchInfo()
+        val searchResultPositions =
+            viewModel.searchResultPositions(curTextChapter, searchResult)
+        val (pageIndex, lineIndex, charIndex, addLine, charIndex2) = searchResultPositions
+        ReadBook.skipToPage(pageIndex) {
+            isSelectingSearchResult = true
+            binding.readView.curPage.selectStartMoveIndex(0, lineIndex, charIndex)
+            when (addLine) {
+                0 -> binding.readView.curPage.selectEndMoveIndex(
+                    0,
+                    lineIndex,
+                    charIndex + searchResultPositions[5] - 1
+                )
 
-                    1 -> binding.readView.curPage.selectEndMoveIndex(
-                        0, lineIndex + 1, charIndex2
-                    )
-                    //consider change page, jump to scroll position
-                    -1 -> binding.readView.curPage.selectEndMoveIndex(1, 0, charIndex2)
-                }
-                binding.readView.isTextSelected = true
-                isSelectingSearchResult = false
+                1 -> binding.readView.curPage.selectEndMoveIndex(
+                    0, lineIndex + 1, charIndex2
+                )
+                //consider change page, jump to scroll position
+                -1 -> binding.readView.curPage.selectEndMoveIndex(1, 0, charIndex2)
             }
+            binding.readView.isTextSelected = true
+            isSelectingSearchResult = false
         }
     }
 
@@ -3037,7 +3038,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             updateReadAloudFloatBar()
         }
         observeEvent<Int>(EventBus.ALOUD_STATE) {
-            if (it == Status.STOP || it == Status.PAUSE) {
+            if ((it == Status.STOP || it == Status.PAUSE) && !readView.isReadAloudDragging && !BaseReadAloudService.isPositionChangePending) {
                 ReadBook.curTextChapter?.let { textChapter ->
                     val page = textChapter.getPageByReadPos(ReadBook.durChapterPos)
                     if (page != null) {
@@ -3069,7 +3070,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                         val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
                         val page = textChapter.getPage(pageIndex)
                         page?.upPageAloudSpan(aloudSpanStart)
-                        if (readView.isTouching && readView.curPage.textPage === page) {
+                        if (readView.curPage.textPage === page) {
                             // Same-page speech ranges must not cancel the user's pending swipe.
                             readView.curPage.invalidateContentView()
                             readView.submitRenderTask()
