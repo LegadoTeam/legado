@@ -1,0 +1,4 @@
+<resources>
+<string name="tablet_fold_optimization">Tablet / foldable optimization</string>
+<string name="tablet_fold_optimization_summary">Use two panes for navigation on large windows. The reader stays full screen.</string>
+</resources>

@@ -31,7 +31,11 @@ class ReadAloudSpeakingPositionSourceTest {
             .replace(Regex("\\s+"), " ")
 
         assertTrue(activityKt.contains("lastReadAloudChapterIndex == speakingChapterIndex"))
-        assertTrue(activityKt.contains("?: ReadAloud.readAloudChapterStart"))
+        val jump = activityKt.substringAfter("override fun backToSpeakingPosition()")
+            .substringBefore("private fun upTextChapterAloudSpan")
+        val livePosition = jump.indexOf("ReadAloud.readAloudChapterStart.takeIf { it >= 0 }")
+        val cachedPosition = jump.indexOf("lastReadAloudChapterStart.takeIf")
+        assertTrue(livePosition >= 0 && cachedPosition > livePosition)
         assertTrue(activityKt.contains("lastReadAloudChapterIndex = ReadAloud.readAloudChapterIndex"))
     }
 

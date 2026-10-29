@@ -57,6 +57,12 @@ abstract class BaseActivity<VB : ViewBinding>(
     private val showOpenMenuIcon: Boolean = true
 ) : AppCompatActivity() {
 
+    override fun startActivityForResult(intent: android.content.Intent, requestCode: Int, options: Bundle?) {
+        super.startActivityForResult(
+            io.legado.app.help.adaptive.AdaptiveUiController.navigationIntent(this, intent),
+            requestCode, io.legado.app.help.adaptive.AdaptiveUiController.navigationOptions(this, intent, options))
+    }
+
     protected abstract val binding: VB
 
     val isInMultiWindow: Boolean

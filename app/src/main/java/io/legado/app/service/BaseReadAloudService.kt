@@ -136,6 +136,12 @@ abstract class BaseReadAloudService : BaseService(),
         val followReadAloudPosition: Boolean
             get() = speechFollowState.followReadAloudPosition
 
+        val isPositionChangePending get() = speechFollowState.pendingPosition != null
+
+        fun beginPositionChange(): Long = speechFollowState.beginPositionChange()
+
+        fun finishPositionChange(token: Long) = speechFollowState.finishPositionChange(token)
+
         @JvmStatic
         fun detachReadAloudFollow() {
             speechFollowState.detachForManualNavigation()
@@ -296,6 +302,7 @@ abstract class BaseReadAloudService : BaseService(),
         readAloudGeneration.incrementAndGet()
         readAloudJob?.cancel()
         super.onDestroy()
+        speechFollowState.cancelPositionChanges()
         restoreReadAloudFollow()
         updateReadAloudChapterIndex(-1)
         readAloudChapterStart = -1
@@ -333,7 +340,8 @@ abstract class BaseReadAloudService : BaseService(),
                 intent.getBooleanExtra("play", true),
                 intent.getIntExtra("pageIndex", ReadBook.durPageIndex),
                 intent.getIntExtra("startPos", 0),
-                intent.getBooleanExtra("rewindToSentenceStart", false)
+                intent.getBooleanExtra("rewindToSentenceStart", false),
+                intent.getLongExtra("positionToken", 0L)
             )
 
             IntentAction.pause -> pauseReadAloud()
@@ -356,16 +364,18 @@ abstract class BaseReadAloudService : BaseService(),
         play: Boolean,
         pageIndex: Int,
         startPos: Int,
-        rewindToSentenceStart: Boolean
+        rewindToSentenceStart: Boolean,
+        positionToken: Long = 0L
     ) {
+        if (positionToken != 0L && speechFollowState.pendingPosition != positionToken) return
+        val transition = if (positionToken != 0L) positionToken else beginPositionChange()
         val generation = readAloudGeneration.incrementAndGet()
         val toLast = this@BaseReadAloudService.toLast
         readAloudJob?.cancel()
         playStop()
-        restoreReadAloudFollow()
         readAloudJob = execute(executeContext = IO) {
-            val textChapter = ReadBook.curTextChapter ?: return@execute
-            if (!textChapter.isCompleted) return@execute
+            val textChapter = checkNotNull(ReadBook.curTextChapter) { "朗读章节尚未准备好" }
+            check(textChapter.isCompleted) { "朗读章节尚未加载完成" }
             val readAloudByPage = getPrefBoolean(PreferKey.readAloudByPage)
             val contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0)
                 .split("\n")
@@ -395,7 +405,8 @@ abstract class BaseReadAloudService : BaseService(),
             )
             ensureActive()
             withContext(Main.immediate) {
-                if (generation != readAloudGeneration.get()) return@withContext
+                if (generation != readAloudGeneration.get() ||
+                    speechFollowState.pendingPosition != transition) return@withContext
                 this@BaseReadAloudService.pageIndex = prepared.pageIndex
                 this@BaseReadAloudService.textChapter = prepared.textChapter
                 this@BaseReadAloudService.readAloudNumber = prepared.readAloudNumber
@@ -406,10 +417,14 @@ abstract class BaseReadAloudService : BaseService(),
                 BaseReadAloudService.readAloudChapterStart = prepared.readAloudChapterStart
                 this@BaseReadAloudService.paragraphStartPos = prepared.paragraphStartPos
                 if (prepared.consumedToLast) this@BaseReadAloudService.toLast = false
+                finishPositionChange(transition)
+                restoreReadAloudFollow()
                 if (play) play() else pageChanged = true
             }
         }.onError(Main) {
             if (it !is CancellationException && generation == readAloudGeneration.get()) {
+                finishPositionChange(transition)
+                postEvent(EventBus.READ_ALOUD_FOLLOW, followReadAloudPosition)
                 AppLog.put("启动朗读出错\n${it.localizedMessage}", it, true)
             }
         }
@@ -467,6 +482,7 @@ abstract class BaseReadAloudService : BaseService(),
     abstract fun upSpeechRate(reset: Boolean = false)
 
     fun upTtsProgress(progress: Int) {
+        if (isPositionChangePending) return
         readAloudChapterStart = progress
         postEvent(EventBus.TTS_PROGRESS, progress)
     }

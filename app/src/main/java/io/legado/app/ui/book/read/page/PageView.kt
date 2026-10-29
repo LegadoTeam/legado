@@ -492,6 +492,10 @@ class PageView(context: Context) : FrameLayout(context) {
         return binding.contentTextView.selectText(x - imgBgPaddingStart, y - headerHeight, select)
     }
 
+    fun getReadAloudDragTargets() = binding.contentTextView.getReadAloudDragTargets().map {
+        it.copy(top = it.top + contentViewTop, bottom = it.bottom + contentViewTop, screenTop = it.screenTop + contentViewTop, screenBottom = it.screenBottom + contentViewTop)
+    }
+
     fun getCurVisiblePage(): TextPage {
         return binding.contentTextView.getCurVisiblePage()
     }

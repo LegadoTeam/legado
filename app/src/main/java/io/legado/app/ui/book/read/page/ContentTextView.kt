@@ -655,6 +655,26 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         }
     }
 
+    fun getReadAloudDragTargets(): List<io.legado.app.model.ReadAloudDragSeekSession.Target> {
+        val targets = arrayListOf<io.legado.app.model.ReadAloudDragSeekSession.Target>()
+        for (relativePos in 0..2) {
+            val offset = relativeOffset(relativePos)
+            if (relativePos > 0 && (!callBack.isScroll || offset >= ChapterProvider.visibleHeight)) break
+            val page = relativePage(relativePos)
+            for (line in page.lines) {
+                if (line.paragraphNum > 0 && line.text.isNotBlank() && line.isVisible(offset)) {
+                    val top = (line.lineTop + offset).coerceAtLeast(visibleRect.top)
+                    val bottom = (line.lineBottom + offset).coerceAtMost(visibleRect.bottom)
+                    if (top > bottom) continue
+                    targets.add(io.legado.app.model.ReadAloudDragSeekSession.Target(
+                        page.chapterIndex, line.paragraphNum, top, bottom,
+                        line.chapterPosition, line.columns.any { it is TextBaseColumn && it.isReadAloud }, left = line.lineStart))
+                }
+            }
+        }
+        return io.legado.app.model.ReadAloudDragSeekSession.readingOrder(targets)
+    }
+
     fun getCurVisiblePage(): TextPage {
         val visiblePage = TextPage()
         var relativeOffset: Float

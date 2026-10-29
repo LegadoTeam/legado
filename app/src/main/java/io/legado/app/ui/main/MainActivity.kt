@@ -205,6 +205,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean = binding.run {
+        io.legado.app.help.adaptive.AdaptiveUiController.returnToRoot(this@MainActivity)
         when (item.itemId) {
             R.id.menu_bookshelf -> {
                 viewPagerMain.setCurrentItem(0, false)
@@ -632,6 +633,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private inner class PageChangeCallback : ViewPager.SimpleOnPageChangeListener() {
 
         override fun onPageSelected(position: Int) {
+            if (pagePosition != position) io.legado.app.help.adaptive.AdaptiveUiController.returnToRoot(this@MainActivity)
             pagePosition = position
             binding.bottomNavigationView.menu[realPositions[position]].isChecked = true
         }

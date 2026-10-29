@@ -1,0 +1,4 @@
+<resources>
+<string name="read_aloud_swipe_pages">滑动听书时开启左右翻页</string>
+<string name="read_aloud_swipe_pages_summary">允许左右滑动和点击翻页，继续朗读原位置；在新页面上下拖动后切换朗读位置</string>
+</resources>

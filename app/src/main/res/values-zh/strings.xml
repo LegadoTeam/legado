@@ -1748,4 +1748,7 @@
     <string name="content_search_scope_up">向上</string>
     <string name="content_search_anchor_unavailable">正文处理后无法可靠定位当前阅读位置。请返回阅读页重试，或切换为全局搜索。</string>
     <string name="content_search_result_unavailable">无法在阅读正文中可靠定位此结果。请检查替换净化和标题设置后重新搜索。</string>
+
+    <string name="read_aloud_drag_seek">听书时拖动播放定位条</string>
+    <string name="read_aloud_drag_seek_summary">在正文任意位置上下滑动，播放条从当前朗读位置按滑动距离移动，越过顶部或底部可翻页；松手从目标段落朗读，原先暂停时保持暂停。点击正文打开菜单</string>
 </resources>
