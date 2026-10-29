@@ -120,6 +120,14 @@ jobs:
           ./gradlew :app:testAppReleaseUnitTest --build-cache --parallel --daemon --warning-mode all \
             2>&1 | tee "$RUNNER_TEMP/gradle-unit-test.log"
 
+      - name: Upload Unit Test XML
+        if: ${{ always() && matrix.type == 'release' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: legado.app.release.unit-tests
+          if-no-files-found: warn
+          path: app/build/test-results/testAppReleaseUnitTest/*.xml
+
       - name: Build With Gradle
         run: |
           set -o pipefail

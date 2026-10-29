@@ -559,6 +559,7 @@
     <string name="restore_default">復原預設</string>
     <string name="reset_region_padding_confirm">確定恢復%s的預設邊距嗎？</string>
     <string name="lock_left_right_padding">左右邊距聯動</string>
+    <string name="lock_top_bottom_padding">上下邊距聯動</string>
     <string name="set_download_per">自訂快取路徑需要儲存權限</string>
     <string name="black">黑色</string>
     <string name="content_empty">文章內容為空</string>
@@ -1345,6 +1346,19 @@
     <string name="book_memo_discard">放棄未儲存的修改並關閉？</string>
     <string name="book_memo_save_failed">備忘儲存失敗：%1$s</string>
     <string name="reimport_book_source">重新匯入本書書源</string>
+    <string name="book_metadata_sync">同步書籍資訊</string>
+    <string name="book_metadata_sync_summary">修改書名或作者時，同步書籤與閱讀記錄。</string>
+    <string name="book_metadata_sync_always">同步</string>
+    <string name="book_metadata_sync_never">不同步</string>
+    <string name="book_metadata_sync_ask">每次提醒</string>
+    <string name="book_metadata_sync_question">同步修改對應書籤與閱讀記錄的書名和作者？</string>
+    <string name="read_record_edit">編輯閱讀記錄</string>
+    <string name="read_record_edit_summary">修改顯示的書名和作者；相同書名和作者的記錄合併顯示，閱讀時長保持不變。</string>
     <string name="customize_my">自訂我的頁面</string>
     <string name="my_more_items">將選取的功能移至更多</string>
+    <string name="content_search_scope_all">全局</string>
+    <string name="content_search_scope_down">向下</string>
+    <string name="content_search_scope_up">向上</string>
+    <string name="content_search_anchor_unavailable">正文處理後無法可靠定位目前閱讀位置。請返回閱讀頁重試，或切換為全域搜尋。</string>
+    <string name="content_search_result_unavailable">無法在閱讀正文中可靠定位此結果。請檢查替換淨化和標題設定後重新搜尋。</string>
 </resources>

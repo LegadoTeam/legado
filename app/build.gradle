@@ -64,8 +64,7 @@ android {
     }
     defaultConfig {
         applicationId "com.legado.app"
-        // The bundled HtmlUnit dependency requires Android O method-handle support.
-        minSdk 26
+        minSdk 23
         targetSdk 36
         versionCode = versionCodeValue
         versionName version

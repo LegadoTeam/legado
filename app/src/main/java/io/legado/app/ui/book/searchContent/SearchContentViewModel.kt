@@ -9,19 +9,52 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.ui.book.read.findContentMatches
 import io.legado.app.utils.ChineseUtils
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import java.util.regex.PatternSyntaxException
 
 class SearchContentViewModel(application: Application) : BaseViewModel(application) {
     companion object {
-        var replaceEnabled: Boolean = false
-        var regexReplace: Boolean = false
+        /*
+         * 三个搜索选项都记住上次选择 (AppConfig), 首次安装取默认值:
+         * 范围=全书、替换=关、正则=关 —— 与改动前的启动状态完全一致。
+         */
+
+        /** 替换净化 */
+        var replaceEnabled: Boolean
+            get() = AppConfig.contentSearchReplace
+            set(value) {
+                AppConfig.contentSearchReplace = value
+            }
+
+        /** 正则模式 */
+        var regexReplace: Boolean
+            get() = AppConfig.contentSearchRegex
+            set(value) {
+                AppConfig.contentSearchRegex = value
+            }
+
+        /**
+         * 搜索范围: 记住上次的选择 (AppConfig), 首次安装默认全书。
+         * 只把读写委托给配置, 调用方写法不变。
+         */
+        var searchScope: ContentSearchScope
+            get() = ContentSearchScope.values()
+                .getOrElse(AppConfig.contentSearchScope) { ContentSearchScope.ALL }
+            set(value) {
+                AppConfig.contentSearchScope = value.ordinal
+            }
     }
     var bookUrl: String = ""
     var book: Book? = null
+    internal var searchAnchor: ContentSearchAnchor? = null
     private var contentProcessor: ContentProcessor? = null
+    var hasSearchState = false
     var lastQuery: String = ""
+    var searchResultMessage: Int? = null
     var searchResultCounts = 0
     val cacheChapterNames = hashSetOf<String>()
     val searchResultList: MutableList<SearchResult> = mutableListOf()
@@ -38,13 +71,18 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
         }
     }
 
-    suspend fun searchChapter(
+    internal suspend fun searchChapter(
         query: String,
-        chapter: BookChapter
+        chapter: BookChapter,
+        options: ContentSearchOptions,
+        anchor: ContentSearchAnchor? = null,
     ): List<SearchResult> {
         val searchResultsWithinChapter: MutableList<SearchResult> = mutableListOf()
         val book = book ?: return searchResultsWithinChapter
-        val chapterContent = BookHelp.getContent(book, chapter) ?: return searchResultsWithinChapter
+        val chapterContent = BookHelp.getContent(book, chapter) ?: run {
+            if (anchor != null) throw ContentSearchAnchorException()
+            return searchResultsWithinChapter
+        }
         currentCoroutineContext().ensureActive()
         chapter.title = when (AppConfig.chineseConverterType) {
             1 -> ChineseUtils.t2s(chapter.title)
@@ -52,10 +90,21 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
             else -> chapter.title
         }
         currentCoroutineContext().ensureActive()
-        val mContent = contentProcessor!!.getContent(
-            book, chapter, chapterContent, useReplace = replaceEnabled
-        ).toString()
-        val positions = searchPosition(mContent, query)
+        val processed = contentProcessor!!.getContent(
+            book, chapter, chapterContent, useReplace = options.replace
+        )
+        val (mContent, titleLength) = if (options.scope == ContentSearchScope.ALL) {
+            processed.toString() to processed.titleLength
+        } else {
+            directionalContentSearchText(processed.toString(), processed.titleLength,
+                processed.displayTitle.orEmpty(), options.splitTitle, options.hideTitle, chapter.isVolume,
+                ReadBookConfig.paragraphIndent)
+        }
+        val searchText = if (options.scope == ContentSearchScope.ALL) null else
+            ContentSearchText(chapter.index, mContent, titleLength)
+        val anchorPosition = anchor?.let { searchText?.resolve(it) }
+        if (anchor != null && anchorPosition == null) throw ContentSearchAnchorException()
+        val positions = searchPosition(mContent, query, options.regex)
         positions.forEachIndexed { index, position ->
             currentCoroutineContext().ensureActive()
             val construct = getResultAndQueryIndex(mContent, position, query)
@@ -67,34 +116,22 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
                 chapterIndex = chapter.index,
                 queryIndexInResult = construct.first,
                 queryIndexInChapter = position,
-                isRegex = regexReplace
+                isRegex = options.regex,
+                contentAnchor = searchText?.anchor(position)
             )
             searchResultsWithinChapter.add(result)
         }
-        searchResultCounts += searchResultsWithinChapter.size
-        return searchResultsWithinChapter
+        return selectContentSearchResults(searchResultsWithinChapter, options.scope, anchorPosition)
     }
 
-    private suspend fun searchPosition(content: String, pattern: String): List<Int> {
-        val position: MutableList<Int> = mutableListOf()
-        if (regexReplace) { // 正则表达式搜索
-            try {
-                Regex(pattern).findAll(content).forEach { match ->
-                    currentCoroutineContext().ensureActive()
-                    position.add(match.range.first)
-                }
-            } catch (e: Exception) {
-                return position
-            }
-        } else {
-            var index = content.indexOf(pattern)
-            while (index >= 0) {
-                currentCoroutineContext().ensureActive()
-                position.add(index)
-                index = content.indexOf(pattern, index + pattern.length)
-            }
+    private suspend fun searchPosition(content: String, pattern: String, regex: Boolean): List<Int> {
+        val context = currentCoroutineContext()
+        return try {
+            findContentMatches(content, pattern, regex, matchCase = true) { context.ensureActive() }
+                .map { it.first }
+        } catch (_: PatternSyntaxException) {
+            emptyList()
         }
-        return position
     }
 
     private fun getResultAndQueryIndex(

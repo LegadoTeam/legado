@@ -343,8 +343,9 @@ class BackupOptionsTest {
         assertTrue(requests.isEmpty())
     }
 
-    @Test fun actualArchivePreservesAllReadAloudControlsIncludingExplicitFalse() = runBlocking(Dispatchers.IO) {
+    @Test fun actualArchivePreservesReaderControlsIncludingExplicitFalse() = runBlocking(Dispatchers.IO) {
         val values = linkedMapOf<String, Any>(
+            PreferKey.readPaddingLargeControls to true,
             PreferKey.readAloudControlsRealtime to false,
             PreferKey.readAloudControlsPause to false,
             PreferKey.readAloudControlsPosition to false,

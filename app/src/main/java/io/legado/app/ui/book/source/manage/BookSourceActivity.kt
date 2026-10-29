@@ -122,6 +122,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     private var checkSourceUiSessionId: Long? = null
     private var groupSourcesByDomain = false
     private var showCheckStatus = AppConfig.showSourceCheckStatus
+    private var showBookshelfCount = AppConfig.showSourceBookshelfCount
     private var checkStatusFilter = 0
     private val checkStatuses = listOf("", BookSourceCheckState.NEEDS_CHECK,
         BookSourceCheckState.PASSED, BookSourceCheckState.FAILED,
@@ -176,6 +177,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.checkStatusFilter.visibility = if (showCheckStatus) View.VISIBLE else View.GONE
         adapter.showCheckStatus = showCheckStatus
+        adapter.showBookshelfCount = showBookshelfCount
         initRecyclerView()
         initSearchView()
         val savedSearch = savedInstanceState?.getString("sourceSearch")
@@ -224,6 +226,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.menu_show_source_check_status).isChecked = showCheckStatus
+        menu.findItem(R.id.menu_show_source_bookshelf_count).isChecked = showBookshelfCount
         menu.findItem(R.id.menu_block_source_navigation).isChecked = AppConfig.blockSourceNavigation
         groupMenu = menu.findItem(R.id.menu_group).subMenu
         val sortSubMenu = menu.findItem(R.id.action_sort).subMenu!!
@@ -344,6 +347,12 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     putString("checkSourceMessage", null)
                 })
                 upBookSource(searchView.query?.toString())
+            }
+            R.id.menu_show_source_bookshelf_count -> {
+                showBookshelfCount = !showBookshelfCount
+                AppConfig.showSourceBookshelfCount = showBookshelfCount
+                item.isChecked = showBookshelfCount
+                adapter.showBookshelfCount = showBookshelfCount
             }
         }
         if (item.groupId == R.id.source_group) {

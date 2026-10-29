@@ -38,6 +38,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var showSourceCheckStatus: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showSourceCheckStatus, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.showSourceCheckStatus, value)
+    var showSourceBookshelfCount: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showSourceBookshelfCount, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.showSourceBookshelfCount, value)
     var blockSourceNavigation: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.blockSourceNavigation, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.blockSourceNavigation, value)
@@ -69,6 +72,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
     var showBoardLine = appCtx.getPrefInt(PreferKey.showBoardLine, 1).coerceIn(1, 5)
     var adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
+    var readPaddingLargeControls: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.readPaddingLargeControls, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.readPaddingLargeControls, value)
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (key) {
@@ -227,6 +233,27 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.showSearchReadRecord, true)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.showSearchReadRecord, value)
+        }
+
+    /** 全文搜索范围: 0 全书 / 1 向下 / 2 向上, 记住上次选择 */
+    var contentSearchScope: Int
+        get() = appCtx.getPrefInt(PreferKey.contentSearchScope, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.contentSearchScope, value)
+        }
+
+    /** 全文搜索: 是否启用替换净化, 记住上次选择(默认关, 与原行为一致) */
+    var contentSearchReplace: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.contentSearchReplace, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.contentSearchReplace, value)
+        }
+
+    /** 全文搜索: 是否启用正则模式, 记住上次选择(默认关, 与原行为一致) */
+    var contentSearchRegex: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.contentSearchRegex, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.contentSearchRegex, value)
         }
 
     var bookshelfReadProgressMode: Int
@@ -592,10 +619,19 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean("readRecordFixedCard", true)
         set(value) { appCtx.putPrefBoolean("readRecordFixedCard", value) }
 
+    val bookMetadataSync: String
+        get() = appCtx.getPrefString(PreferKey.bookMetadataSync) ?: "never"
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.enableReadRecord, value)
+        }
+
+    var enableRssReadRecord: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.enableRssReadRecord, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.enableRssReadRecord, value)
         }
 
     val autoChangeSource: Boolean
@@ -754,6 +790,20 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val webDavBookAutoRestore
         get() = appCtx.getPrefBoolean(PreferKey.webDavBookAutoRestore, false)
+
+    /**
+     * WebDAV 上保留的备份份数，默认 0 表示**不自动清理**。
+     *
+     * 之所以默认不清理：已有用户可能积累了大量备份，升级后若默认取一个小数字，
+     * 会在下一次备份时把历史备份一次性删掉。设成 0 则对存量用户零影响，
+     * 需要清理的用户自行填一个正整数（填 1 即只保留最新一份）。
+     */
+    val webDavBackupKeepCount: Int
+        get() = appCtx.getPrefString(PreferKey.webDavBackupKeepCount)
+            ?.trim()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+
+    val webDavBookAutoUpload
+        get() = appCtx.getPrefBoolean(PreferKey.webDavBookAutoUpload, false)
 
     val recordHeapDump get() = appCtx.getPrefBoolean(PreferKey.recordHeapDump, false)
 

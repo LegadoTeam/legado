@@ -41,20 +41,36 @@ class ReadPaddingLayoutTest {
     }
 
     @Test
-    fun `region controls are equal and touch sized`() {
+    fun `padding sliders keep compact controls and long press`() {
+        val document = readPaddingLayout()
+        (verticalPaddingIds + horizontalPaddingIds).forEach { id ->
+            val slider = document.findElementById(id)
+            assertEquals("40dp", slider.androidAttribute("layout_height"))
+            assertEquals("28dp", slider.appAttribute("adjustButtonSize"))
+            assertEquals("24dp", slider.appAttribute("adjustButtonIconSize"))
+            assertEquals("true", slider.appAttribute("repeatOnLongPress"))
+        }
+    }
+
+    @Test
+    fun `region controls remain equal and aligned with reset`() {
         val document = readPaddingLayout()
         regionButtonIds.forEach { id ->
             val button = document.findElementById(id)
             assertEquals("0dp", button.androidAttribute("layout_width"))
             assertEquals("1", button.androidAttribute("layout_weight"))
-            assertEquals("48dp", button.androidAttribute("layout_height"))
+            assertEquals("36dp", button.androidAttribute("layout_height"))
             assertEquals("true", button.androidAttribute("clickable"))
             assertEquals("true", button.androidAttribute("focusable"))
+            assertEquals("center", button.androidAttribute("gravity"))
+            assertEquals("false", button.androidAttribute("includeFontPadding"))
+            assertEquals("0dp", button.androidAttribute("paddingVertical"))
         }
+        assertEquals("13dp", document.findElementById("@+id/header_controls").androidAttribute("layout_marginBottom"))
 
         val reset = document.findElementById("@+id/iv_reset")
-        assertEquals("48dp", reset.androidAttribute("layout_width"))
-        assertEquals("48dp", reset.androidAttribute("layout_height"))
+        assertEquals("32dp", reset.androidAttribute("layout_width"))
+        assertEquals("32dp", reset.androidAttribute("layout_height"))
         assertEquals("@string/restore_default", reset.androidAttribute("contentDescription"))
     }
 
@@ -63,10 +79,15 @@ class ReadPaddingLayoutTest {
         val document = readPaddingLayout()
         val lock = document.findElementById("@+id/sw_lock_lr")
         assertEquals("@string/lock_left_right_padding", lock.androidAttribute("text"))
-        assertEquals("48dp", lock.androidAttribute("minHeight"))
+        val verticalLock = document.findElementById("@+id/sw_lock_tb")
+        assertEquals("@string/lock_top_bottom_padding", verticalLock.androidAttribute("text"))
         val showLine = document.findElementById("@+id/sw_show_line")
         assertEquals("@string/showLine", showLine.androidAttribute("text"))
-        assertEquals("48dp", showLine.androidAttribute("minHeight"))
+        assertEquals("gone", showLine.androidAttribute("visibility"))
+        listOf(lock, verticalLock, showLine).forEach {
+            assertEquals("40dp", it.androidAttribute("layout_height"))
+            assertEquals("40dp", it.androidAttribute("minHeight"))
+        }
     }
 
     private fun readPaddingLayout(): Document {

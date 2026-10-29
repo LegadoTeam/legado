@@ -24,4 +24,15 @@ class ReadRecordAuthorLayoutTest {
         val source = layout.readText()
         assertTrue(source.contains("app:layout_constraintTop_toBottomOf=\"@id/tv_author\""))
     }
+
+    @Test
+    fun `read record last time follows the tallest reading time field`() {
+        val layout = File("app/src/main/res/layout/item_read_record.xml")
+            .takeIf(File::isFile)
+            ?: File("src/main/res/layout/item_read_record.xml")
+        val source = layout.readText()
+        assertTrue(source.contains("android:id=\"@+id/reading_time_bottom\""))
+        assertTrue(source.contains("app:constraint_referenced_ids=\"tv_reading_time_tag,tv_reading_time\""))
+        assertTrue(source.contains("app:layout_constraintTop_toBottomOf=\"@id/reading_time_bottom\""))
+    }
 }

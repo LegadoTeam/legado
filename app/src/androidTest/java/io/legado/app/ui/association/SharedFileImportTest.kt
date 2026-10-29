@@ -28,6 +28,8 @@ import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isChecked
+import androidx.test.espresso.matcher.ViewMatchers.hasSibling
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
@@ -46,6 +48,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
@@ -61,6 +64,8 @@ import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.GSON
 import io.legado.app.utils.defaultSharedPreferences
 import kotlinx.coroutines.runBlocking
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.not
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -90,6 +95,7 @@ class SharedFileImportTest {
     private val sources = arrayListOf<BookSource>()
     private val rules = arrayListOf<HighlightRule>()
     private val replacements = arrayListOf<ReplaceRule>()
+    private val txtTocRules = arrayListOf<TxtTocRule>()
 
     @Before fun setUp() {
         directory.mkdirs()
@@ -107,6 +113,7 @@ class SharedFileImportTest {
         rules.forEach { rule -> appDb.highlightRuleDao.all.find { it.uuid == rule.uuid }
             ?.let { appDb.highlightRuleDao.delete(it) } }
         replacements.forEach { appDb.replaceRuleDao.delete(it) }
+        txtTocRules.forEach { appDb.txtTocRuleDao.delete(it) }
         books.forEach { book ->
             appDb.bookChapterDao.delByBook(book.bookUrl)
             appDb.bookDao.delete(book)
@@ -240,6 +247,46 @@ class SharedFileImportTest {
             await { appDb.replaceRuleDao.all.any { it.id == rule.id } }
             assertEquals("changed", appDb.replaceRuleDao.all.single { it.id == rule.id }.replacement)
             assertFalse(appDb.highlightRuleDao.all.any { it.pattern == id })
+        }
+    }
+
+    @Test(timeout = 120_000) fun txtTocPreviewSelectsChangedContentAndPersistsOnlyAfterConfirmation() {
+        val original = TxtTocRule(id = System.nanoTime(), name = "TXT update",
+            rule = "^Old (\\d+)$", replacement = "$0", example = "Old 1", serialNumber = 12)
+        val unchanged = original.copy(id = original.id + 1, name = "TXT unchanged")
+        val updated = original.copy(rule = "^New (\\d+)$", replacement = "$1",
+            example = "New 1", serialNumber = 13, enable = false)
+        val added = original.copy(id = original.id + 2, name = "TXT new", rule = "^Added (\\d+)$")
+        val candidates = listOf(updated, unchanged, added)
+        candidates.forEach { assertNull(appDb.txtTocRuleDao.get(it.id)) }
+        txtTocRules.addAll(candidates)
+        appDb.txtTocRuleDao.insert(original, unchanged)
+        val file = File(directory, "txt-toc-rules.json").apply { writeText(GSON.toJson(candidates)) }
+
+        launchShare(file, "application/json").use { scenario ->
+            awaitDialog(scenario)
+            onView(withText(R.string.import_txt_toc_rule)).inRoot(isDialog()).check(matches(isDisplayed()))
+            for ((rule, status, selected) in listOf(
+                Triple(updated, R.string.import_status_update, true),
+                Triple(unchanged, R.string.import_status_exist, false),
+                Triple(added, R.string.import_status_new, true)
+            )) {
+                val name = allOf(withId(R.id.cb_source_name), withText(rule.name))
+                onView(name).inRoot(isDialog()).check(matches(if (selected) isChecked() else not(isChecked())))
+                onView(allOf(withId(R.id.tv_source_state), hasSibling(name))).inRoot(isDialog())
+                    .check(matches(withText(status)))
+            }
+            assertEquals(GSON.toJson(original), GSON.toJson(appDb.txtTocRuleDao.get(original.id)))
+            assertEquals(GSON.toJson(unchanged), GSON.toJson(appDb.txtTocRuleDao.get(unchanged.id)))
+            assertNull(appDb.txtTocRuleDao.get(added.id))
+            screenshot("share-txt-toc-preview")
+            onView(withId(R.id.tv_ok)).inRoot(isDialog()).perform(click())
+            await { appDb.txtTocRuleDao.get(updated.id)?.rule == updated.rule &&
+                appDb.txtTocRuleDao.get(added.id) != null }
+            candidates.forEach { rule ->
+                assertEquals(GSON.toJson(rule), GSON.toJson(appDb.txtTocRuleDao.get(rule.id)))
+            }
+            await { scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED }
         }
     }
 

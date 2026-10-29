@@ -13,27 +13,32 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="16dp"
-        android:paddingTop="8dp"
+        android:paddingTop="24dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="16dp">
 
         <LinearLayout
+            android:id="@+id/header_controls"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginBottom="13dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <LinearLayout
+                android:id="@+id/region_controls"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
                 android:layout_weight="1"
                 android:orientation="horizontal">
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btn_region_header"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginHorizontal="2dp"
+                    android:layout_height="36dp"
+                    android:layout_marginHorizontal="4dp"
                     android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"
@@ -42,7 +47,9 @@
                     android:ellipsize="end"
                     android:maxLines="2"
                     android:minWidth="0dp"
+                    android:includeFontPadding="false"
                     android:paddingHorizontal="4dp"
+                    android:paddingVertical="0dp"
                     android:text="@string/header"
                     android:textAllCaps="false"
                     android:textColor="@color/primaryText"
@@ -51,8 +58,8 @@
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btn_region_body"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginHorizontal="2dp"
+                    android:layout_height="36dp"
+                    android:layout_marginHorizontal="4dp"
                     android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"
@@ -61,7 +68,9 @@
                     android:ellipsize="end"
                     android:maxLines="2"
                     android:minWidth="0dp"
+                    android:includeFontPadding="false"
                     android:paddingHorizontal="4dp"
+                    android:paddingVertical="0dp"
                     android:text="@string/main_body"
                     android:textAllCaps="false"
                     android:textColor="@color/primaryText"
@@ -71,8 +80,8 @@
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btn_region_footer"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginHorizontal="2dp"
+                    android:layout_height="36dp"
+                    android:layout_marginHorizontal="4dp"
                     android:layout_weight="1"
                     android:clickable="true"
                     android:focusable="true"
@@ -81,7 +90,9 @@
                     android:ellipsize="end"
                     android:maxLines="2"
                     android:minWidth="0dp"
+                    android:includeFontPadding="false"
                     android:paddingHorizontal="4dp"
+                    android:paddingVertical="0dp"
                     android:text="@string/footer"
                     android:textAllCaps="false"
                     android:textColor="@color/primaryText"
@@ -91,11 +102,12 @@
 
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/iv_reset"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="4dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/restore_default"
-                android:padding="12dp"
+                android:padding="6dp"
                 android:src="@drawable/ic_restore" />
 
         </LinearLayout>
@@ -103,47 +115,67 @@
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_top"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="400"
+            app:adjustButtonSize="28dp"
+            app:adjustButtonIconSize="24dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_top" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_bottom"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="400"
+            app:adjustButtonSize="28dp"
+            app:adjustButtonIconSize="24dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_bottom" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_left"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="100"
+            app:adjustButtonSize="28dp"
+            app:adjustButtonIconSize="24dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_left" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_right"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="40dp"
             app:isBottomBackground="true"
             app:max="100"
+            app:adjustButtonSize="28dp"
+            app:adjustButtonIconSize="24dp"
+            app:repeatOnLongPress="true"
             app:title="@string/padding_right" />
 
         <io.legado.app.lib.theme.view.ThemeSwitch
             android:id="@+id/sw_lock_lr"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
+            android:layout_height="40dp"
+            android:minHeight="40dp"
             android:text="@string/lock_left_right_padding" />
+
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/sw_lock_tb"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:minHeight="40dp"
+            android:text="@string/lock_top_bottom_padding" />
 
         <io.legado.app.lib.theme.view.ThemeSwitch
             android:id="@+id/sw_show_line"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
+            android:layout_height="40dp"
+            android:minHeight="40dp"
+            android:visibility="gone"
             android:text="@string/showLine" />
 
     </LinearLayout>

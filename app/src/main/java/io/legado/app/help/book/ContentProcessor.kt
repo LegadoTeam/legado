@@ -31,6 +31,36 @@ internal fun sameTitleLineMatcher(
         "[\\t\\x0B\\f\\p{Zs}]*(?:(?:\\r\\n|\\r|\\n)\\s*|$)"
 ).matcher(content)
 
+internal data class ProcessedBookParagraphs(
+    val textList: List<String>,
+    val titleLength: Int,
+)
+
+internal fun processBookParagraphs(
+    content: String,
+    includeTitle: Boolean,
+    titleLineCount: Int,
+    paragraphIndent: String = ReadBookConfig.paragraphIndent,
+): ProcessedBookParagraphs {
+    val contents = arrayListOf<String>()
+    var titleLength = 0
+    content.lineSequence().forEachIndexed { index, str ->
+        val paragraph = str.trim {
+            it.code <= 0x20 || it == '　'
+        }
+        if (paragraph.isNotEmpty()) {
+            if (contents.isEmpty() && includeTitle) {
+                contents.add(paragraph)
+            } else {
+                contents.add("$paragraphIndent$paragraph")
+            }
+            if (index < titleLineCount) titleLength += contents.last().length + 1
+        }
+    }
+    val length = contents.sumOf { it.length } + (contents.size - 1).coerceAtLeast(0)
+    return ProcessedBookParagraphs(contents, titleLength.coerceAtMost(length))
+}
+
 class ContentProcessor private constructor(
     private val bookName: String,
     private val bookOrigin: String
@@ -209,31 +239,25 @@ class ContentProcessor private constructor(
                 mContent = mContent.replace(placeholder, originalContent)
             }
         }
+        var titleLineCount = 0
+        var displayTitle: String? = null
         if (includeTitle) {
             //重新添加标题
-            mContent = chapter.getDisplayTitle(
+            val title = chapter.getDisplayTitle(
                 titleRules,
                 useReplace = replaceEnabled,
                 replaceBook = replaceBook
-            ) + "\n" + mContent
+            )
+            titleLineCount = title.lineSequence().count()
+            displayTitle = title
+            mContent = title + "\n" + mContent
         }
         if (isAndroid8) {
             mContent = mContent.replace('\u00A0', ' ')
         }
-        val contents = arrayListOf<String>()
-        mContent.lineSequence().forEach { str ->
-            val paragraph = str.trim {
-                it.code <= 0x20 || it == '　'
-            }
-            if (paragraph.isNotEmpty()) {
-                if (contents.isEmpty() && includeTitle) {
-                    contents.add(paragraph)
-                } else {
-                    contents.add("${ReadBookConfig.paragraphIndent}$paragraph")
-                }
-            }
-        }
-        return BookContent(sameTitleRemoved, contents, effectiveReplaceRules)
+        val paragraphs = processBookParagraphs(mContent, includeTitle, titleLineCount)
+        return BookContent(sameTitleRemoved, paragraphs.textList, effectiveReplaceRules,
+            paragraphs.titleLength, displayTitle)
     }
 
 }

@@ -39,6 +39,8 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.searchContent.SearchResult
+import io.legado.app.ui.book.searchContent.ContentSearchAnchorException
+import io.legado.app.ui.book.searchContent.resolveContentSearchMatch
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.utils.GSON
 import io.legado.app.utils.DocumentUtils
@@ -569,11 +571,20 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     ): Array<Int> {
         // calculate search result's pageIndex
         val pages = textChapter.pages
+        if (searchResult.contentAnchor != null && (!textChapter.isCompleted || pages.isEmpty() ||
+                textChapter.chapter.index != searchResult.chapterIndex)) {
+            throw ContentSearchAnchorException()
+        }
         val content = textChapter.getContent()
         var queryLength = searchContentQuery.length
 
         var index: Int
-        if (searchResult.isRegex) {
+        if (searchResult.contentAnchor != null) {
+            val match = resolveContentSearchMatch(searchResult, content, textChapter.layoutTitleLength)
+                ?: throw ContentSearchAnchorException()
+            index = match.first
+            queryLength = match.last + 1 - match.first
+        } else if (searchResult.isRegex) {
             val regex = Regex(searchContentQuery)
             val matches = regex.findAll(content)
             val match = matches.elementAtOrNull(searchResult.resultCountWithinChapter)
@@ -588,16 +599,13 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             }
         }
         val contentPosition = index
-        var pageIndex = 0
-        var length = pages[pageIndex].text.length
-        while (length < contentPosition && pageIndex + 1 < pages.size) {
-            pageIndex += 1
-            length += pages[pageIndex].text.length
-        }
+        val pageIndex = contentSearchPageIndex(pages.map { it.text.length }, contentPosition)
+        var length = pages.take(pageIndex + 1).sumOf { it.text.length }
 
         // calculate search result's lineIndex
         val currentPage = pages[pageIndex]
         val curTextLines = currentPage.lines
+        if (searchResult.contentAnchor != null && curTextLines.isEmpty()) throw ContentSearchAnchorException()
         var lineIndex = 0
         var curLine = curTextLines[lineIndex]
         length = length - currentPage.text.length + curLine.text.length

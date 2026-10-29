@@ -16,4 +16,24 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/menu_content_scope_all"
+            android:title="@string/content_search_scope_all"
+            android:checkable="true"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/menu_content_scope_down"
+            android:title="@string/content_search_scope_down"
+            android:checkable="true"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/menu_content_scope_up"
+            android:title="@string/content_search_scope_up"
+            android:checkable="true"
+            app:showAsAction="never" />
+    </group>
+
 </menu>
