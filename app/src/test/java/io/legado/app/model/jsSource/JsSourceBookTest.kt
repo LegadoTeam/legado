@@ -7,13 +7,18 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.isWebFile
+import io.legado.app.testing.AndroidDebugLogRule
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 class JsSourceBookTest {
+
+    @get:Rule
+    val androidDebugLog = AndroidDebugLogRule()
 
     @Test
     fun `volume placeholder skips js content and ignores its tag`() = runBlocking {

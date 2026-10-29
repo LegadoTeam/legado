@@ -194,6 +194,7 @@ json-path = { module = "com.jayway.jsonpath:json-path", version.ref = "jsonPath"
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 jsoupxpath = { module = "cn.wanghaomiao:JsoupXpath", version.ref = "jsoupxpath" }
 junit = { module = "junit:junit", version = "4.13.2" }
+mockito-core = { module = "org.mockito:mockito-core", version = "5.14.2" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 

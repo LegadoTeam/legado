@@ -70,6 +70,6 @@ class CronetInitializationContractTest {
             it.parentFile
         }.map {
             File(it, path)
-        }.first { it.isFile }.readText()
+        }.first { it.isFile }.readText().replace("\r\n", "\n")
     }
 }

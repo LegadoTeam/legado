@@ -219,7 +219,7 @@ class RssWebResourceProxyTest {
     fun activityDoesNotReadWebViewStateFromTheResourceInterceptorThread() {
         val source = java.io.File(
             "src/main/java/io/legado/app/ui/rss/read/ReadRssActivity.kt"
-        ).readText()
+        ).readText().replace("\r\n", "\n")
         val interceptor = source.substringAfter(
             "private suspend fun getProxiedResource",
         ).substringBefore("private suspend fun getModifiedContentWithJs")
