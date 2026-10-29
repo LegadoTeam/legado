@@ -28,6 +28,14 @@ class HttpTtsPauseTest {
     }
 
     @Test
+    fun `engine chunks do not add pauses inside one display paragraph`() {
+        assertFalse(shouldInsertParagraphPause("paragraph-1", "paragraph-1", 300))
+        assertTrue(shouldInsertParagraphPause("paragraph-1", "paragraph-2", 300))
+        assertFalse(shouldInsertParagraphPause("paragraph-2", null, 300))
+        assertFalse(shouldInsertParagraphPause("paragraph-1", "paragraph-2", 0))
+    }
+
+    @Test
     fun `player queue keeps room for a paragraph and its pause`() {
         assertTrue(hasHttpTtsQueueCapacity(10, 2))
         assertFalse(hasHttpTtsQueueCapacity(11, 2))
@@ -100,8 +108,9 @@ class HttpTtsPauseTest {
         assertTrue(dataSource.contains("getSpeakStream(httpTts, speakText, sessionId)"))
         assertTrue(dataSource.contains("isSessionActive(sessionId)"))
         assertTrue(speakStream.contains("ensureSessionActive(sessionId)"))
-        assertTrue(createSpeakFile.contains("runInterruptible"))
-        assertTrue(createSpeakFile.contains("file.delete()"))
+        assertTrue(createSpeakFile.contains("downloadCancellable"))
+        assertTrue(createSpeakFile.contains("HttpTtsFileCache.write"))
+        assertTrue(createSpeakFile.contains("context.ensureActive()"))
         assertTrue(queueWait.contains("if (pause)"))
         assertTrue(queueWait.contains("delay(1_000L)"))
         assertTrue(ttsPlayStop.contains("speakJob?.cancel()"))

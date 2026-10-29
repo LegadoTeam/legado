@@ -74,6 +74,8 @@ import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
+import io.legado.app.model.ParagraphTtsStart
+import io.legado.app.model.ParagraphTtsStopped
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -113,6 +115,8 @@ import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.delegate.ScrollPageDelegate
 import io.legado.app.ui.book.read.page.entities.PageDirection
 import io.legado.app.ui.book.read.page.entities.TextPage
+import io.legado.app.ui.book.read.paragraph.ParagraphItem
+import io.legado.app.ui.book.read.paragraph.ParagraphReadView
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.searchContent.SearchContentActivity
@@ -345,6 +349,131 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
     private var justInitData: Boolean = false
     private var syncDialog: AlertDialog? = null
+    private var paragraphModeActive = false
+    private var pausedParagraphViewport: ParagraphReadView.Viewport? = null
+    private data class SpokenLocation(val bookUrl: String, val chapterUrl: String, val itemId: String)
+    private var pausedSpokenLocation: SpokenLocation? = null
+    private var paragraphReaderSession = 0L
+    private var paragraphAloudOnPause = false
+    private var paragraphBookOnPause: String? = null
+    private var paragraphRenderedPosition: Int? = null
+    private var lastParagraphAloudState: Int? = null
+
+    private fun currentSpokenLocation(): SpokenLocation? =
+        BaseReadAloudService.currentParagraphProgress()?.let { progress ->
+            SpokenLocation(progress.bookUrl, progress.anchor.chapterUrl, progress.anchor.itemId)
+        }
+
+    private fun clearPausedParagraphViewport() {
+        pausedParagraphViewport = null
+        pausedSpokenLocation = null
+    }
+
+    fun updateParagraphMode() {
+        val enabled = AppConfig.paragraphReadMode
+        val changed = paragraphModeActive != enabled
+        if (changed) {
+            if (paragraphModeActive) binding.paragraphReadView.reportTopItem()
+            else binding.readView.updateScrollReadPosition(preserveText = true)
+            binding.readView.cancelTouchGestures()
+            binding.readView.cancelSelect(true)
+            binding.readView.markReadPositionChanged()
+            clearPausedParagraphViewport()
+        }
+        paragraphModeActive = enabled
+        binding.readView.visibility = if (enabled) View.INVISIBLE else View.VISIBLE
+        binding.readView.importantForAccessibility = if (enabled) {
+            View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        } else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        binding.paragraphReadView.visibility = if (enabled) View.VISIBLE else View.GONE
+        binding.paragraphReadView.importantForAccessibility = if (enabled) {
+            View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        } else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        if (enabled) {
+            if (changed) autoPageStop()
+            binding.paragraphReadView.upStyle()
+            renderParagraphContent()
+        } else if (changed) binding.readView.upContent(resetPageOffset = true)
+        if (changed && BaseReadAloudService.isRun && ReadBook.curTextChapter?.isCompleted == true) {
+            ReadAloud.restoreReadAloudFollow()
+            ReadBook.readAloud(!BaseReadAloudService.pause)
+        }
+        if (enabled && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            if (paragraphReaderSession == 0L) paragraphReaderSession = newParagraphReaderSession()
+            ReadBook.paragraphReaderVisibleSession = paragraphReaderSession
+        } else {
+            ReadBook.paragraphReaderVisibleSession = 0L
+            if (!enabled) paragraphReaderSession = 0L
+        }
+        updateReadAloudFloatBar()
+    }
+
+    private fun newParagraphReaderSession() = System.nanoTime().takeIf { it != 0L } ?: 1L
+
+    private fun renderParagraphContent() {
+        if (!paragraphModeActive) return
+        val chapter = ReadBook.curTextChapter
+        val view = binding.paragraphReadView
+        if (ReadBook.msg != null || chapter == null || !chapter.isCompleted) {
+            view.showMessage(ReadBook.msg ?: getString(R.string.loading))
+            return
+        }
+        val position = ReadBook.durChapterPos
+        if (!view.isShowing(chapter)) {
+            if (pausedParagraphViewport?.bookUrl != ReadBook.book?.bookUrl ||
+                pausedParagraphViewport?.chapterUrl != chapter.chapter.url) clearPausedParagraphViewport()
+            val anchor = ReadBook.book?.config?.paragraphAnchor?.takeIf {
+                it.chapterUrl == chapter.chapter.url && it.chapterPosition == position
+            }
+            view.setChapter(chapter, anchor?.itemId, position)
+        } else if ((!BaseReadAloudService.isRun || !ReadAloud.followReadAloudPosition) &&
+            paragraphRenderedPosition != position) view.scrollToPosition(position)
+        paragraphRenderedPosition = position
+        view.updateControls()
+    }
+
+    private fun saveParagraphTop(item: ParagraphItem) {
+        if (!paragraphModeActive || paragraphReaderSession == 0L ||
+            BaseReadAloudService.isRun && ReadAloud.followReadAloudPosition) return
+        val chapter = ReadBook.curTextChapter ?: return
+        if (!binding.paragraphReadView.isShowing(chapter)) return
+        val book = ReadBook.book ?: return
+        val anchor = Book.ParagraphAnchor(chapter.chapter.url, item.id, item.chapterPosition)
+        val changed = ReadBook.durChapterPos != item.chapterPosition || book.config.paragraphAnchor != anchor
+        ReadBook.durChapterPos = item.chapterPosition
+        paragraphRenderedPosition = item.chapterPosition
+        book.config.paragraphAnchor = anchor
+        if (changed) {
+            ReadBook.saveRead(true)
+            upSeekBarProgress()
+        }
+    }
+
+    private fun startParagraphFromTop() {
+        val item = binding.paragraphReadView.topItem ?: return
+        autoPageStop()
+        if (!BaseReadAloudService.isRun) ReadAloud.upReadAloudClass()
+        clearPausedParagraphViewport()
+        ReadAloud.playParagraph(this, item.chapterPosition, item.id)
+    }
+
+    private fun playParagraph() {
+        when {
+            BaseReadAloudService.isPlay() -> {
+                pausedParagraphViewport = binding.paragraphReadView.captureViewport()
+                pausedSpokenLocation = currentSpokenLocation()
+                ReadAloud.pause(this)
+            }
+            BaseReadAloudService.isRun -> {
+                if (ReadAloud.followReadAloudPosition) {
+                    pausedParagraphViewport?.let(binding.paragraphReadView::restoreViewport)
+                }
+                clearPausedParagraphViewport()
+                ReadAloud.resume(this)
+            }
+            else -> startParagraphFromTop()
+        }
+    }
 
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -355,6 +484,16 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBundle("pdfZoom", binding.readView.pdfZoom.save())
         outState.putBundle("aloudControls", aloudControls.save())
+        outState.putParcelable("pausedParagraphViewport", pausedParagraphViewport)
+        outState.putBoolean("paragraphAloudOnPause", paragraphModeActive && BaseReadAloudService.isRun)
+        outState.putString("paragraphBookOnPause", ReadBook.book?.bookUrl)
+        pausedSpokenLocation?.let { location ->
+            outState.putBundle("pausedParagraphSpeech", Bundle().apply {
+                putString("book", location.bookUrl)
+                putString("chapter", location.chapterUrl)
+                putString("item", location.itemId)
+            })
+        }
         editingHighlight?.let { outState.putParcelable(STATE_EDITING_HIGHLIGHT, it) }
         super.onSaveInstanceState(outState)
     }
@@ -383,11 +522,50 @@ class ReadBookActivity : BaseReadBookActivity(),
             backToSpeakingPosition()
         }
         binding.readAloudFloatBarContainer.llReadFromHere.setOnClickListener {
-            ReadBook.readAloud()
+            if (paragraphModeActive) startParagraphFromTop() else ReadBook.readAloud()
         }
         window.setBackgroundDrawable(null)
         upScreenTimeOut()
         ReadBook.register(this)
+        binding.paragraphReadView.apply {
+            onMenu = { showActionMenu() }
+            onImage = { item ->
+                item.imageSrc?.let { src ->
+                    item.imageClick?.let { clickImg(it, src) } ?: oldClickImg(src)
+                }
+            }
+            onPreviousChapter = {
+                clearPausedParagraphViewport()
+                ReadAloud.changeParagraphChapter(this@ReadBookActivity, false)
+            }
+            onNextChapter = {
+                clearPausedParagraphViewport()
+                ReadAloud.changeParagraphChapter(this@ReadBookActivity, true)
+            }
+            onPlayPause = { playParagraph() }
+            onTopItemChanged = { saveParagraphTop(it) }
+            onUserScroll = {
+                binding.readView.markReadPositionChanged()
+                if (BaseReadAloudService.isRun) clearPausedParagraphViewport()
+                if (BaseReadAloudService.isRun && ReadAloud.followReadAloudPosition) {
+                    ReadAloud.detachReadAloudFollow()
+                    updateReadAloudFloatBar()
+                }
+            }
+        }
+        updateParagraphMode()
+        @Suppress("DEPRECATION")
+        if (paragraphModeActive) {
+            pausedParagraphViewport = savedInstanceState?.getParcelable("pausedParagraphViewport")
+            paragraphAloudOnPause = savedInstanceState?.getBoolean("paragraphAloudOnPause") == true
+            paragraphBookOnPause = savedInstanceState?.getString("paragraphBookOnPause")
+            savedInstanceState?.getBundle("pausedParagraphSpeech")?.let { state ->
+                val book = state.getString("book") ?: return@let
+                val chapter = state.getString("chapter") ?: return@let
+                val item = state.getString("item") ?: return@let
+                pausedSpokenLocation = SpokenLocation(book, chapter, item)
+            }
+        }
         onBackPressedDispatcher.addCallback(this) {
             if (isShowingSearchResult) {
                 exitSearchMenu()
@@ -430,6 +608,9 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        clearPausedParagraphViewport()
+        paragraphAloudOnPause = false
+        paragraphBookOnPause = null
         setIntent(intent)
         editingHighlight = null
         resetBookmarkObserver()
@@ -479,6 +660,33 @@ class ReadBookActivity : BaseReadBookActivity(),
         upSystemUiVisibility()
         registerReceiver(timeBatteryReceiver, timeBatteryReceiver.filter)
         binding.readView.upTime()
+        updateParagraphMode()
+        if (paragraphModeActive) {
+            paragraphReaderSession = newParagraphReaderSession()
+            ReadBook.paragraphReaderVisibleSession = paragraphReaderSession
+            if (paragraphAloudOnPause && paragraphBookOnPause == ReadBook.book?.bookUrl &&
+                ReadAloud.followReadAloudPosition) {
+                val location = currentSpokenLocation()
+                if (BaseReadAloudService.pause && location != null) {
+                    val viewport = ParagraphReadView.Viewport(location.bookUrl, location.chapterUrl, location.itemId, 0)
+                    if (pausedParagraphViewport == null || pausedSpokenLocation != location) {
+                        pausedParagraphViewport = viewport
+                        pausedSpokenLocation = location
+                    }
+                    pausedParagraphViewport?.let(binding.paragraphReadView::restoreViewport)
+                } else if (BaseReadAloudService.isPlay()) backToSpeakingPosition()
+                else if (!BaseReadAloudService.isRun) {
+                    clearPausedParagraphViewport()
+                    ReadBook.book?.let { book ->
+                        ReadBook.openChapter(book.durChapterIndex, book.durChapterPos, success = {
+                            renderParagraphContent()
+                            book.config.paragraphAnchor?.let { binding.paragraphReadView.followSpeech(it.itemId) }
+                        })
+                    }
+                }
+            }
+        }
+        paragraphAloudOnPause = false
         updateReadAloudFloatBar()
         screenOffTimerStart()
         // 网络监听，当从无网切换到网络环境时同步进度（注意注册的同时就会收到监听，因此界面激活时无需重复执行同步操作）
@@ -508,6 +716,11 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onPause() {
+        if (paragraphModeActive) binding.paragraphReadView.reportTopItem()
+        paragraphAloudOnPause = paragraphModeActive && BaseReadAloudService.isRun
+        paragraphBookOnPause = ReadBook.book?.bookUrl
+        ReadBook.paragraphReaderVisibleSession = 0L
+        paragraphReaderSession = 0L
         super.onPause()
         binding.readView.cancelTouchGestures()
         autoPageStop()
@@ -1449,7 +1662,11 @@ class ReadBookActivity : BaseReadBookActivity(),
         if (menuLayoutIsVisible || !AppConfig.mouseWheelPage) {
             return
         }
-        if (binding.readView.isScroll) {
+        if (paragraphModeActive) {
+            binding.paragraphReadView.scrollByPixels(
+                -(distance * (AppConfig.mouseWheelScrollSpeed / 2f)).toInt()
+            )
+        } else if (binding.readView.isScroll) {
             // 滚动视图时滚动,否则翻页
             val scrollDistance = (distance * (AppConfig.mouseWheelScrollSpeed / 2f)).toInt()
             (binding.readView.pageDelegate as? ScrollPageDelegate)?.curPage?.scroll(scrollDistance)
@@ -1506,6 +1723,10 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun keyPage(direction: PageDirection) {
+        if (paragraphModeActive) {
+            if (direction != PageDirection.NONE) binding.paragraphReadView.scrollScreen(direction == PageDirection.NEXT)
+            return
+        }
         binding.readView.cancelTouchGestures()
         binding.readView.cancelSelect()
         binding.readView.pageDelegate?.isCancel = false
@@ -1552,7 +1773,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             val shouldResetPageOffset = resetPageOffset &&
                 (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
             binding.readView.cancelTouchGesturesOnContentUpdate()
-            binding.readView.upContent(relativePosition, shouldResetPageOffset)
+            if (paragraphModeActive) renderParagraphContent()
+            else binding.readView.upContent(relativePosition, shouldResetPageOffset)
             scheduleAloudFollowCheck()
             observeBookmarks()
             upBookmarkIndicator()
@@ -1582,7 +1804,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         val shouldResetPageOffset = resetPageOffset &&
             (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
         binding.readView.cancelTouchGesturesOnContentUpdate()
-        binding.readView.upContent(relativePosition, shouldResetPageOffset)
+        if (paragraphModeActive) renderParagraphContent()
+        else binding.readView.upContent(relativePosition, shouldResetPageOffset)
         scheduleAloudFollowCheck()
         observeBookmarks()
         upBookmarkIndicator()
@@ -1651,6 +1874,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun restoreAloudFollowOnVisiblePage() {
+        if (paragraphModeActive) return
         if (!BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
             !getPrefBoolean(PreferKey.readAloudControlsRealtime, true)
         ) return
@@ -1693,6 +1917,26 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun backToSpeakingPosition() {
         if (!BaseReadAloudService.isRun) return
+        if (paragraphModeActive) {
+            val progress = BaseReadAloudService.currentParagraphProgress() ?: return
+            if (ReadBook.book?.bookUrl != progress.bookUrl) return
+            val follow = {
+                val current = BaseReadAloudService.currentParagraphProgress()
+                if (current != null && current.bookUrl == progress.bookUrl &&
+                    current.chapterIndex == ReadBook.durChapterIndex) {
+                    ReadAloud.restoreReadAloudFollow()
+                    ReadBook.durChapterPos = current.chapterPosition
+                    ReadBook.book?.config?.paragraphAnchor = current.anchor
+                    clearPausedParagraphViewport()
+                    renderParagraphContent()
+                    binding.paragraphReadView.followSpeech(current.anchor.itemId)
+                }
+            }
+            if (progress.chapterIndex != ReadBook.durChapterIndex) {
+                ReadBook.openChapter(progress.chapterIndex, progress.chapterPosition, success = { follow() })
+            } else follow()
+            return
+        }
         val speakingChapterIndex = ReadAloud.readAloudChapterIndex
         // 优先用观察到的进度; 回退到服务里存活的朗读位置(Activity 重建后进度事件可能尚未到达)
         val chapterStart = lastReadAloudChapterStart.takeIf {
@@ -1798,6 +2042,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 自动翻页
      */
     override fun autoPage() {
+        if (paragraphModeActive) return
         ReadAloud.stop(this)
         if (isAutoPage) {
             autoPageStop()
@@ -2449,6 +2694,10 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 朗读按钮
      */
     override fun onClickReadAloud() {
+        if (paragraphModeActive) {
+            playParagraph()
+            return
+        }
         autoPageStop()
         when {
             !BaseReadAloudService.isRun -> {
@@ -2678,7 +2927,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onMenuHide() {
-        binding.readView.autoPager.resume()
+        if (!paragraphModeActive) binding.readView.autoPager.resume()
         aloudControls.reveal()
         updateReadAloudFloatBar(menuHiding = true)
     }
@@ -2772,7 +3021,10 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun toggleBookmark() {
         if (bookmarkTogglePending) return
         val book = ReadBook.book ?: return
-        val page = binding.readView.curPage.textPage
+        if (paragraphModeActive) binding.paragraphReadView.reportTopItem()
+        val page = if (paragraphModeActive) {
+            ReadBook.curTextChapter?.getPageByReadPos(ReadBook.durChapterPos) ?: return
+        } else binding.readView.curPage.textPage
         if (page.lines.isEmpty()) {
             toastOnUi(R.string.create_bookmark_error)
             return
@@ -2977,6 +3229,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onDestroy() {
+        if (ReadBook.paragraphReaderVisibleSession == paragraphReaderSession) {
+            ReadBook.paragraphReaderVisibleSession = 0L
+        }
         super.onDestroy()
         aloudControls.dispose()
         tts?.clearTts()
@@ -3007,6 +3262,10 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG) { values ->
             if (5 in values && isInitFinish) {
+                if (paragraphModeActive) {
+                    binding.paragraphReadView.reportTopItem()
+                    ReadBook.preserveCurrentPositionForRefresh()
+                }
                 binding.readView.updateScrollReadPosition(preserveText = true)
             }
             values.forEach { value ->
@@ -3034,9 +3293,33 @@ class ReadBookActivity : BaseReadBookActivity(),
                     13 -> upPageAnim()
                 }
             }
+            if (paragraphModeActive) {
+                paragraphReadView.upStyle()
+                renderParagraphContent()
+            }
             updateReadAloudFloatBar()
         }
         observeEvent<Int>(EventBus.ALOUD_STATE) {
+            if (paragraphModeActive) {
+                paragraphReadView.updateControls()
+                when (it) {
+                    Status.PAUSE -> if (BaseReadAloudService.isRun &&
+                        pausedParagraphViewport == null && paragraphReaderSession != 0L) {
+                        pausedParagraphViewport = paragraphReadView.captureViewport()
+                        pausedSpokenLocation = currentSpokenLocation()
+                    }
+                    Status.PLAY -> if (lastParagraphAloudState == Status.PAUSE) {
+                        if (ReadAloud.followReadAloudPosition) {
+                            pausedParagraphViewport?.let(paragraphReadView::restoreViewport)
+                        }
+                        clearPausedParagraphViewport()
+                    }
+                    Status.STOP -> clearPausedParagraphViewport()
+                }
+                lastParagraphAloudState = it
+                updateReadAloudFloatBar()
+                return@observeEvent
+            }
             if (it == Status.STOP || it == Status.PAUSE) {
                 ReadBook.curTextChapter?.let { textChapter ->
                     val page = textChapter.getPageByReadPos(ReadBook.durChapterPos)
@@ -3054,6 +3337,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         observeEventSticky<Int>(EventBus.TTS_PROGRESS) { chapterStart ->
             lastReadAloudChapterStart = chapterStart
             lastReadAloudChapterIndex = ReadAloud.readAloudChapterIndex
+            if (paragraphModeActive) return@observeEventSticky
             if (!ReadAloud.followReadAloudPosition) {
                 scheduleAloudFollowCheck()
                 return@observeEventSticky
@@ -3078,6 +3362,23 @@ class ReadBookActivity : BaseReadBookActivity(),
                         }
                     }
                 }
+            }
+        }
+        observeEvent<ParagraphTtsStart>(EventBus.PARAGRAPH_TTS_START) { event ->
+            if (paragraphModeActive && BaseReadAloudService.isPlay() &&
+                ReadAloud.followReadAloudPosition && ReadBook.book?.bookUrl == event.bookUrl &&
+                ReadBook.durChapterIndex == event.chapterIndex &&
+                BaseReadAloudService.currentParagraphProgress()?.anchor?.itemId == event.itemId) {
+                renderParagraphContent()
+                paragraphReadView.followSpeech(event.itemId)
+            }
+        }
+        observeEvent<ParagraphTtsStopped>(EventBus.PARAGRAPH_TTS_STOP) { event ->
+            if (paragraphModeActive && !BaseReadAloudService.isRun &&
+                event.readerSession != 0L && event.readerSession == paragraphReaderSession &&
+                ReadBook.book?.bookUrl == event.bookUrl) {
+                paragraphReadView.reportTopItem()
+                ReadBook.saveRead(true)
             }
         }
         observeEvent<Boolean>(PreferKey.keepLight) {

@@ -10,6 +10,7 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewConfiguration
+import android.view.View
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.Magnifier
@@ -1136,6 +1137,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     fun updateScrollReadPosition(preserveText: Boolean = false) {
+        // Paragraph mode keeps this renderer laid out, but its old page is not the reader's viewport.
+        if (visibility != View.VISIBLE) return
         // The configured mode may already have changed; capture the page still on screen.
         if (ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
         // A replacement chapter can finish before its final UI bind runs.

@@ -42,6 +42,8 @@ internal fun speechChunkEnd(text: String, start: Int, limit: Int): Int {
  */
 class TTSReadAloudService : BaseReadAloudService() {
 
+    override val paragraphSpeechLimit: Int get() = TextToSpeech.getMaxSpeechInputLength()
+
     private var textToSpeech: TextToSpeech? = null
     private var ttsInitFinish = false
     private var ttsInitGeneration = 0L
@@ -56,6 +58,7 @@ class TTSReadAloudService : BaseReadAloudService() {
         kotlin.runCatching {
             initTts()
         }.onFailure {
+            if (AppConfig.paragraphReadMode) pauseReadAloud()
             AppLog.put("${getString(R.string.tts_init_failed)}\n$it", it, true)
         }
     }
@@ -102,9 +105,11 @@ class TTSReadAloudService : BaseReadAloudService() {
             textToSpeech?.let {
                 it.setOnUtteranceProgressListener(ttsUtteranceListener)
                 ttsInitFinish = true
+                if (paragraphMode && pause) return
                 play()
             }
         } else {
+            if (AppConfig.paragraphReadMode) pauseReadAloud()
             toastOnUi(R.string.tts_init_failed)
         }
     }
@@ -112,6 +117,7 @@ class TTSReadAloudService : BaseReadAloudService() {
     @Synchronized
     override fun play() {
         val sessionId = playbackSessionId.incrementAndGet()
+        if (paragraphMode && paragraphWaitingForChapter) return
         if (!ttsInitFinish) return
         if (!requestFocus()) return
         if (contentList.isEmpty()) {
@@ -120,6 +126,11 @@ class TTSReadAloudService : BaseReadAloudService() {
             return
         }
         super.play()
+        if (paragraphMode) {
+            restartParagraphSession()
+            playParagraphQueue(sessionId)
+            return
+        }
         MediaHelp.playSilentSound(this@TTSReadAloudService)
         speakJob?.cancel()
         val startSpeak = nowSpeak
@@ -184,6 +195,40 @@ class TTSReadAloudService : BaseReadAloudService() {
         }
     }
 
+    private fun playParagraphQueue(sessionId: Long) {
+        MediaHelp.playSilentSound(this)
+        speakJob?.cancel()
+        val queuedItems = paragraphSpeechItems
+        val firstSpeak = nowSpeak
+        speakJob = execute {
+            var added = false
+            for (index in firstSpeak until queuedItems.size) {
+                ensureActive()
+                if (!isCurrentPlayback(sessionId)) return@execute
+                val speech = queuedItems[index]
+                val result = speakCurrent(
+                    sessionId, speech.text,
+                    if (added) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH,
+                    index, speech.item.canonicalPositionAt(speech.textStart), true
+                ) ?: return@execute
+                if (result == TextToSpeech.ERROR) {
+                    callbackHandler.post {
+                        if (isCurrentPlayback(sessionId)) pauseReadAloud()
+                    }
+                    return@execute
+                }
+                added = true
+            }
+        }.onError {
+            if (isCurrentPlayback(sessionId)) {
+                AppLog.put("tts朗读出错\n${it.localizedMessage}", it, true)
+                callbackHandler.post {
+                    if (isCurrentPlayback(sessionId)) pauseReadAloud()
+                }
+            }
+        }
+    }
+
     @Synchronized
     override fun playStop() {
         playbackSessionId.incrementAndGet()
@@ -235,6 +280,10 @@ class TTSReadAloudService : BaseReadAloudService() {
 
         override fun onStart(s: String) {
             dispatchCurrentCallback(s) {
+                if (paragraphMode) {
+                    utteranceParagraphIndex(s)?.let(::paragraphStarted)
+                    return@dispatchCurrentCallback
+                }
                 val msg = "onStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$s"
                 LogUtils.d(TAG, msg)
                 if (AppConfig.recordLog && !startCallbackLogged) {
@@ -254,6 +303,10 @@ class TTSReadAloudService : BaseReadAloudService() {
 
         override fun onDone(s: String) {
             dispatchCurrentCallback(s) {
+                if (paragraphMode) {
+                    utteranceParagraphIndex(s)?.let(::paragraphFinished)
+                    return@dispatchCurrentCallback
+                }
                 LogUtils.d(TAG, "onDone utteranceId:$s")
                 if (s.substringAfterLast(':') != "false") nextParagraph()
             }
@@ -262,6 +315,12 @@ class TTSReadAloudService : BaseReadAloudService() {
         override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
             super.onRangeStart(utteranceId, start, end, frame)
             dispatchCurrentCallback(utteranceId) {
+                if (paragraphMode) {
+                    val index = utteranceParagraphIndex(utteranceId) ?: return@dispatchCurrentCallback
+                    val speech = paragraphSpeechItems[index]
+                    upTtsProgress(speech.item.canonicalPositionAt(speech.textStart + start))
+                    return@dispatchCurrentCallback
+                }
                 val msg =
                     "onRangeStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$utteranceId start:$start end:$end frame:$frame"
                 LogUtils.d(TAG, msg)
@@ -277,6 +336,10 @@ class TTSReadAloudService : BaseReadAloudService() {
 
         override fun onError(utteranceId: String?, errorCode: Int) {
             dispatchCurrentCallback(utteranceId) {
+                if (paragraphMode) {
+                    pauseReadAloud()
+                    return@dispatchCurrentCallback
+                }
                 LogUtils.d(
                     TAG,
                     "onError nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$utteranceId errorCode:$errorCode"
@@ -301,6 +364,10 @@ class TTSReadAloudService : BaseReadAloudService() {
         @Deprecated("Deprecated in Java")
         override fun onError(s: String) {
             dispatchCurrentCallback(s) {
+                if (paragraphMode) {
+                    pauseReadAloud()
+                    return@dispatchCurrentCallback
+                }
                 LogUtils.d(TAG, "onError nowSpeak:$nowSpeak pageIndex:$pageIndex s:$s")
                 if (s.substringAfterLast(':') != "false") nextParagraph()
             }
@@ -320,6 +387,11 @@ class TTSReadAloudService : BaseReadAloudService() {
 
     private fun utterancePosition(id: String?): Int =
         id?.split(':', limit = 5)?.getOrNull(3)?.toIntOrNull() ?: readAloudNumber
+
+    private fun utteranceParagraphIndex(id: String?): Int? =
+        id?.split(':', limit = 5)?.getOrNull(2)?.toIntOrNull()?.takeIf {
+            !pause && isParagraphPlaybackCurrent() && it in paragraphSpeechItems.indices
+        }
 
     private fun utteranceId(sessionId: Long, index: Int, position: Int, last: Boolean): String {
         return "${AppConst.APP_TAG}:$sessionId:$index:$position:$last"

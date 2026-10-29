@@ -28,6 +28,8 @@ import com.script.ScriptException
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
+import io.legado.app.constant.EventBus
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
@@ -40,11 +42,14 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
+import io.legado.app.utils.observeEvent
+import io.legado.app.utils.observeSharedPreferences
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.servicePendingIntent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -80,6 +85,9 @@ internal fun normalizeHttpTtsPauseDuration(durationMs: Int): Int {
 internal fun shouldInsertHttpTtsPause(index: Int, lastIndex: Int, durationMs: Int): Boolean {
     return index < lastIndex && normalizeHttpTtsPauseDuration(durationMs) > 0
 }
+
+internal fun shouldInsertParagraphPause(itemId: String, nextItemId: String?, durationMs: Int): Boolean =
+    nextItemId != null && nextItemId != itemId && normalizeHttpTtsPauseDuration(durationMs) > 0
 
 internal fun hasHttpTtsQueueCapacity(mediaItemCount: Int, newItemCount: Int): Boolean {
     return newItemCount in 1..MAX_HTTP_TTS_PLAYER_QUEUE_SIZE &&
@@ -185,10 +193,42 @@ class HttpReadAloudService : BaseReadAloudService(),
     private val downloadTaskActiveLock = Mutex()
     private val playbackSessionId = AtomicLong()
     private val activeDownloader = AtomicReference<Downloader?>()
+    private val prefetchDownloader = AtomicReference<Downloader?>()
+    private val paragraphPrefetchState = ParagraphPrefetchState<ParagraphAudioRequest>()
+    private var pendingParagraphPrefetch: ParagraphAudioRequest? = null
+    private var paragraphPrefetchJob: Job? = null
+    private var paragraphLookaheadJob: Job? = null
+
+    private data class ParagraphAudioRequest(
+        val chapter: TextChapter,
+        val httpTts: HttpTTS,
+        val rate: Int,
+        val sessionId: Long,
+        val paragraphSession: Long,
+        val stream: Boolean,
+        val variable: String,
+        val loginHeader: String,
+    )
 
     override fun onCreate() {
         super.onCreate()
         exoPlayer.addListener(this)
+        observeEvent<TextChapter>(EventBus.TEXT_CHAPTER_READY) { chapter ->
+            pendingParagraphPrefetch?.let { tryStartParagraphPrefetch(it, chapter) }
+        }
+        observeEvent<Boolean>(EventBus.READ_ALOUD_FOLLOW) { following ->
+            if (!following) pendingParagraphPrefetch?.let(::loadParagraphLookahead)
+        }
+        observeSharedPreferences { _, key ->
+            if (key == PreferKey.streamReadAloudAudio && paragraphMode) {
+                val wasPaused = pause
+                playStop()
+                restartParagraphSession()
+                if (!paragraphWaitingForChapter) {
+                    if (wasPaused) pageChanged = true else play()
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -203,6 +243,7 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     override fun play() {
+        if (paragraphMode && paragraphWaitingForChapter) return
         pageChanged = false
         playStop()
         if (!requestFocus()) return
@@ -211,7 +252,9 @@ class HttpReadAloudService : BaseReadAloudService(),
             ReadBook.readAloud()
         } else {
             super.play()
-            if (AppConfig.streamReadAloudAudio) {
+            if (paragraphMode) {
+                downloadAndPlayParagraphAudios(AppConfig.streamReadAloudAudio)
+            } else if (AppConfig.streamReadAloudAudio) {
                 downloadAndPlayAudiosStream()
             } else {
                 downloadAndPlayAudios()
@@ -228,6 +271,10 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     private fun updateNextPos() {
+        if (paragraphMode) {
+            paragraphFinished(nowSpeak)
+            return
+        }
         readAloudNumber += contentList[nowSpeak].length + 1 - paragraphStartPos
         paragraphStartPos = 0
         if (nowSpeak < contentList.lastIndex) {
@@ -235,6 +282,229 @@ class HttpReadAloudService : BaseReadAloudService(),
         } else {
             nextChapter(auto = true)
         }
+    }
+
+    private fun isParagraphRequestActive(request: ParagraphAudioRequest): Boolean =
+        isSessionActive(request.sessionId) && isRun && paragraphMode &&
+                !paragraphWaitingForChapter && paragraphSession == request.paragraphSession &&
+                ReadBook.book?.bookUrl == request.chapter.chapter.bookUrl &&
+                textChapter?.chapter?.url == request.chapter.chapter.url &&
+                textChapter?.chapter?.index == request.chapter.chapter.index &&
+                speechRate == request.rate && AppConfig.streamReadAloudAudio == request.stream &&
+                ReadAloud.httpTTS?.let { it.id == request.httpTts.id && it.equal(request.httpTts) } == true
+
+    private fun checkParagraphRequest(request: ParagraphAudioRequest) {
+        if (!isParagraphRequestActive(request)) {
+            throw CancellationException("Paragraph audio request is no longer current")
+        }
+    }
+
+    private fun paragraphCacheName(
+        content: String,
+        chapter: TextChapter,
+        request: ParagraphAudioRequest,
+    ): String = buildHttpTtsCacheFileName(
+        chapter.title, request.httpTts.url, request.rate,
+        request.variable, request.loginHeader, content,
+    )
+
+    private fun downloadAndPlayParagraphAudios(stream: Boolean) {
+        val chapter = textChapter ?: return
+        val httpTts = ReadAloud.httpTTS?.copy() ?: return
+        val request = ParagraphAudioRequest(
+            chapter, httpTts, speechRate, startPlaybackSession(), paragraphSession, stream,
+            httpTts.getVariable(), httpTts.getLoginHeader().orEmpty(),
+        )
+        val speechItems = paragraphSpeechItems
+        val firstIndex = nowSpeak
+        downloadTask = execute {
+            downloadTaskActiveLock.withLock {
+                checkParagraphRequest(request)
+                val downloaderChannel = Channel<Downloader>()
+                val worker = if (stream) launch {
+                    for (downloader in downloaderChannel) {
+                        checkParagraphRequest(request)
+                        activeDownloader.set(downloader)
+                        try {
+                            downloadCancellable({ downloader.download(null) }, downloader::cancel)
+                        } finally {
+                            activeDownloader.compareAndSet(downloader, null)
+                        }
+                    }
+                } else null
+                try {
+                    for (index in firstIndex until speechItems.size) {
+                        ensureActive()
+                        checkParagraphRequest(request)
+                        val speech = speechItems[index]
+                        val fileName = paragraphCacheName(speech.text, chapter, request)
+                        val duration = normalizeHttpTtsPauseDuration(httpTts.pauseDuration)
+                        val insertPause = shouldInsertParagraphPause(
+                            speech.item.id, speechItems.getOrNull(index + 1)?.item?.id, duration,
+                        )
+                        if (stream) {
+                            val factory = createParagraphDataSourceFactory(request, speech.text)
+                            downloaderChannel.send(createDownloader(factory, fileName))
+                            val source = createMediaSource(factory, fileName, index, request.sessionId)
+                            val silence = if (insertPause) {
+                                createPauseMediaSource(duration, request.sessionId)
+                            } else null
+                            enqueueMediaSources(request.sessionId, listOfNotNull(source, silence))
+                        } else {
+                            if (!hasSpeakFile(fileName)) {
+                                val input = getSpeakStream(
+                                    httpTts, speech.text, request.sessionId, requestRate = request.rate,
+                                ) ?: throw NoStackTraceException("TTS returned no audio")
+                                writeParagraphAudio(fileName, input, request)
+                            }
+                            val item = createQueueMediaItem(
+                                Uri.fromFile(getSpeakFileAsMd5(fileName)), index, request.sessionId,
+                            )
+                            val silence = if (insertPause) {
+                                createPauseMediaItem(
+                                    Uri.fromFile(getOrCreatePauseFile(duration)), duration, request.sessionId,
+                                )
+                            } else null
+                            enqueueMediaItems(request.sessionId, listOfNotNull(item, silence))
+                        }
+                    }
+                    withContext(Main) { armParagraphPrefetch(request) }
+                } finally {
+                    downloaderChannel.close()
+                }
+                worker?.join()
+            }
+        }.onError {
+            if (it !is CancellationException && isParagraphRequestActive(request)) {
+                AppLog.put("段落朗读下载出错\n${it.localizedMessage}", it, true)
+                lifecycleScope.launch(Main) {
+                    if (isParagraphRequestActive(request)) pauseReadAloud()
+                }
+            }
+        }
+    }
+
+    private suspend fun writeParagraphAudio(
+        name: String,
+        input: InputStream,
+        request: ParagraphAudioRequest,
+    ) {
+        val context = currentCoroutineContext()
+        input.use { stream ->
+            downloadCancellable(download = {
+                HttpTtsFileCache.write(getSpeakFileAsMd5(name), stream) {
+                    context.ensureActive()
+                    checkParagraphRequest(request)
+                }
+            }, cancel = stream::close)
+        }
+    }
+
+    private fun createParagraphDataSourceFactory(
+        request: ParagraphAudioRequest,
+        text: String,
+        prefetch: Boolean = false,
+    ): CacheDataSource.Factory = CacheDataSource.Factory()
+        .setCache(cache)
+        .setCacheWriteDataSinkFactory(cacheDataSinkFactory)
+        .setUpstreamDataSourceFactory(DataSource.Factory {
+            InputStreamDataSource {
+                runBlocking {
+                    checkParagraphRequest(request)
+                    getSpeakStream(
+                        request.httpTts, text, request.sessionId, prefetch, request.rate,
+                    ) ?: throw NoStackTraceException("TTS returned no audio")
+                }
+            }
+        })
+
+    /** Called on Main after the current chapter queue has been prepared. */
+    private fun armParagraphPrefetch(request: ParagraphAudioRequest) {
+        if (!isParagraphRequestActive(request)) return
+        if (request.chapter.chapter.index + 1 >= ReadBook.simulatedChapterSize) return
+        pendingParagraphPrefetch = request
+        paragraphPrefetchState.arm(request)
+        val target = listOfNotNull(
+            ReadBook.prevTextChapter, ReadBook.curTextChapter, ReadBook.nextTextChapter,
+        ).firstOrNull { isParagraphPrefetchTarget(request, it) }
+        if (target?.isCompleted == true) {
+            tryStartParagraphPrefetch(request, target)
+        } else if (target == null || !ReadAloud.followReadAloudPosition) {
+            loadParagraphLookahead(request)
+        }
+        // A shared chapter still being laid out will notify TEXT_CHAPTER_READY once.
+    }
+
+    private fun isParagraphPrefetchTarget(request: ParagraphAudioRequest, chapter: TextChapter): Boolean =
+        chapter.chapter.bookUrl == request.chapter.chapter.bookUrl &&
+                chapter.chapter.index == request.chapter.chapter.index + 1
+
+    private fun loadParagraphLookahead(request: ParagraphAudioRequest) {
+        if (!isParagraphRequestActive(request) || !paragraphPrefetchState.claimLoad(request)) return
+        val book = ReadBook.book?.takeIf { it.bookUrl == request.chapter.chapter.bookUrl } ?: return
+        paragraphLookaheadJob = lifecycleScope.launch(IO) {
+            try {
+                val target = loadParagraphSpeechChapter(book, request.chapter.chapter.index + 1)
+                withContext(Main) {
+                    if (target != null) tryStartParagraphPrefetch(request, target)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLog.put("下一章段落预加载失败\n${error.localizedMessage}", error)
+            }
+        }
+    }
+
+    private fun tryStartParagraphPrefetch(request: ParagraphAudioRequest, target: TextChapter) {
+        if (!isParagraphRequestActive(request) || !target.isCompleted || !target.hasBodyContent ||
+            !isParagraphPrefetchTarget(request, target) || !paragraphPrefetchState.claimAttempt(request)
+        ) return
+        paragraphPrefetchJob = lifecycleScope.launch(IO) {
+            val items = ParagraphSpeechQueue.buildPrefetch(
+                target.paragraphItems, paragraphSpeechLimit, NEXT_CHAPTER_TTS_PREFETCH_ITEM_LIMIT,
+            )
+            for (speech in items) {
+                ensureActive()
+                checkParagraphRequest(request)
+                try {
+                    val name = paragraphCacheName(speech.text, target, request)
+                    if (request.stream) {
+                        val downloader = createDownloader(
+                            createParagraphDataSourceFactory(request, speech.text, prefetch = true), name,
+                        )
+                        prefetchDownloader.set(downloader)
+                        try {
+                            checkParagraphRequest(request)
+                            downloadCancellable({ downloader.download(null) }, downloader::cancel)
+                        } finally {
+                            prefetchDownloader.compareAndSet(downloader, null)
+                        }
+                    } else if (!hasSpeakFile(name)) {
+                        val input = getSpeakStream(
+                            request.httpTts, speech.text, request.sessionId,
+                            prefetch = true, requestRate = request.rate,
+                        ) ?: continue
+                        writeParagraphAudio(name, input, request)
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    // Speculative failure never changes playback errors or inserts silence.
+                    AppLog.put("下一章段落语音预取失败\n${error.localizedMessage}", error)
+                }
+            }
+        }
+    }
+
+    private fun cancelParagraphPrefetch() {
+        pendingParagraphPrefetch = null
+        paragraphPrefetchState.clear()
+        paragraphLookaheadJob?.cancel()
+        paragraphLookaheadJob = null
+        paragraphPrefetchJob?.cancel()
+        paragraphPrefetchJob = null
+        prefetchDownloader.getAndSet(null)?.cancel()
     }
 
     private fun downloadAndPlayAudios() {
@@ -305,7 +575,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         val contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0, 1)
             .splitToSequence("\n")
             .filter { it.isNotEmpty() }
-            .take(10)
+            .take(NEXT_CHAPTER_TTS_PREFETCH_ITEM_LIMIT)
             .toList()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
@@ -408,7 +678,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         val contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0, 1)
             .splitToSequence("\n")
             .filter { it.isNotEmpty() }
-            .take(10)
+            .take(NEXT_CHAPTER_TTS_PREFETCH_ITEM_LIMIT)
             .toList()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
@@ -488,7 +758,9 @@ class HttpReadAloudService : BaseReadAloudService(),
     private suspend fun getSpeakStream(
         httpTts: HttpTTS,
         speakText: String,
-        sessionId: Long
+        sessionId: Long,
+        prefetch: Boolean = false,
+        requestRate: Int = speechRate,
     ): InputStream? {
         while (true) {
             ensureSessionActive(sessionId)
@@ -496,7 +768,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 val analyzeUrl = AnalyzeUrl(
                     httpTts.url,
                     speakText = speakText,
-                    speakSpeed = speechRate,
+                    speakSpeed = requestRate,
                     source = httpTts,
                     readTimeout = 300 * 1000L,
                     coroutineContext = currentCoroutineContext()
@@ -547,11 +819,13 @@ class HttpReadAloudService : BaseReadAloudService(),
                 currentCoroutineContext().ensureActive()
                 ensureSessionActive(sessionId)
                 response.body.byteStream().let { stream ->
-                    downloadErrorNo = 0
-                    return stream
+                    val checked = checkedAudioStream(stream)
+                    if (!prefetch) downloadErrorNo = 0
+                    return checked
                 }
             } catch (e: Exception) {
                 ensureSessionActive(sessionId)
+                if (prefetch) throw e
                 when (e) {
                     is CancellationException -> throw e
                     is ScriptException, is WrappedException -> {
@@ -602,33 +876,27 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     private fun createSilentSound(fileName: String) {
-        val file = createSpeakFile(fileName)
-        file.writeBytes(resources.openRawResource(R.raw.silent_sound).readBytes())
+        resources.openRawResource(R.raw.silent_sound).use { input ->
+            HttpTtsFileCache.write(getSpeakFileAsMd5(fileName), input) { }
+        }
     }
 
     private fun hasSpeakFile(name: String): Boolean {
-        return FileUtils.exist("${ttsFolderPath}$name.mp3")
+        return HttpTtsFileCache.isReusable(getSpeakFileAsMd5(name))
     }
 
     private fun getSpeakFileAsMd5(name: String): File {
         return File("${ttsFolderPath}$name.mp3")
     }
 
-    private fun createSpeakFile(name: String): File {
-        return FileUtils.createFileIfNotExist("${ttsFolderPath}$name.mp3")
-    }
-
     private suspend fun createSpeakFile(name: String, inputStream: InputStream) {
-        val file = FileUtils.createFileIfNotExist("${ttsFolderPath}$name.mp3")
-        try {
-            runInterruptible {
-                file.outputStream().use { out ->
-                    inputStream.use { it.copyTo(out) }
+        val context = currentCoroutineContext()
+        inputStream.use { input ->
+            downloadCancellable(download = {
+                HttpTtsFileCache.write(getSpeakFileAsMd5(name), input) {
+                    context.ensureActive()
                 }
-            }
-        } catch (throwable: Throwable) {
-            file.delete()
-            throw throwable
+            }, cancel = input::close)
         }
     }
 
@@ -697,6 +965,13 @@ class HttpReadAloudService : BaseReadAloudService(),
 
     private fun upPlayPos() {
         playIndexJob?.cancel()
+        if (paragraphMode) {
+            val index = exoPlayer.currentMediaItem?.mediaId?.substringAfterLast(':')?.toIntOrNull()
+            if (!pause && !isPauseMediaItem(exoPlayer.currentMediaItem) &&
+                isCurrentSessionMediaItem(exoPlayer.currentMediaItem) && index != null
+            ) paragraphStarted(index)
+            return
+        }
         val textChapter = textChapter ?: return
         playIndexJob = lifecycleScope.launch {
             upTtsProgress(readAloudNumber)
@@ -728,7 +1003,11 @@ class HttpReadAloudService : BaseReadAloudService(),
     override fun upSpeechRate(reset: Boolean) {
         playStop()
         speechRate = AppConfig.speechRatePlay + 5
-        if (AppConfig.streamReadAloudAudio) {
+        if (paragraphMode && paragraphWaitingForChapter) return
+        if (paragraphMode) {
+            restartParagraphSession()
+            downloadAndPlayParagraphAudios(AppConfig.streamReadAloudAudio)
+        } else if (AppConfig.streamReadAloudAudio) {
             downloadAndPlayAudiosStream()
         } else {
             downloadAndPlayAudios()
@@ -760,9 +1039,9 @@ class HttpReadAloudService : BaseReadAloudService(),
                 // 结束
                 if (!isCurrentSessionMediaItem(exoPlayer.currentMediaItem)) return
                 playErrorNo = 0
-                updateNextPos()
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
+                updateNextPos()
             }
         }
     }
@@ -787,7 +1066,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
         trimPlayedMediaItems()
         if (isPauseMediaItem(mediaItem)) return
-        updateNextPos()
+        if (!paragraphMode) updateNextPos()
         upPlayPos()
     }
 
@@ -890,6 +1169,7 @@ class HttpReadAloudService : BaseReadAloudService(),
 
     private fun invalidatePlaybackSession() {
         playbackSessionId.incrementAndGet()
+        cancelParagraphPrefetch()
     }
 
     private fun isSessionActive(sessionId: Long): Boolean {

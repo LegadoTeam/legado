@@ -102,7 +102,9 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
         ) {
             when (key) {
                 PreferKey.readAloudByPage, PreferKey.streamReadAloudAudio -> {
-                    if (BaseReadAloudService.isRun) {
+                    // Paragraph HTTP playback observes stream changes in its own service,
+                    // including when the visible reader has detached from the speech cursor.
+                    if (BaseReadAloudService.isRun && !AppConfig.paragraphReadMode) {
                         postEvent(EventBus.MEDIA_BUTTON, false)
                     }
                 }

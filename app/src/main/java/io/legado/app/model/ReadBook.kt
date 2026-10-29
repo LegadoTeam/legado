@@ -144,6 +144,8 @@ internal fun resolveReplacePreviewPosition(
 
 @Suppress("MemberVisibilityCanBePrivate")
 object ReadBook : CoroutineScope by MainScope() {
+    /** Nonzero while the paragraph reader is resumed; scopes delayed speech events to that view. */
+    @Volatile var paragraphReaderVisibleSession = 0L
 
     data class ReplacePreview(
         val sourceChapter: TextChapter,
@@ -514,6 +516,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 if (curTextChapter === chapter) curTextChapter = replacement
                 if (nextTextChapter === chapter) nextTextChapter = replacement
                 callBack?.upContent(chapterIndex - durChapterIndex, resetPageOffset = false)
+                publishTextChapterReady(currentBook, replacement, contentToken)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -1179,7 +1182,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 if (restartReadAloudFromVisiblePage) {
                     readAloud(!BaseReadAloudService.pause)
                 } else {
-                    val scrollPageAnim = pageAnim() == 3
+                    val scrollPageAnim = !AppConfig.paragraphReadMode && pageAnim() == 3
                     if (scrollPageAnim && pageChanged) {
                         ReadAloud.pause(appCtx)
                     } else {
@@ -1203,12 +1206,20 @@ object ReadBook : CoroutineScope by MainScope() {
         book ?: return
         val textChapter = curTextChapter ?: return
         if (textChapter.isCompleted) {
-            ReadAloud.play(
-                appCtx,
-                play,
-                startPos = startPos,
-                rewindToSentenceStart = rewindToSentenceStart
-            )
+            if (AppConfig.paragraphReadMode) {
+                if (BaseReadAloudService.isRun && !ReadAloud.followReadAloudPosition) return
+                ReadAloud.playParagraph(
+                    appCtx, durChapterPos, play = play,
+                    preservePlaybackState = BaseReadAloudService.isRun,
+                )
+            } else {
+                ReadAloud.play(
+                    appCtx,
+                    play,
+                    startPos = startPos,
+                    rewindToSentenceStart = rewindToSentenceStart
+                )
+            }
         }
     }
 
@@ -1648,6 +1659,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 }
             }
 
+            publishTextChapterReady(book, textChapter, contentToken)
             return@async
         }.onError {
             if (it is CancellationException) {
@@ -1775,12 +1787,25 @@ object ReadBook : CoroutineScope by MainScope() {
                     }
                 }
             }
+            publishTextChapterReady(book, textChapter, contentToken)
         }.onFailure {
             if (it is CancellationException) {
                 return@onFailure
             }
             AppLog.put("ChapterProvider ERROR", it)
             appCtx.toastOnUi("ChapterProvider ERROR:\n${it.stackTraceStr}")
+        }
+    }
+
+    private suspend fun publishTextChapterReady(
+        book: Book,
+        textChapter: TextChapter,
+        token: ContentSaveToken
+    ) = withContext(Main.immediate) {
+        ensureContentCurrent(book, token)
+        ensureActive()
+        if (textChapter.isCompleted && isActiveTextChapter(textChapter)) {
+            postEvent(EventBus.TEXT_CHAPTER_READY, textChapter)
         }
     }
 
@@ -1829,6 +1854,42 @@ object ReadBook : CoroutineScope by MainScope() {
             callBack?.loadChapterList(it)
         }
         saveRead()
+    }
+
+    /** Persist background speech without moving the visible reader or replacing its layout. */
+    fun saveParagraphSpeechProgress(
+        bookUrl: String,
+        chapterIndex: Int,
+        chapterPosition: Int,
+        anchor: Book.ParagraphAnchor
+    ) {
+        val book = book?.takeIf { it.bookUrl == bookUrl } ?: return
+        if (!AppConfig.paragraphReadMode || paragraphReaderVisibleSession != 0L) return
+        val source = bookSource
+        val time = System.currentTimeMillis()
+        executor.execute {
+            if (this.book?.bookUrl != bookUrl || paragraphReaderVisibleSession != 0L) return@execute
+            runCatching {
+                val chapter = appDb.bookChapterDao.getChapter(bookUrl, chapterIndex)
+                    ?.takeIf { it.url == anchor.chapterUrl } ?: return@runCatching
+                book.lastCheckCount = 0
+                book.durChapterTime = time
+                book.durChapterIndex = chapterIndex
+                book.durChapterPos = chapterPosition
+                book.config.paragraphAnchor = anchor
+                book.durChapterTitle = chapter.getDisplayTitle(
+                    ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
+                    book.getUseReplaceRule(),
+                    replaceBook = book.toReplaceBook()
+                )
+                SourceCallBack.callBackBook(
+                    SourceCallBack.SAVE_READ, source, book, chapter, time.toString()
+                )
+                book.update()
+            }.onFailure {
+                AppLog.put("保存段落朗读进度信息出错\n$it", it)
+            }
+        }
     }
 
     fun saveRead(pageChanged: Boolean = false) {

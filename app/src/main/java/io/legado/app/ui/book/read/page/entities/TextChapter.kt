@@ -9,6 +9,7 @@ import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.help.HighlightAnchor
 import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.book.BookContent
+import io.legado.app.ui.book.read.paragraph.ParagraphItem
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.read.page.provider.TextChapterLayout
 import io.legado.app.ui.book.read.page.provider.HighlightSpacing
@@ -41,6 +42,10 @@ data class TextChapter(
     // Layout appends from IO while reading, navigation and progress query from the main thread.
     private val textPages = CopyOnWriteArrayList<TextPage>()
     val pages: List<TextPage> get() = textPages
+
+    @Volatile
+    var paragraphItems: List<ParagraphItem> = emptyList()
+        internal set
 
     private var layout: TextChapterLayout? = null
 
