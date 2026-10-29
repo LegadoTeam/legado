@@ -74,6 +74,7 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        io.legado.app.help.adaptive.AdaptiveUiController.install(this)
         CrashHandler(this)
         if (isDebuggable) {
             ThreadUtils.hasSubtleSideEffectsSetThreadAssertsDisabledForTesting(true)

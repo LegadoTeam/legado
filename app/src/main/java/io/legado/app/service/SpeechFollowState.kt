@@ -11,12 +11,34 @@ class SpeechFollowState {
     var followReadAloudPosition: Boolean = true
         private set
 
+    private var revision = 0L
+    var pendingPosition: Long? = null
+        private set
+
+    fun beginPositionChange(): Long {
+        val token = ++revision
+        pendingPosition = token
+        followReadAloudPosition = false
+        return token
+    }
+
+    fun finishPositionChange(token: Long): Boolean {
+        if (pendingPosition != token) return false
+        pendingPosition = null
+        return true
+    }
+
+    fun cancelPositionChanges() {
+        pendingPosition = null
+        revision++
+    }
+
     fun detachForManualNavigation() {
         followReadAloudPosition = false
     }
 
     fun restoreForNewSpeechSession() {
-        followReadAloudPosition = true
+        if (pendingPosition == null) followReadAloudPosition = true
     }
 
     fun shouldSyncSpeechNavigation(): Boolean {

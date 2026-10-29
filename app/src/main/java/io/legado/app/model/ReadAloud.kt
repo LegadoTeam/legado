@@ -88,7 +88,9 @@ object ReadAloud {
         if (!BaseReadAloudService.isRun) {
             restoreReadAloudFollow()
         }
+        val token = BaseReadAloudService.beginPositionChange()
         val intent = Intent(context, aloudClass)
+        intent.putExtra("positionToken", token)
         intent.action = IntentAction.play
         intent.putExtra("play", play)
         intent.putExtra("pageIndex", pageIndex)
@@ -98,6 +100,7 @@ object ReadAloud {
         try {
             context.startForegroundServiceCompat(intent)
         } catch (e: Exception) {
+            BaseReadAloudService.finishPositionChange(token)
             val msg = "启动朗读服务出错\n${e.localizedMessage}"
             AppLog.put(msg, e)
             context.toastOnUi(msg)

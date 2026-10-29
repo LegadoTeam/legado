@@ -35,9 +35,11 @@
         android:label="${app_name}"
         android:networkSecurityConfig="@xml/network_security_config"
         android:requestLegacyExternalStorage="true"
+        android:resizeableActivity="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.Light"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning,UnusedAttribute">
+        <property android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED" android:value="true" />
         <!-- 主入口 -->
         <activity
             android:name=".ui.welcome.WelcomeActivity"

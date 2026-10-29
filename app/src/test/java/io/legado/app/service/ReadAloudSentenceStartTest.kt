@@ -80,7 +80,14 @@ class ReadAloudSentenceStartTest {
         assertTrue(service.contains("pageIndex = textChapter.getPageIndexByCharIndex(readAloudNumber)"))
         assertTrue(select.contains("ReadBook.readAloud(startPos = startPos, rewindToSentenceStart = false)"))
         assertFalse(select.contains("rewindToSentenceStart = true"))
-        assertTrue(readFromHere.contains("ReadBook.readAloud()"))
+        assertTrue(readFromHere.contains("readAloudFromVisiblePosition()"))
+        val visiblePosition = activity.substringAfter("private fun readAloudFromVisiblePosition()")
+            .substringBefore("override val oldBook")
+        assertTrue(visiblePosition.contains("binding.readView.getReadAloudPos()"))
+        assertTrue(visiblePosition.contains("ReadAloud.play(this, pageIndex = page"))
+        assertTrue(visiblePosition.contains("position - chapter.getReadLength(page)"))
+        assertTrue(visiblePosition.contains("rewindToSentenceStart = false"))
+        assertFalse(visiblePosition.contains("rewindToSentenceStart = true"))
         assertFalse(readFromHere.contains("rewindToSentenceStart = true"))
     }
 

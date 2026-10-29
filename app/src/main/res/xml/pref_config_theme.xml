@@ -2,6 +2,13 @@
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="tabletFoldOptimization"
+        android:defaultValue="false"
+        android:title="@string/tablet_fold_optimization"
+        android:summary="@string/tablet_fold_optimization_summary"
+        app:iconSpaceReserved="false" />
+
     <io.legado.app.lib.prefs.IconListPreference
         android:defaultValue="ic_launcher"
         android:entries="@array/icon_names"

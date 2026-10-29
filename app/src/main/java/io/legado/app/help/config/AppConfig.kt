@@ -769,7 +769,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefString(PreferKey.readAloudStart, "sentence") != "page"
 
     val readAloudFollowManualPage
-        get() = appCtx.getPrefBoolean(PreferKey.readAloudFollowManualPage, false)
+        get() = appCtx.getPrefBoolean(PreferKey.readAloudFollowManualPage, false) &&
+            !(readAloudDragSeek && readAloudSwipePages)
+
+    val readAloudSwipePages
+        get() = appCtx.getPrefBoolean(PreferKey.readAloudSwipePages, false)
+
+    val readAloudDragSeek
+        get() = appCtx.getPrefBoolean(PreferKey.readAloudDragSeek, true)
 
     val replaceEnableDefault get() = appCtx.getPrefBoolean(PreferKey.replaceEnableDefault, true)
 

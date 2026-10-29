@@ -1861,4 +1861,7 @@
     <string name="content_search_scope_up">From here up</string>
     <string name="content_search_anchor_unavailable">The reading position could not be located after text processing. Return to the reader and try again, or choose Whole book.</string>
     <string name="content_search_result_unavailable">This result could not be located reliably in the displayed text. Check text replacement and title settings, then search again.</string>
+
+    <string name="read_aloud_drag_seek">Drag the listening position bar</string>
+    <string name="read_aloud_drag_seek_summary">Swipe anywhere in the text to move the bar relative to the current spoken position. Crossing the top or bottom previews the adjacent page. Release to speak the target paragraph. Paused speech stays paused; tap for the menu.</string>
 </resources>

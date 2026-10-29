@@ -1,5 +1,7 @@
 package io.legado.app.ui.config
 
+import io.legado.app.utils.observeSharedPreferences
+import io.legado.app.lib.theme.primaryTextColor
 import android.os.Bundle
 import android.view.Menu
 import androidx.activity.viewModels
@@ -24,6 +26,7 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
     override val viewModel by viewModels<ConfigViewModel>()
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        setupAdaptiveSettings()
         when (val configTag = intent.getStringExtra("configTag")) {
             ConfigTag.MY_MORE -> replaceFragment<MyPreferenceFragment>(configTag)
             ConfigTag.OTHER_CONFIG -> replaceFragment<OtherConfigFragment>(configTag)
@@ -33,6 +36,72 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
             ConfigTag.COVER_FONT_CONFIG -> replaceFragment<CoverFontConfigFragment>(configTag)
             ConfigTag.WELCOME_CONFIG -> replaceFragment<WelcomeConfigFragment>(configTag)
             else -> finish()
+        }
+    }
+
+    private lateinit var adaptiveRow: io.legado.app.help.adaptive.AdaptiveSettingsRow
+    private lateinit var adaptiveNavigation: android.widget.ScrollView
+    private lateinit var adaptiveDivider: android.view.View
+
+    private fun setupAdaptiveSettings() {
+        val frame = binding.configFrameLayout
+        val root = frame.parent as android.widget.LinearLayout
+        root.removeView(frame)
+        val density = resources.displayMetrics.density
+        val rows = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.VERTICAL }
+        adaptiveNavigation = android.widget.ScrollView(this).apply {
+            isFillViewport = true
+            visibility = android.view.View.GONE
+            addView(rows)
+        }
+        adaptiveDivider = android.view.View(this).apply {
+            setBackgroundColor(0x33888888)
+            visibility = android.view.View.GONE
+        }
+        adaptiveRow = io.legado.app.help.adaptive.AdaptiveSettingsRow(this).apply {
+            addView(adaptiveNavigation, android.widget.LinearLayout.LayoutParams(0, -1, 1f))
+            addView(adaptiveDivider, android.widget.LinearLayout.LayoutParams((density).toInt().coerceAtLeast(1), -1))
+            addView(frame, android.widget.LinearLayout.LayoutParams(0, -1, 1f))
+        }
+        root.addView(adaptiveRow, android.widget.LinearLayout.LayoutParams(-1, 0, 1f))
+        val pages: List<Pair<String, () -> Unit>> = listOf(
+            "主题设置" to { replaceFragment<ThemeConfigFragment>(ConfigTag.THEME_CONFIG) },
+            "备份与恢复" to { replaceFragment<BackupConfigFragment>(ConfigTag.BACKUP_CONFIG) },
+            "封面设置" to { replaceFragment<CoverConfigFragment>(ConfigTag.COVER_CONFIG) },
+            "封面字体" to { replaceFragment<CoverFontConfigFragment>(ConfigTag.COVER_FONT_CONFIG) },
+            "欢迎页设置" to { replaceFragment<WelcomeConfigFragment>(ConfigTag.WELCOME_CONFIG) },
+            "其他设置" to { replaceFragment<OtherConfigFragment>(ConfigTag.OTHER_CONFIG) })
+        pages.forEach { (label, action) ->
+            rows.addView(android.widget.TextView(this).apply {
+                text = label
+                textSize = 16f
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                minHeight = (64 * density).toInt()
+                setPadding((20 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (12 * density).toInt())
+                setTextColor(this@ConfigActivity.primaryTextColor)
+                val background = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, background, true)
+                setBackgroundResource(background.resourceId)
+                setOnClickListener { action() }
+            }, android.widget.LinearLayout.LayoutParams(-1, -2))
+        }
+        adaptiveRow.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updateAdaptiveSettings() }
+        adaptiveRow.post { updateAdaptiveSettings() }
+        observeSharedPreferences { _, key ->
+            if (key == io.legado.app.constant.PreferKey.tabletFoldOptimization)
+                adaptiveRow.post { updateAdaptiveSettings() }
+        }
+    }
+
+    private fun updateAdaptiveSettings() {
+        val usePanes = io.legado.app.help.adaptive.AdaptivePanePolicy.useTwoPanes(
+            io.legado.app.help.adaptive.AdaptiveUiController.enabled(this),
+            (adaptiveRow.width / resources.displayMetrics.density).toInt(), resources.configuration.screenHeightDp
+        ) && !io.legado.app.help.adaptive.AdaptiveUiController.embedded(this)
+        val visibility = if (usePanes) android.view.View.VISIBLE else android.view.View.GONE
+        if (adaptiveNavigation.visibility != visibility) {
+            adaptiveNavigation.visibility = visibility
+            adaptiveDivider.visibility = visibility
         }
     }
 

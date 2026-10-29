@@ -51,7 +51,7 @@ class ReadAloudControls(
     private var initialY = 0f
     private val layoutListener = View.OnLayoutChangeListener { view, left, _, right, _, oldLeft, _, oldRight, _ ->
         if (view === parent && right - left != oldRight - oldLeft && bar.isVisible) {
-            updateSize(binding.ivPauseAloud.isVisible)
+            updateSize(binding.ivPauseAloud.isVisible && !binding.llBackToSpeech.isVisible)
         }
         if (!dragging) position()
     }
@@ -69,7 +69,7 @@ class ReadAloudControls(
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        if (key?.startsWith("readAloudControls") == true) {
+        if (key == PreferKey.readAloudDragSeek || key?.startsWith("readAloudControls") == true) {
             if (key != PreferKey.readAloudControlsX && key != PreferKey.readAloudControlsY) reveal()
             else position()
         }
@@ -77,46 +77,36 @@ class ReadAloudControls(
 
     fun update(menuVisible: Boolean) {
         this.menuVisible = menuVisible
+        val isRunning = BaseReadAloudService.isRun
         val following = ReadAloud.followReadAloudPosition
-        val isRun = BaseReadAloudService.isRun
-        if (isRun != running || following && !wasFollowing) {
+        if (isRunning != running || following != wasFollowing) {
             hidden = false
             movement = 0f
         }
-        running = isRun
+        running = isRunning
         wasFollowing = following
         val showPause = following && prefs.getBoolean(PreferKey.readAloudControlsPause, true)
-        val shouldShow = ReadAloudBarVisibility.shouldShow(
-            isRun, following, menuVisible, showPause,
-            prefs.getBoolean(PreferKey.readAloudControlsPosition, true),
-        ) && !hidden
-        bar.isVisible = shouldShow
-        if (!shouldShow) return
+        val showPosition = !showPause && prefs.getBoolean(PreferKey.readAloudControlsPosition, true)
+        bar.animate().cancel()
+        bar.isVisible = readAloudControlsVisible(isRunning, AppConfig.readAloudDragSeek,
+            menuVisible, hidden, showPause, showPosition)
         binding.ivPauseAloud.isVisible = showPause
-        binding.llBackToSpeech.isVisible = !showPause
-        binding.llReadFromHere.isVisible = !showPause
-        binding.vBarDivider.isVisible = !showPause
-        binding.ivPauseAloud.setImageResource(
-            if (BaseReadAloudService.pause) R.drawable.ic_play_24dp else R.drawable.ic_pause_24dp,
-        )
+        binding.llBackToSpeech.isVisible = showPosition
+        binding.llReadFromHere.isVisible = showPosition
+        binding.vBarDivider.isVisible = showPosition
+        binding.ivPauseAloud.setImageResource(if (BaseReadAloudService.pause)
+            R.drawable.ic_play_24dp else R.drawable.ic_pause_24dp)
         binding.ivPauseAloud.contentDescription = context.getString(
-            if (BaseReadAloudService.pause) R.string.resume else R.string.pause,
-        )
-        val background = context.bottomBackground
-        val foreground = context.getPrimaryTextColor(ColorUtils.isColorLight(background))
-        val opacity = prefs.getInt(PreferKey.readAloudControlsOpacity, 90).coerceIn(0, 100) / 100f
-        (bar.background.mutate() as GradientDrawable).apply {
-            setColor(ColorUtils.withAlpha(background, opacity))
-            setStroke(1.dpToPx(), ColorUtils.withAlpha(foreground, if (AppConfig.isEInkMode) 1f else .25f))
+            if (BaseReadAloudService.pause) R.string.resume else R.string.pause)
+        if (bar.isVisible) {
+            val background = context.bottomBackground
+            val foreground = ColorUtils.withAlpha(
+                context.getPrimaryTextColor(ColorUtils.isColorLight(background)), 1f)
+            applyReadAloudControlStyle(binding, background, foreground,
+                prefs.getInt(PreferKey.readAloudControlsOpacity, 90), 1.dpToPx(), AppConfig.isEInkMode)
+            updateSize(showPause && !showPosition)
+            bar.post { position() }
         }
-        binding.ivPauseAloud.setColorFilter(foreground)
-        binding.ivBackToSpeech.setColorFilter(foreground)
-        binding.ivReadFromHere.setColorFilter(foreground)
-        binding.tvBackToSpeech.setTextColor(foreground)
-        binding.tvReadFromHere.setTextColor(foreground)
-        binding.vBarDivider.setBackgroundColor(ColorUtils.withAlpha(foreground, .3f))
-        updateSize(showPause)
-        position()
     }
 
     private fun updateSize(showPause: Boolean) {
@@ -156,7 +146,8 @@ class ReadAloudControls(
         binding.tvReadFromHere.setText(if (compact) R.string.read_aloud_here_short else R.string.read_aloud_from_here)
         listOf(binding.tvBackToSpeech, binding.tvReadFromHere).forEach { text ->
             text.includeFontPadding = false
-            text.maxLines = if (compact) 1 else 2
+            text.maxLines = 1
+            text.setSingleLine(true)
             text.updateLayoutParams<LinearLayout.LayoutParams> {
                 marginStart = if (compact) 0 else scaled(4f)
                 this.height = height
@@ -282,3 +273,25 @@ class ReadAloudControls(
 internal fun readAloudControlWidth(prefs: SharedPreferences): Int =
     prefs.getInt(PreferKey.readAloudControlsWidth,
         prefs.getInt(PreferKey.readAloudControlsSize, 48).coerceIn(48, 72) * 6).coerceIn(85, 432)
+
+/** Drag seeking owns the listening UI only while its switch is enabled. */
+internal fun readAloudControlsVisible(running: Boolean, dragSeek: Boolean, menuVisible: Boolean,
+    hidden: Boolean, pauseEnabled: Boolean, positionEnabled: Boolean): Boolean =
+    running && !dragSeek && !menuVisible && !hidden && (pauseEnabled || positionEnabled)
+
+/** Opacity belongs to the surface; labels, icons and the original outline remain legible. */
+internal fun applyReadAloudControlStyle(binding: ViewReadAloudFloatBarBinding,
+    background: Int, foreground: Int, opacityPercent: Int, strokeWidth: Int, eInk: Boolean) {
+    binding.root.alpha = 1f
+    binding.root.elevation = 0f
+    (binding.root.background.mutate() as GradientDrawable).apply {
+        setColor(ColorUtils.withAlpha(background, opacityPercent.coerceIn(0, 100) / 100f))
+        setStroke(strokeWidth, ColorUtils.withAlpha(foreground, if (eInk) 1f else .25f))
+    }
+    binding.ivPauseAloud.setColorFilter(foreground)
+    binding.ivBackToSpeech.setColorFilter(foreground)
+    binding.ivReadFromHere.setColorFilter(foreground)
+    binding.tvBackToSpeech.setTextColor(foreground)
+    binding.tvReadFromHere.setTextColor(foreground)
+    binding.vBarDivider.setBackgroundColor(ColorUtils.withAlpha(foreground, .3f))
+}
