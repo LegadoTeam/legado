@@ -1,0 +1,4 @@
+<resources>
+<string name="tablet_fold_optimization">平板/折叠屏优化</string>
+<string name="tablet_fold_optimization_summary">大屏下主页与详情左右分栏，支持的设备可拖动分割线；阅读正文保持全屏</string>
+</resources>

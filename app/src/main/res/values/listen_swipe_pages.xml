@@ -1,0 +1,4 @@
+<resources>
+<string name="read_aloud_swipe_pages">Allow page turns while drag seeking</string>
+<string name="read_aloud_swipe_pages_summary">Browse pages without interrupting speech. Drag vertically to speak from the new position.</string>
+</resources>
