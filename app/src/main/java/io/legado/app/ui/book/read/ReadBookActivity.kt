@@ -405,6 +405,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             ReadBook.paragraphReaderVisibleSession = 0L
             if (!enabled) paragraphReaderSession = 0L
         }
+        updateParagraphReadAloudHighlight()
         updateReadAloudFloatBar()
     }
 
@@ -430,6 +431,13 @@ class ReadBookActivity : BaseReadBookActivity(),
             paragraphRenderedPosition != position) view.scrollToPosition(position)
         paragraphRenderedPosition = position
         view.updateControls()
+        updateParagraphReadAloudHighlight()
+    }
+
+    private fun updateParagraphReadAloudHighlight() {
+        binding.paragraphReadView.updateReadAloudHighlight(
+            if (paragraphModeActive) BaseReadAloudService.currentParagraphHighlight() else null
+        )
     }
 
     private fun saveParagraphTop(item: ParagraphItem) {
@@ -3317,6 +3325,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     Status.STOP -> clearPausedParagraphViewport()
                 }
                 lastParagraphAloudState = it
+                updateParagraphReadAloudHighlight()
                 updateReadAloudFloatBar()
                 return@observeEvent
             }
@@ -3337,7 +3346,10 @@ class ReadBookActivity : BaseReadBookActivity(),
         observeEventSticky<Int>(EventBus.TTS_PROGRESS) { chapterStart ->
             lastReadAloudChapterStart = chapterStart
             lastReadAloudChapterIndex = ReadAloud.readAloudChapterIndex
-            if (paragraphModeActive) return@observeEventSticky
+            if (paragraphModeActive) {
+                updateParagraphReadAloudHighlight()
+                return@observeEventSticky
+            }
             if (!ReadAloud.followReadAloudPosition) {
                 scheduleAloudFollowCheck()
                 return@observeEventSticky
@@ -3365,6 +3377,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         observeEvent<ParagraphTtsStart>(EventBus.PARAGRAPH_TTS_START) { event ->
+            if (paragraphModeActive) updateParagraphReadAloudHighlight()
             if (paragraphModeActive && BaseReadAloudService.isPlay() &&
                 ReadAloud.followReadAloudPosition && ReadBook.book?.bookUrl == event.bookUrl &&
                 ReadBook.durChapterIndex == event.chapterIndex &&

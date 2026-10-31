@@ -53,6 +53,7 @@ import io.legado.app.receiver.MediaButtonReceiver
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import io.legado.app.ui.book.read.paragraph.ParagraphAloudHighlight
 import io.legado.app.ui.book.read.paragraph.ParagraphPosition
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.activityPendingIntent
@@ -125,6 +126,20 @@ abstract class BaseReadAloudService : BaseService(),
 
         fun currentParagraphProgress(): ParagraphProgress? = currentService?.let { service ->
             if (isRun && service.paragraphMode) service.lastStartedParagraphProgress else null
+        }
+
+        /** Resolve visible speech from the active service, never from the browsing position. */
+        internal fun currentParagraphHighlight(): ParagraphAloudHighlight? {
+            val service = currentService ?: return null
+            if (!isPlay() || !service.isParagraphPlaybackCurrent()) return null
+            val chapter = service.textChapter?.chapter ?: return null
+            val progress = service.lastStartedParagraphProgress ?: return null
+            val item = service.paragraphSpeechItems.getOrNull(service.nowSpeak)?.item ?: return null
+            if (progress.bookUrl != chapter.bookUrl || progress.chapterIndex != chapter.index ||
+                progress.anchor.chapterUrl != chapter.url || progress.anchor.itemId != item.id ||
+                readAloudChapterIndex != chapter.index || readAloudChapterStart < 0
+            ) return null
+            return ParagraphAloudHighlight(chapter.bookUrl, chapter.url, item.id, readAloudChapterStart)
         }
 
         fun cancelParagraphChapterPlayback() {
@@ -1137,11 +1152,12 @@ abstract class BaseReadAloudService : BaseService(),
             return
         }
         val visibleCanFollow = followReadAloudPosition && ReadBook.durChapterIndex == speechChapterIndex()
-        resumeReadAloudInternal()
         invalidateParagraphPlayback()
         waitingParagraphChapterIndex = chapterIndex
         paragraphDetachedLoadStarted = false
         lastStartedParagraphProgress = null
+        // PLAY observers must see that the previous chapter's speech has already ended.
+        resumeReadAloudInternal()
         if (visibleCanFollow) {
             val moved = if (next) ReadBook.moveToNextChapter(true, syncReadAloudFollow = true)
                 else ReadBook.moveToPrevChapter(true, toLast = false, syncReadAloudFollow = true)

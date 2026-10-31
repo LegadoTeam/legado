@@ -5,6 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.Parcelable
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.UnderlineSpan
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
@@ -73,6 +78,7 @@ class ParagraphReadView @JvmOverloads constructor(
     private val itemAdapter = ItemAdapter()
     private var items: List<ParagraphItem> = emptyList()
     private var chapter: TextChapter? = null
+    private var aloudHighlight: ParagraphAloudHighlight? = null
     private val scrollState = ParagraphScrollState()
     private var pendingViewport: Viewport? = null
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -167,6 +173,7 @@ class ParagraphReadView @JvmOverloads constructor(
     fun isShowing(textChapter: TextChapter): Boolean = chapter === textChapter && list.isVisible
 
     fun showMessage(text: CharSequence) {
+        updateReadAloudHighlight(null)
         invalidatePendingScroll()
         chapter = null
         items = emptyList()
@@ -179,6 +186,7 @@ class ParagraphReadView @JvmOverloads constructor(
     }
 
     fun setChapter(textChapter: TextChapter, itemId: String?, position: Int) {
+        updateReadAloudHighlight(null)
         invalidatePendingScroll()
         chapter = textChapter
         items = textChapter.paragraphItems
@@ -199,6 +207,43 @@ class ParagraphReadView @JvmOverloads constructor(
     }
 
     fun scrollToPosition(position: Int) = scrollToItem(findPosition(position))
+
+    /** Paint speech progress without rebinding rows or changing the browsing position. */
+    internal fun updateReadAloudHighlight(highlight: ParagraphAloudHighlight?) {
+        val shownChapter = chapter?.chapter
+        val current = highlight?.takeIf {
+            it.matchesChapter(shownChapter?.bookUrl, shownChapter?.url)
+        }
+        val previous = aloudHighlight
+        if (previous == current) return
+        aloudHighlight = current
+        for (index in 0 until list.childCount) {
+            val holder = list.getChildViewHolder(list.getChildAt(index)) as? ItemHolder ?: continue
+            if (holder.boundId != previous?.itemId && holder.boundId != current?.itemId) continue
+            val item = items.getOrNull(holder.bindingAdapterPosition) ?: continue
+            if (holder.boundId == item.id && !item.isImage) applyReadAloudHighlight(holder.text, item)
+        }
+    }
+
+    private fun applyReadAloudHighlight(view: TextView, item: ParagraphItem) {
+        val text = view.text as? Spannable ?: return
+        clearReadAloudSpans(text)
+        val start = aloudHighlight?.textStart(item) ?: return
+        text.setSpan(AloudColorSpan(ReadBookConfig.textAccentColor), start, text.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        if (AppConfig.isEInkMode) {
+            text.setSpan(AloudUnderlineSpan(), start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
+
+    private fun clearReadAloudSpans(text: CharSequence) {
+        if (text !is Spannable) return
+        text.getSpans(0, text.length, AloudColorSpan::class.java).forEach(text::removeSpan)
+        text.getSpans(0, text.length, AloudUnderlineSpan::class.java).forEach(text::removeSpan)
+    }
+
+    private class AloudColorSpan(color: Int) : ForegroundColorSpan(color)
+    private class AloudUnderlineSpan : UnderlineSpan()
 
     fun followSpeech(itemId: String) {
         val shownChapter = chapter ?: return
@@ -437,7 +482,7 @@ class ParagraphReadView @JvmOverloads constructor(
             holder.container.setPadding(0, 0, 0,
                 (ChapterProvider.contentPaintTextHeight * ReadBookConfig.paragraphSpacing / 10f).toInt())
             if (!item.isImage) {
-                holder.text.text = item.text
+                holder.text.setText(SpannableString(item.text), TextView.BufferType.SPANNABLE)
                 holder.text.setTextColor(ReadBookConfig.textColor)
                 holder.text.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                     if (item.isTitle) ChapterProvider.titlePaint.textSize else ChapterProvider.contentPaint.textSize)
@@ -446,7 +491,9 @@ class ParagraphReadView @JvmOverloads constructor(
                 holder.text.letterSpacing = ReadBookConfig.letterSpacing
                 holder.text.gravity = if (item.isTitle && ReadBookConfig.isMiddleTitle) Gravity.CENTER else Gravity.START
                 ViewCompat.setAccessibilityHeading(holder.text, item.isTitle)
+                applyReadAloudHighlight(holder.text, item)
             } else {
+                clearReadAloudSpans(holder.text.text)
                 val imageNumber = items.take(position + 1).count { it.isImage }
                 holder.image.contentDescription = context.getString(R.string.paragraph_image, imageNumber)
                 holder.image.minimumHeight = 64.dpToPx()
@@ -477,7 +524,19 @@ class ParagraphReadView @JvmOverloads constructor(
 
         override fun onViewRecycled(holder: ItemHolder) {
             holder.boundId = null
+            clearReadAloudSpans(holder.text.text)
             holder.releaseImage()
+        }
+
+        override fun onViewAttachedToWindow(holder: ItemHolder) {
+            super.onViewAttachedToWindow(holder)
+            // A cached row can return without another bind or recycle callback.
+            val item = items.getOrNull(holder.bindingAdapterPosition)
+            if (item != null && holder.boundId == item.id && !item.isImage) {
+                applyReadAloudHighlight(holder.text, item)
+            } else {
+                clearReadAloudSpans(holder.text.text)
+            }
         }
     }
 }
