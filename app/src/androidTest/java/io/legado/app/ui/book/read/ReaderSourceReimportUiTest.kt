@@ -3,6 +3,10 @@ package io.legado.app.ui.book.read
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.util.Log
+import android.view.MotionEvent
+import android.view.Window
+import android.view.ViewTreeObserver
 import android.view.View
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
@@ -49,6 +53,7 @@ import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
+import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.association.ImportBookSourceDialog
 import io.legado.app.ui.association.ImportBookSourceViewModel
 import io.legado.app.ui.book.read.config.ReaderMenuConfigDialog
@@ -485,12 +490,104 @@ class ReaderSourceReimportUiTest {
         }
     }
 
-    private fun showMenu() {
-        awaitDraw()
-        if (!main { it.findViewById<ReadMenu>(R.id.read_menu).isVisible }) {
-            onView(withId(R.id.read_view)).perform(click())
+    private val menuDiagnosticFields by lazy {
+        listOf("pressDown", "isMove", "longPressed", "pressOnTextSelected", "mcRect",
+            "replacePreviewGestureState", "pullBookmarkState").map { name ->
+            ReadView::class.java.getDeclaredField(name).apply { isAccessible = true }
         }
-        await("reader menu visible") { it.findViewById<ReadMenu>(R.id.read_menu).isVisible }
+    }
+
+    private fun readerMenuState(activity: ReadBookActivity): String {
+        val reader = activity.findViewById<ReadView>(R.id.read_view)
+        val page = reader.curPage.textPage
+        val delegate = reader.pageDelegate
+        val location = IntArray(2).also(reader::getLocationOnScreen)
+        val gates = menuDiagnosticFields.joinToString { "${it.name}=${it.get(reader)}" }
+        return "activity=${System.identityHashCode(activity)} init=${activity.isInitFinish} " +
+            "focus=${activity.window.decorView.hasWindowFocus()} attached=${reader.isAttachedToWindow} " +
+            "shown=${reader.isShown} enabled=${reader.isEnabled} layout=${reader.isLayoutRequested} " +
+            "bounds=${location.toList()}/${reader.width}x${reader.height} " +
+            "chapter=${ReadBook.durChapterIndex} pos=${ReadBook.durChapterPos} " +
+            "model=${System.identityHashCode(ReadBook.curTextChapter)} complete=${ReadBook.curTextChapter?.isCompleted} " +
+            "page=${System.identityHashCode(page)}/${page.chapterIndex}/${page.index} msg=${page.isMsgPage} " +
+            "sameChapter=${page.textChapter === ReadBook.curTextChapter} " +
+            "delegate=${delegate?.javaClass?.simpleName}/${System.identityHashCode(delegate)} " +
+            "running=${delegate?.isRunning} started=${delegate?.isStarted} moved=${delegate?.isMoved} " +
+            "abort=${reader.isAbortAnim} selected=${reader.isTextSelected} start=${reader.startX},${reader.startY} " +
+            "refresh=${reader.pageFactory.isRefreshingResources} auto=${reader.isAutoPage} " +
+            "aloud=${BaseReadAloudService.isRun} search=${activity.isShowingSearchResult} " +
+            "menu=${activity.findViewById<ReadMenu>(R.id.read_menu).isVisible} " +
+            "dialogs=${activity.supportFragmentManager.fragments.map { it.javaClass.simpleName }} $gates"
+    }
+
+    private fun showMenu() {
+        var touchTrace = ""
+        val restore = main { activity ->
+            val reader = activity.findViewById<ReadView>(R.id.read_view)
+            val window = activity.window
+            val callback = checkNotNull(window.callback)
+            var lastFrame = ""
+            fun record(label: String) {
+                Log.i("ReaderMenuTest", "$label uptime=${SystemClock.uptimeMillis()} ${readerMenuState(activity)}")
+            }
+            val frames = ViewTreeObserver.OnPreDrawListener {
+                val state = readerMenuState(activity)
+                if (state != lastFrame) {
+                    Log.i("ReaderMenuTest", "preDraw uptime=${SystemClock.uptimeMillis()} $state")
+                    lastFrame = state
+                }
+                true
+            }
+            val tracedCallback = object : Window.Callback by callback {
+                override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+                    val action = MotionEvent.actionToString(event.action)
+                    touchTrace += "window $action ${event.eventTime}; "
+                    record("window before $action time=${event.eventTime} down=${event.downTime} " +
+                        "xy=${event.x},${event.y} raw=${event.rawX},${event.rawY}")
+                    val handled = callback.dispatchTouchEvent(event)
+                    record("window after $action handled=$handled")
+                    return handled
+                }
+
+                override fun onWindowFocusChanged(hasFocus: Boolean) {
+                    callback.onWindowFocusChanged(hasFocus)
+                    record("window focus=$hasFocus")
+                }
+            }
+            window.callback = tracedCallback
+            reader.viewTreeObserver.addOnPreDrawListener(frames)
+            // The production reader has no touch listener. Observe without consuming the event.
+            reader.setOnTouchListener { _, event ->
+                val action = MotionEvent.actionToString(event.action)
+                touchTrace += "reader $action ${event.eventTime}; "
+                record("reader before $action time=${event.eventTime} xy=${event.x},${event.y}")
+                false
+            }
+            record("installed")
+            val cleanup: () -> Unit = {
+                if (window.callback === tracedCallback) window.callback = callback
+                reader.setOnTouchListener(null)
+                if (reader.viewTreeObserver.isAlive) reader.viewTreeObserver.removeOnPreDrawListener(frames)
+            }
+            cleanup
+        }
+        try {
+            awaitDraw()
+            if (!main { it.findViewById<ReadMenu>(R.id.read_menu).isVisible }) {
+                main { Log.i("ReaderMenuTest", "before Espresso click ${readerMenuState(it)}") }
+                onView(withId(R.id.read_view)).perform(click())
+                main { Log.i("ReaderMenuTest", "after Espresso click ${readerMenuState(it)}") }
+            }
+            await("reader menu visible") { it.findViewById<ReadMenu>(R.id.read_menu).isVisible }
+        } catch (failure: Throwable) {
+            runCatching {
+                main { Log.e("ReaderMenuTest", "failed touches=$touchTrace ${readerMenuState(it)}", failure) }
+                screenshot("reader-reimport-menu-timeout")
+            }.onFailure(failure::addSuppressed)
+            throw failure
+        } finally {
+            instrumentation.runOnMainSync { restore() }
+        }
     }
 
     private fun awaitDraw() {
