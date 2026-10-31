@@ -35,7 +35,8 @@ concurrency:
 
 jobs:
   native-release:
-    runs-on: ubuntu-latest
+    # Keep API 23's legacy system image on the host used by its last passing run.
+    runs-on: ${{ matrix.api == 23 && 'ubuntu-24.04' || 'ubuntu-latest' }}
     timeout-minutes: 35
     strategy:
       fail-fast: false

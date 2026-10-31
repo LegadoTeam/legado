@@ -3,11 +3,16 @@ package io.legado.app.model.webBook
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.testing.AndroidDebugLogRule
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 
 class WebBookTest {
+
+    @get:Rule
+    val androidDebugLog = AndroidDebugLogRule()
 
     private val source = BookSource(
         bookSourceUrl = "https://source.example",

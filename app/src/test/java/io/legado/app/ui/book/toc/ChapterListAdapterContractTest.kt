@@ -42,6 +42,7 @@ class ChapterListAdapterContractTest {
             .first { it.isDirectory }
             .resolve("io/legado/app/ui/book/toc/ChapterListAdapter.kt")
             .readText()
+            .replace("\r\n", "\n")
         val clearCache = source.substringAfter("fun clearDisplayTitle()")
             .substringBefore("fun upDisplayTitles")
         val updateTitles = source.substringAfter("fun upDisplayTitles")

@@ -30,6 +30,9 @@ import java.net.InetAddress
 
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
+    val paragraphReadMode get() = appCtx.getPrefBoolean(PreferKey.paragraphReadMode, false)
+    val paragraphReadControls get() = appCtx.getPrefBoolean(PreferKey.paragraphReadControls, true)
+    val paragraphReadProgress get() = appCtx.getPrefBoolean(PreferKey.paragraphReadProgress, true)
     private const val JS_SOURCE_API_PREFS = "js_source_api_credentials"
     private const val JS_SOURCE_API_TOKEN = "token"
 

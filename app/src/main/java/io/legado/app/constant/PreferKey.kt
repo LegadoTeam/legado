@@ -3,6 +3,10 @@ package io.legado.app.constant
 @Suppress("ConstPropertyName")
 object PreferKey {
 
+    const val paragraphReadMode = "paragraphReadMode"
+    const val paragraphReadControls = "paragraphReadControls"
+    const val paragraphReadProgress = "paragraphReadProgress"
+
     const val myMoreItems = "myMoreItems"
     const val language = "language"
     const val fontScale = "fontScale"

@@ -206,12 +206,26 @@ android {
     }
 }
 
+def mockitoAgent = configurations.create('mockitoAgent') {
+    canBeConsumed = false
+    transitive = false
+}
+
+tasks.withType(Test).configureEach {
+    // Attach explicitly on Java 21 instead of relying on runtime self-attachment.
+    jvmArgumentProviders.add({
+        ["-javaagent:${mockitoAgent.asPath}"]
+    } as org.gradle.process.CommandLineArgumentProvider)
+}
+
 dependencies {
     //compileOnly "com.android.tools.build:gradle:$agp_version"
     //noinspection GradleDependency,GradlePackageUpdate
     //coreLibraryDesugaring('com.android.tools:desugar_jdk_libs_nio:2.0.4')
     coreLibraryDesugaring(libs.desugar)
     testImplementation(libs.junit)
+    testImplementation(libs.mockito.core)
+    add(mockitoAgent.name, libs.mockito.core)
     androidTestImplementation(libs.bundles.androidTest)
     //kotlin
     //noinspection GradleDependency,DifferentStdlibGradleVersion

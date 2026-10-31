@@ -3,14 +3,19 @@ package io.legado.app.model.rss
 import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssSource
 import io.legado.app.help.http.StrResponse
+import io.legado.app.testing.AndroidDebugLogRule
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
 class RssContentPaginationTest {
+
+    @get:Rule
+    val androidDebugLog = AndroidDebugLogRule()
 
     @Test
     fun `content page returns content and absolute next page url`() = runBlocking {

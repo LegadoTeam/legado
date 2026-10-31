@@ -22,6 +22,19 @@ import io.legado.app.utils.startForegroundServiceCompat
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 
+data class ParagraphTtsStart(
+    val bookUrl: String,
+    val chapterIndex: Int,
+    val itemId: String,
+    val chapterPosition: Int
+)
+
+data class ParagraphTtsStopped(
+    val bookUrl: String,
+    val chapterIndex: Int,
+    val readerSession: Long
+)
+
 internal fun resolveReadAloudEngineName(
     ttsEngine: String?,
     systemTtsName: String,
@@ -37,6 +50,8 @@ internal fun resolveReadAloudEngineName(
 }
 
 object ReadAloud {
+    const val ACTION_PARAGRAPH_PLAY = "paragraphPlay"
+    const val ACTION_PARAGRAPH_CHAPTER = "paragraphChapter"
     var httpTTS: HttpTTS? = null
     val ttsEngine get() = ReadBook.book?.getTtsEngine() ?: AppConfig.ttsEngine
     private var aloudClass: Class<*> = getReadAloudClass()
@@ -115,6 +130,49 @@ object ReadAloud {
             putInt("startPos", startPos)
         }
         postEvent(EventBus.READ_ALOUD_PLAY, bundle)
+    }
+
+    fun playParagraph(
+        context: Context,
+        position: Int,
+        itemId: String? = null,
+        play: Boolean = true,
+        preservePlaybackState: Boolean = false,
+    ) {
+        if (!BaseReadAloudService.isRun) restoreReadAloudFollow()
+        val intent = Intent(context, aloudClass).apply {
+            action = ACTION_PARAGRAPH_PLAY
+            putExtra("position", position)
+            putExtra("itemId", itemId)
+            putExtra("play", play)
+            putExtra("preservePlaybackState", preservePlaybackState)
+            putExtra("paragraphBookUrl", ReadBook.book?.bookUrl)
+            putExtra("paragraphChapterUrl", ReadBook.curTextChapter?.chapter?.url)
+        }
+        try {
+            context.startForegroundServiceCompat(intent)
+        } catch (e: Exception) {
+            val msg = "启动朗读服务出错\n${e.localizedMessage}"
+            AppLog.put(msg, e)
+            context.toastOnUi(msg)
+        }
+    }
+
+    fun changeParagraphChapter(context: Context, next: Boolean) {
+        if (BaseReadAloudService.isRun && followReadAloudPosition) {
+            context.startForegroundServiceCompat(Intent(context, aloudClass).apply {
+                action = ACTION_PARAGRAPH_CHAPTER
+                putExtra("next", next)
+            })
+        } else if (next) {
+            ReadBook.moveToNextChapter(true)
+        } else {
+            ReadBook.moveToPrevChapter(true, toLast = false)
+        }
+    }
+
+    fun cancelParagraphChapterPlayback() {
+        BaseReadAloudService.cancelParagraphChapterPlayback()
     }
 
     fun pause(context: Context) {

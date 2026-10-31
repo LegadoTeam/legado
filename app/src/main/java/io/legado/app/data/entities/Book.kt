@@ -497,6 +497,13 @@ data class Book(
     }
 
     @Parcelize
+    data class ParagraphAnchor(
+        val chapterUrl: String,
+        val itemId: String,
+        val chapterPosition: Int
+    ) : Parcelable
+
+    @Parcelize
     data class ReadConfig(
         var reverseToc: Boolean = false,
         var reverseTocDisplay: Boolean = false,
@@ -518,7 +525,8 @@ data class Book(
         var playSpeed: Float = 1.0f,     //音频播放速度
         var useGlobalAudioSkip: Boolean = false,
         // 阅读页手动选择的替换规则；旧书籍配置缺失时保持空集合。
-        var manualReplaceRuleIds: List<Long> = emptyList()
+        var manualReplaceRuleIds: List<Long> = emptyList(),
+        var paragraphAnchor: ParagraphAnchor? = null
     ) : Parcelable
 
     class Converters {

@@ -82,6 +82,7 @@ class ReadRecordDeviceScopeTest {
         return sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
             ?.readText()
+            ?.replace("\r\n", "\n")
             .orEmpty()
     }
 }

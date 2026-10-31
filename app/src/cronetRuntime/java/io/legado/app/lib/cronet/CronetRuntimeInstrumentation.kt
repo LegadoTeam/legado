@@ -3,6 +3,7 @@ package io.legado.app.lib.cronet
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
 import android.system.Os
 import android.util.Base64
@@ -32,8 +33,10 @@ import org.chromium.net.X509Util
 import org.json.JSONObject
 import java.io.File
 import java.math.BigInteger
+import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.URL
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.CountDownLatch
@@ -112,7 +115,8 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                 // Exercise the same one-retry path used by the real request helper after a failed download.
                 check(CronetLoader.installWithRetry()) {
                     "Cronet install retry failed; results=$results; downloading=${CronetLoader.download}; " +
-                        "files=${componentDir.walkTopDown().filter { it.isFile }.map { "${it.name}:${it.length()}" }.toList()}"
+                        "files=${componentDir.walkTopDown().filter { it.isFile }.map { "${it.name}:${it.length()}" }.toList()}; " +
+                        diagnoseInstallFailure()
                 }
                 check((1..8).all { CronetLoader.install() }) { "Retry did not publish a valid shared library" }
             }
@@ -249,6 +253,42 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             executor.shutdownNow()
             client.dispatcher.executorService.shutdownNow()
             client.connectionPool.evictAll()
+        }
+    }
+
+    /** Preserve the failed assertion while exposing errors hidden by the release loader. */
+    private fun diagnoseInstallFailure(): String {
+        var connection: HttpURLConnection? = null
+        return try {
+            val abi = Build.SUPPORTED_ABIS.first()
+            val metadata = targetContext.assets.open("cronet.json").bufferedReader().use {
+                JSONObject(it.readText())
+            }
+            val url = "https://storage.googleapis.com/chromium-cronet/android/" +
+                "${BuildConfig.Cronet_Version}/Release/cronet/libs/$abi/" +
+                "libcronet.${BuildConfig.Cronet_Version}.so"
+            connection = URL(url).openConnection() as HttpURLConnection
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            val status = connection.responseCode
+            val digest = MessageDigest.getInstance("MD5")
+            var bytes = 0L
+            connection.inputStream.use { input ->
+                val buffer = ByteArray(32 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                    bytes += count
+                }
+            }
+            val actual = "%032x".format(BigInteger(1, digest.digest()))
+            "downloadProbe: abi=$abi, connection=${connection.javaClass.name}, status=$status, " +
+                "bytes=$bytes, md5=$actual, expected=${metadata.optString(abi)}"
+        } catch (error: Throwable) {
+            "downloadProbe: connection=${connection?.javaClass?.name}; ${error.stackTraceToString()}"
+        } finally {
+            runCatching { connection?.disconnect() }
         }
     }
 
