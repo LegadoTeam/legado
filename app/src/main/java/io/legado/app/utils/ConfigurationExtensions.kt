@@ -5,7 +5,8 @@ package io.legado.app.utils
 import android.content.res.Configuration
 import android.content.res.Resources
 
-val sysConfiguration: Configuration = Resources.getSystem().configuration
+val sysConfiguration: Configuration
+    get() = Resources.getSystem().configuration
 
 val Configuration.isNightMode: Boolean
     get() {

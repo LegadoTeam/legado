@@ -5,7 +5,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.res.Configuration
 import android.os.Build
@@ -147,15 +146,20 @@ class App : Application() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        val diff = newConfig.diff(oldConfig)
-        if ((diff and ActivityInfo.CONFIG_UI_MODE) != 0) {
-            ResourceThemeGeneration.observeSystemNight(
-                newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES,
-                AppConfig.themeMode !in listOf("1", "2", "3"),
-            )
-            applyDayNight(this)
-        }
+        val oldNightMode = oldConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val newNightMode = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
         oldConfig = Configuration(newConfig)
+        if (oldNightMode != newNightMode) {
+            val followsSystem = AppConfig.themeMode !in listOf("1", "2", "3")
+            ResourceThemeGeneration.observeSystemNight(
+                newNightMode == Configuration.UI_MODE_NIGHT_YES,
+                followsSystem,
+            )
+            if (followsSystem) {
+                // 阅读页等界面没有监听 RECREATE 事件，需要一起刷新主题。
+                applyDayNight(this, recreateAllActivities = true)
+            }
+        }
     }
 
     /**

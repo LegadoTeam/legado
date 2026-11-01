@@ -84,12 +84,12 @@ object ThemeConfig {
     }
 
     private fun initNightMode() {
-        val targetMode =
-            if (AppConfig.isNightTheme) {
-                AppCompatDelegate.MODE_NIGHT_YES
-            } else {
-                AppCompatDelegate.MODE_NIGHT_NO
-            }
+        // 跟随系统时保留 FOLLOW_SYSTEM，不能固定为当前的日间或夜间状态。
+        val targetMode = when (AppConfig.themeMode) {
+            "1", "3" -> AppCompatDelegate.MODE_NIGHT_NO
+            "2" -> AppCompatDelegate.MODE_NIGHT_YES
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
         AppCompatDelegate.setDefaultNightMode(targetMode)
     }
 
