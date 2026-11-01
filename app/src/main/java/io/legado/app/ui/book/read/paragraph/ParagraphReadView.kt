@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read.paragraph
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
 import android.os.Parcelable
 import android.text.Spannable
@@ -19,6 +20,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatButton
+import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
@@ -385,8 +387,21 @@ class ParagraphReadView @JvmOverloads constructor(
         progress.text = chapter?.let { ParagraphPosition.readProgress(it, item) }.orEmpty()
     }
 
+    internal fun upBackground() {
+        val drawable = ReadBookConfig.bg?.constantState?.newDrawable(resources)?.mutate()?.apply {
+            alpha = (ReadBookConfig.bgAlpha / 100f * 255).toInt()
+        }
+        val padding = Rect(paddingLeft, paddingTop, paddingRight, paddingBottom)
+        // Match the paged reader's base beneath translucent colors and images.
+        background = LayerDrawable(
+            listOfNotNull(ReadBookConfig.bgMeanColor.toDrawable(), drawable).toTypedArray()
+        )
+        // A nine-patch's drawable padding must not replace the window insets.
+        setPadding(padding.left, padding.top, padding.right, padding.bottom)
+    }
+
     fun upStyle() {
-        background = ReadBookConfig.bg?.constantState?.newDrawable()?.mutate()
+        upBackground()
         message.setTextColor(ReadBookConfig.textColor)
         progress.setTextColor(ReadBookConfig.textColor)
         list.setPadding(
