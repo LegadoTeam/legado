@@ -535,6 +535,17 @@ class ReadBookActivity : BaseReadBookActivity(),
         window.setBackgroundDrawable(null)
         upScreenTimeOut()
         ReadBook.register(this)
+        binding.readView.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            val width = right - left
+            val height = bottom - top
+            if (paragraphModeActive && width > 0 && height > 0 &&
+                (width != oldRight - oldLeft || height != oldBottom - oldTop)
+            ) {
+                // ReadView.onSizeChanged has now replaced the provisional background.
+                // Refresh only the background so reading position and focus are preserved.
+                binding.paragraphReadView.upBackground()
+            }
+        }
         binding.paragraphReadView.apply {
             onMenu = { showActionMenu() }
             onImage = { item ->
