@@ -1,6 +1,10 @@
 package io.legado.app.ui.book.read.page.provider
 
 import io.legado.app.R
+import io.legado.app.constant.PreferKey
+import io.legado.app.model.ReadAloud
+import io.legado.app.service.BaseReadAloudService
+import io.legado.app.utils.getPrefBoolean
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.api.DataSource
 import io.legado.app.ui.book.read.page.api.PageFactory
@@ -99,6 +103,14 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
             return TextPage().format()
         }
 
+    private fun TextPage.prepareAloudSpan(): TextPage {
+        // Adjacent pages can contain the same spoken natural paragraph.
+        if (!BaseReadAloudService.isPlay() || appCtx.getPrefBoolean(PreferKey.readAloudByPage) ||
+            textChapter.position != ReadAloud.readAloudChapterIndex
+        ) removePageAloudSpan()
+        return this
+    }
+
     override val nextPage: TextPage
         get() = with(dataSource) {
             message?.let {
@@ -107,7 +119,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
             currentChapter?.let {
                 val pageIndex = pageIndex
                 if (pageIndex < it.pageSize - 1) {
-                    return@with it.getPage(pageIndex + 1)?.removePageAloudSpan()
+                    return@with it.getPage(pageIndex + 1)?.prepareAloudSpan()
                         ?: TextPage(title = it.title).format()
                 }
                 if (!it.isCompleted) {
@@ -115,7 +127,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
                 }
             }
             nextChapter?.let {
-                return@with it.getPage(0)?.removePageAloudSpan()
+                return@with it.getPage(0)?.prepareAloudSpan()
                     ?: TextPage(title = it.title).format()
             }
             return TextPage().format()
@@ -129,7 +141,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
             currentChapter?.let {
                 val pageIndex = pageIndex
                 if (pageIndex > 0) {
-                    return@with it.getPage(pageIndex - 1)?.removePageAloudSpan()
+                    return@with it.getPage(pageIndex - 1)?.prepareAloudSpan()
                         ?: TextPage(title = it.title).format()
                 }
                 if (!it.isCompleted) {
@@ -137,7 +149,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
                 }
             }
             prevChapter?.let {
-                return@with it.lastPage?.removePageAloudSpan()
+                return@with it.lastPage?.prepareAloudSpan()
                     ?: TextPage(title = it.title).format()
             }
             return TextPage().format()
@@ -151,7 +163,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
             currentChapter?.let {
                 val pageIndex = pageIndex
                 if (pageIndex < it.pageSize - 2) {
-                    return@with it.getPage(pageIndex + 2)?.removePageAloudSpan()
+                    return@with it.getPage(pageIndex + 2)?.prepareAloudSpan()
                         ?: TextPage(title = it.title).format()
                 }
                 if (!it.isCompleted) {
@@ -159,10 +171,10 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
                 }
                 nextChapter?.let { nc ->
                     if (pageIndex < it.pageSize - 1) {
-                        return@with nc.getPage(0)?.removePageAloudSpan()
+                        return@with nc.getPage(0)?.prepareAloudSpan()
                             ?: TextPage(title = nc.title).format()
                     }
-                    return@with nc.getPage(1)?.removePageAloudSpan()
+                    return@with nc.getPage(1)?.prepareAloudSpan()
                         ?: TextPage(text = keepSwipeTip).format()
                 }
             }

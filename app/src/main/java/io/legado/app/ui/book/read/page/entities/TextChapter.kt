@@ -70,6 +70,26 @@ data class TextChapter(
         return getPage(getPageIndexByCharIndex(readPos))
     }
 
+    /** 高亮完整自然段，包括相邻页面上的续段，并清除旧段落标记。 */
+    fun upParagraphAloudSpan(chapterStart: Int) {
+        val paragraph = getParagraphs(false).firstOrNull { chapterStart in it.chapterIndices }
+        val paragraphStart = paragraph?.chapterPosition ?: -1
+        val paragraphEnd = paragraph?.lastLine?.let { it.chapterPosition + it.charSize } ?: -1
+        pages.forEach { page ->
+            if (paragraph == null || page.lines.isEmpty() ||
+                paragraphEnd <= page.chapterPosition ||
+                paragraphStart > page.lines.last().chapterPosition + page.lines.last().charSize
+            ) {
+                page.removePageAloudSpan()
+            } else {
+                page.upPageAloudSpan(
+                    paragraphStart - page.chapterPosition,
+                    paragraphEnd - page.chapterPosition,
+                )
+            }
+        }
+    }
+
     val lastPage: TextPage? get() = pages.lastOrNull()
 
     val lastIndex: Int get() = pages.lastIndex

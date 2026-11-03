@@ -219,14 +219,17 @@ data class TextPage(
     /**
      * 更新朗读标志
      * @param aloudSpanStart 朗读文字开始位置
+     * @param aloudSpanEnd 朗读文字结束位置（不包含），跨页时起止位置可在本页之外
      */
-    fun upPageAloudSpan(aloudSpanStart: Int) {
+    fun upPageAloudSpan(aloudSpanStart: Int, aloudSpanEnd: Int = Int.MAX_VALUE) {
         var lineStart = 0
-        var inParagraph = false
+        var inParagraph = aloudSpanStart < 0 && aloudSpanEnd > 0
         hasReadAloudSpan = false
         for (line in textLines) {
             val lineLength = line.text.length + if (line.isParagraphEnd) 1 else 0
-            val startsHere = aloudSpanStart >= lineStart && aloudSpanStart < lineStart + lineLength
+            val startsHere = aloudSpanStart >= lineStart && aloudSpanStart < lineStart + lineLength &&
+                aloudSpanStart < aloudSpanEnd
+            if (lineStart >= aloudSpanEnd) inParagraph = false
             if (startsHere) inParagraph = true
             line.isReadAloud = inParagraph
             if (inParagraph) hasReadAloudSpan = true

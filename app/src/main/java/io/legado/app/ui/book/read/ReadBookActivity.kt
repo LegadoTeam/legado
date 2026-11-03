@@ -1794,6 +1794,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             binding.readView.cancelTouchGesturesOnContentUpdate()
             if (paragraphModeActive) renderParagraphContent()
             else binding.readView.upContent(relativePosition, shouldResetPageOffset)
+            updateCrossPageAloudHighlight()
             scheduleAloudFollowCheck()
             observeBookmarks()
             upBookmarkIndicator()
@@ -1825,6 +1826,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.readView.cancelTouchGesturesOnContentUpdate()
         if (paragraphModeActive) renderParagraphContent()
         else binding.readView.upContent(relativePosition, shouldResetPageOffset)
+        updateCrossPageAloudHighlight()
         scheduleAloudFollowCheck()
         observeBookmarks()
         upBookmarkIndicator()
@@ -1892,6 +1894,25 @@ class ReadBookActivity : BaseReadBookActivity(),
         handler.post(restoreAloudFollowRunnable)
     }
 
+    private fun updateCrossPageAloudHighlight() {
+        if (paragraphModeActive || getPrefBoolean(PreferKey.readAloudByPage) ||
+            !BaseReadAloudService.isPlay()
+        ) return
+        val chapter = ReadBook.curTextChapter ?: return
+        val chapterStart = ReadAloud.readAloudChapterStart
+        if (chapterStart < 0 || ReadAloud.readAloudChapterIndex != ReadBook.durChapterIndex) {
+            chapter.pages.forEach { it.removePageAloudSpan() }
+        } else {
+            chapter.upParagraphAloudSpan(chapterStart)
+        }
+        binding.readView.run {
+            prevPage.invalidateContentView()
+            curPage.invalidateContentView()
+            nextPage.invalidateContentView()
+            submitRenderTask()
+        }
+    }
+
     private fun restoreAloudFollowOnVisiblePage() {
         if (paragraphModeActive) return
         if (!BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
@@ -1907,7 +1928,11 @@ class ReadBookActivity : BaseReadBookActivity(),
         val speakingPage = chapter.getPageByReadPos(chapterStart) ?: return
         if (chapter.getPageByReadPos(line.chapterPosition) !== speakingPage) return
         ReadAloud.restoreReadAloudFollow()
-        speakingPage.upPageAloudSpan(chapterStart - chapter.getReadLength(speakingPage.index))
+        if (getPrefBoolean(PreferKey.readAloudByPage)) {
+            speakingPage.upPageAloudSpan(chapterStart - chapter.getReadLength(speakingPage.index))
+        } else {
+            chapter.upParagraphAloudSpan(chapterStart)
+        }
         binding.readView.upContent(resetPageOffset = false)
     }
 
@@ -1996,7 +2021,11 @@ class ReadBookActivity : BaseReadBookActivity(),
             ReadBook.durChapterPos = chapterStart
             val pageIndex = ReadBook.durPageIndex
             val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
-            textChapter.getPage(pageIndex)?.upPageAloudSpan(aloudSpanStart)
+            if (getPrefBoolean(PreferKey.readAloudByPage)) {
+                textChapter.getPage(pageIndex)?.upPageAloudSpan(aloudSpanStart)
+            } else {
+                textChapter.upParagraphAloudSpan(chapterStart)
+            }
             upContent()
         }
     }
@@ -3342,11 +3371,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
             if (it == Status.STOP || it == Status.PAUSE) {
                 ReadBook.curTextChapter?.let { textChapter ->
-                    val page = textChapter.getPageByReadPos(ReadBook.durChapterPos)
-                    if (page != null) {
-                        page.removePageAloudSpan()
-                        readView.upContent(resetPageOffset = false)
-                    }
+                    textChapter.pages.forEach { page -> page.removePageAloudSpan() }
+                    readView.upContent(resetPageOffset = false)
                 }
             }
             updateReadAloudFloatBar()
@@ -3362,6 +3388,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 return@observeEventSticky
             }
             if (!ReadAloud.followReadAloudPosition) {
+                updateCrossPageAloudHighlight()
                 scheduleAloudFollowCheck()
                 return@observeEventSticky
             }
@@ -3375,7 +3402,11 @@ class ReadBookActivity : BaseReadBookActivity(),
                         val pageIndex = ReadBook.durPageIndex
                         val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
                         val page = textChapter.getPage(pageIndex)
-                        page?.upPageAloudSpan(aloudSpanStart)
+                        if (getPrefBoolean(PreferKey.readAloudByPage)) {
+                            page?.upPageAloudSpan(aloudSpanStart)
+                        } else {
+                            textChapter.upParagraphAloudSpan(chapterStart)
+                        }
                         if (readView.isTouching && readView.curPage.textPage === page) {
                             // Same-page speech ranges must not cancel the user's pending swipe.
                             readView.curPage.invalidateContentView()
