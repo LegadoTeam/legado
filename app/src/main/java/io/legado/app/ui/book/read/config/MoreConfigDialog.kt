@@ -31,6 +31,7 @@ import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.removePref
 import io.legado.app.utils.setEdgeEffectColor
+import io.legado.app.utils.showDialogFragment
 
 class MoreConfigDialog : BasePrefDialogFragment() {
     private val readPreferTag = "readPreferenceFragment"
@@ -116,11 +117,6 @@ class MoreConfigDialog : BasePrefDialogFragment() {
             key: String?
         ) {
             when (key) {
-                PreferKey.paragraphReadMode,
-                PreferKey.paragraphReadControls,
-                PreferKey.paragraphReadProgress -> {
-                    (activity as? ReadBookActivity)?.updateParagraphMode()
-                }
                 PreferKey.readBodyToLh -> activity?.recreate()
                 PreferKey.hideStatusBar -> {
                     ReadBookConfig.hideStatusBar = getPrefBoolean(PreferKey.hideStatusBar)
@@ -188,6 +184,10 @@ class MoreConfigDialog : BasePrefDialogFragment() {
 
         override fun onPreferenceTreeClick(preference: Preference): Boolean {
             when (preference.key) {
+                "paragraphReadConfig" -> {
+                    showDialogFragment(ParagraphReadConfigDialog())
+                    return true
+                }
                 "customPageKey" -> PageKeyDialog(requireContext()).show()
                 "clickRegionalConfig" -> {
                     (activity as? ReadBookActivity)?.showClickRegionalConfig()

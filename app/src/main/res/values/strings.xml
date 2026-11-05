@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="paragraph_read_mode">Paragraph reading mode</string>
+    <string name="paragraph_read_settings">Paragraph reading settings</string>
     <string name="paragraph_read_mode_summary">Read complete paragraphs and images as separate screen reader items. Applies to all books.</string>
     <string name="paragraph_read_controls">Show paragraph reading controls</string>
     <string name="paragraph_read_progress">Show paragraph reading progress</string>
+    <string name="paragraph_read_chapter_swipe">Swipe between chapters at list edges</string>
+    <string name="paragraph_read_chapter_swipe_summary">Pull down at the chapter start to open the previous chapter at its end. Pull up at the chapter end to open the next chapter at its start.</string>
     <string name="paragraph_play">Play</string>
     <string name="paragraph_image">Image %1$d</string>
     <string name="paragraph_read_menu">Reading menu</string>

@@ -14,8 +14,12 @@ import android.text.style.UnderlineSpan
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -65,6 +69,7 @@ class ParagraphReadView @JvmOverloads constructor(
     var onImage: ((ParagraphItem) -> Unit)? = null
     var onPreviousChapter: (() -> Unit)? = null
     var onNextChapter: (() -> Unit)? = null
+    var onBoundaryChapter: ((Boolean) -> Boolean)? = null
     var onPlayPause: (() -> Unit)? = null
     var onTopItemChanged: ((ParagraphItem) -> Unit)? = null
     var onUserScroll: (() -> Unit)? = null
@@ -82,6 +87,8 @@ class ParagraphReadView @JvmOverloads constructor(
     private var chapter: TextChapter? = null
     private var aloudHighlight: ParagraphAloudHighlight? = null
     private val scrollState = ParagraphScrollState()
+    private val chapterGesture = ParagraphChapterGesture(ViewConfiguration.get(context).scaledTouchSlop.toFloat())
+    private var chapterNavigationPending = false
     private var pendingViewport: Viewport? = null
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var statusInset = 0
@@ -96,15 +103,69 @@ class ParagraphReadView @JvmOverloads constructor(
         list.clipToPadding = false
         list.overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
         list.setAccessibilityDelegateCompat(object : RecyclerViewAccessibilityDelegate(list) {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                if (chapterNavigationPending) {
+                    info.isScrollable = false
+                    info.removeAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_BACKWARD)
+                    info.removeAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_UP)
+                    info.removeAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_FORWARD)
+                    info.removeAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_DOWN)
+                    return
+                }
+            }
+
             override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean {
-                if (action == AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD
-                    || action == AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD
-                    || action == AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_UP.id
-                    || action == AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_DOWN.id
-                ) {
+                val nextChapter = when (action) {
+                    AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD,
+                    AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_DOWN.id -> true
+                    AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD,
+                    AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_UP.id -> false
+                    else -> null
+                }
+                if (nextChapter != null) {
+                    if (chapterNavigationPending) return false
                     beginUserScroll()
                 }
                 return super.performAccessibilityAction(host, action, args)
+            }
+        })
+        list.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+            override fun onInterceptTouchEvent(recyclerView: RecyclerView, event: MotionEvent): Boolean {
+                if (chapterNavigationPending) {
+                    chapterGesture.cancel()
+                    return true
+                }
+                if (event.pointerCount != 1) {
+                    chapterGesture.cancel()
+                    return false
+                }
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> chapterGesture.start(
+                        event.x, event.y,
+                        canGoPrevious = list.scrollState == RecyclerView.SCROLL_STATE_IDLE && canNavigateBoundary(false),
+                        canGoNext = list.scrollState == RecyclerView.SCROLL_STATE_IDLE && canNavigateBoundary(true),
+                    )
+                    MotionEvent.ACTION_MOVE -> return chapterGesture.move(event.x, event.y)
+                    MotionEvent.ACTION_UP -> {
+                        val nextChapter = chapterGesture.release(event.x, event.y)
+                        return nextChapter?.let(::requestBoundaryChapter) ?: false
+                    }
+                    MotionEvent.ACTION_CANCEL -> chapterGesture.cancel()
+                }
+                return false
+            }
+
+            override fun onTouchEvent(recyclerView: RecyclerView, event: MotionEvent) {
+                if (chapterNavigationPending || event.pointerCount != 1) {
+                    chapterGesture.cancel()
+                    return
+                }
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_MOVE -> chapterGesture.move(event.x, event.y)
+                    MotionEvent.ACTION_UP -> chapterGesture.release(event.x, event.y)?.let(::requestBoundaryChapter)
+                    MotionEvent.ACTION_CANCEL -> chapterGesture.cancel()
+                }
             }
         })
         // A non-accessible trailing space lets even a short final paragraph reach the top.
@@ -174,7 +235,41 @@ class ParagraphReadView @JvmOverloads constructor(
 
     fun isShowing(textChapter: TextChapter): Boolean = chapter === textChapter && list.isVisible
 
+    fun setChapterNavigationPending(pending: Boolean) {
+        val changed = chapterNavigationPending != pending
+        if (chapterNavigationPending && !pending && scrollState.isProgrammatic) {
+            invalidatePendingScroll()
+        }
+        chapterNavigationPending = pending
+        chapterGesture.cancel()
+        if (changed) list.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+    }
+
+    private fun canNavigateBoundary(nextChapter: Boolean): Boolean {
+        if (!AppConfig.paragraphReadMode || !AppConfig.paragraphReadChapterSwipe || chapterNavigationPending
+            || !isShown || !list.isVisible || items.isEmpty() || scrollState.isProgrammatic
+            || list.isLayoutRequested || list.hasPendingAdapterUpdates() || list.childCount == 0
+        ) return false
+        val shownChapter = chapter ?: return false
+        if (!shownChapter.isCompleted || !shownChapter.hasBodyContent || ReadBook.msg != null
+            || ReadBook.curTextChapter !== shownChapter
+            || ReadBook.book?.bookUrl != shownChapter.chapter.bookUrl
+            || ReadBook.durChapterIndex != shownChapter.chapter.index
+        ) return false
+        val targetIndex = ReadBook.durChapterIndex + if (nextChapter) 1 else -1
+        return targetIndex in 0 until minOf(ReadBook.chapterSize, ReadBook.simulatedChapterSize)
+            && !list.canScrollVertically(if (nextChapter) 1 else -1)
+    }
+
+    private fun requestBoundaryChapter(nextChapter: Boolean): Boolean {
+        if (!canNavigateBoundary(nextChapter)) return false
+        chapterGesture.cancel()
+        beginUserScroll()
+        return onBoundaryChapter?.invoke(nextChapter) == true
+    }
+
     fun showMessage(text: CharSequence) {
+        chapterGesture.cancel()
         updateReadAloudHighlight(null)
         invalidatePendingScroll()
         chapter = null
@@ -187,7 +282,14 @@ class ParagraphReadView @JvmOverloads constructor(
         updateControls()
     }
 
-    fun setChapter(textChapter: TextChapter, itemId: String?, position: Int) {
+    fun setChapter(
+        textChapter: TextChapter,
+        itemId: String?,
+        position: Int,
+        requestAccessibilityFocus: Boolean = false,
+        onPositioned: (() -> Unit)? = null,
+    ) {
+        chapterGesture.cancel()
         updateReadAloudHighlight(null)
         invalidatePendingScroll()
         chapter = textChapter
@@ -200,7 +302,7 @@ class ParagraphReadView @JvmOverloads constructor(
         list.post { list.invalidateItemDecorations() }
         val exact = items.indexOfFirst { it.id == itemId }
         val index = if (exact >= 0) exact else findPosition(position)
-        scrollToItem(index)
+        scrollToItem(index, requestAccessibilityFocus = requestAccessibilityFocus, onPositioned = onPositioned)
         updateControls()
     }
 
@@ -334,7 +436,12 @@ class ParagraphReadView @JvmOverloads constructor(
         onUserScroll?.invoke()
     }
 
-    private fun scrollToItem(index: Int, offsetPx: Int = 0) {
+    private fun scrollToItem(
+        index: Int,
+        offsetPx: Int = 0,
+        requestAccessibilityFocus: Boolean = false,
+        onPositioned: (() -> Unit)? = null,
+    ) {
         if (items.isEmpty()) return
         val shownChapter = chapter ?: return
         val boundedIndex = index.coerceIn(items.indices)
@@ -346,6 +453,15 @@ class ParagraphReadView @JvmOverloads constructor(
                 if (chapter !== shownChapter || !scrollState.completeProgrammaticScroll(generation)) return@post
                 pendingViewport = null
                 reportTopItem()
+                if (requestAccessibilityFocus) {
+                    val manager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+                    if (manager?.isEnabled == true && manager.isTouchExplorationEnabled) {
+                        val holder = list.findViewHolderForAdapterPosition(boundedIndex) as? ItemHolder
+                        val focusTarget = holder?.let { if (items[boundedIndex].isImage) it.image else it.text }
+                        focusTarget?.performAccessibilityAction(AccessibilityNodeInfoCompat.ACTION_ACCESSIBILITY_FOCUS, null)
+                    }
+                }
+                onPositioned?.invoke()
             }
         }
         list.stopScroll()
@@ -353,12 +469,13 @@ class ParagraphReadView @JvmOverloads constructor(
     }
 
     fun scrollScreen(forward: Boolean) {
+        if (chapterNavigationPending) return
         beginUserScroll()
         list.smoothScrollBy(0, (list.height - list.paddingTop).coerceAtLeast(1) * if (forward) 1 else -1)
     }
 
     fun scrollByPixels(distance: Int) {
-        if (distance == 0) return
+        if (distance == 0 || chapterNavigationPending) return
         beginUserScroll()
         list.scrollBy(0, distance)
         reportTopItem()
@@ -416,6 +533,8 @@ class ParagraphReadView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
+        chapterGesture.cancel()
+        invalidatePendingScroll()
         scope.cancel()
         super.onDetachedFromWindow()
     }

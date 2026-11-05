@@ -6,6 +6,7 @@ object PreferKey {
     const val paragraphReadMode = "paragraphReadMode"
     const val paragraphReadControls = "paragraphReadControls"
     const val paragraphReadProgress = "paragraphReadProgress"
+    const val paragraphReadChapterSwipe = "paragraphReadChapterSwipe"
 
     const val myMoreItems = "myMoreItems"
     const val language = "language"

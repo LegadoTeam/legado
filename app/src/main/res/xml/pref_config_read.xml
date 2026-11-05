@@ -2,27 +2,9 @@
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:key="paragraphReadMode"
-        android:defaultValue="false"
-        android:title="@string/paragraph_read_mode"
-        android:summary="@string/paragraph_read_mode_summary"
-        app:iconSpaceReserved="false"
-        app:isBottomBackground="true" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:key="paragraphReadControls"
-        android:defaultValue="true"
-        android:dependency="paragraphReadMode"
-        android:title="@string/paragraph_read_controls"
-        app:iconSpaceReserved="false"
-        app:isBottomBackground="true" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:key="paragraphReadProgress"
-        android:defaultValue="true"
-        android:dependency="paragraphReadMode"
-        android:title="@string/paragraph_read_progress"
+    <io.legado.app.lib.prefs.Preference
+        android:key="paragraphReadConfig"
+        android:title="@string/paragraph_read_settings"
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 

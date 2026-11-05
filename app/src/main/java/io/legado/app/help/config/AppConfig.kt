@@ -33,6 +33,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val paragraphReadMode get() = appCtx.getPrefBoolean(PreferKey.paragraphReadMode, false)
     val paragraphReadControls get() = appCtx.getPrefBoolean(PreferKey.paragraphReadControls, true)
     val paragraphReadProgress get() = appCtx.getPrefBoolean(PreferKey.paragraphReadProgress, true)
+    val paragraphReadChapterSwipe get() = appCtx.getPrefBoolean(PreferKey.paragraphReadChapterSwipe, false)
     private const val JS_SOURCE_API_PREFS = "js_source_api_credentials"
     private const val JS_SOURCE_API_TOKEN = "token"
 
