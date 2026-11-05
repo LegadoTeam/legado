@@ -74,7 +74,7 @@ activity = "1.13.0"
 #noinspection GradleDependency
 lifecycle = "2.10.0"
 #noinspection GradleDependency
-room = "2.8.4"
+room = "2.8.5"
 #noinspection GradleDependency
 recyclerview = "1.4.0"
 #noinspection GradleDependency
