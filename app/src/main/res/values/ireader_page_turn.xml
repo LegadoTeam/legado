@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ireader_page_turn">iReader native page turns</string>
+    <string name="ireader_page_turn_option">iReader Native</string>
+    <string name="ireader_page_turn_not_selected">Select iReader Native in Flip animation to use these settings.</string>
+    <string name="ireader_page_turn_effect">Effect</string>
+    <string name="ireader_page_turn_ripple">Water ripple</string>
+    <string name="ireader_page_turn_waterfall">Waterfall</string>
+    <string name="ireader_page_turn_speed">Speed</string>
+    <string name="ireader_page_turn_slow">Slow</string>
+    <string name="ireader_page_turn_normal">Standard</string>
+    <string name="ireader_page_turn_fast">Fast</string>
+    <string name="ireader_page_turn_reverse">Reverse effect direction</string>
+    <string name="ireader_page_turn_reverse_summary">Use when the effect moves opposite to the page turn</string>
+    <string name="ireader_page_turn_reverse_landscape">Correct landscape direction</string>
+    <string name="ireader_page_turn_reverse_landscape_summary">Reverse the effect in landscape only</string>
+    <string name="ireader_page_turn_refresh_interval">App full refresh interval</string>
+    <string name="ireader_page_turn_refresh_interval_summary">System managed by default. Add periodic ghosting cleanup if needed.</string>
+    <string name="ireader_page_turn_refresh_follow_system">Managed by the system</string>
+    <string name="ireader_page_turn_mode_unsupported">The current device screen mode does not support the selected effect. Choose HD, Fast or Smart in the device’s screen settings.</string>
+    <string name="ireader_page_turn_unavailable">The device does not provide a compatible iReader display interface.</string>
+    <string name="ireader_page_turn_failed">The effect could not be applied. Using ordinary page turns for this session; restart the app to try again.</string>
+    <string name="ireader_page_turn_diagnostics">Copy effect diagnostics</string>
+    <string-array name="ireader_page_turn_effects">
+        <item>@string/ireader_page_turn_ripple</item>
+        <item>@string/ireader_page_turn_waterfall</item>
+    </string-array>
+    <string-array name="ireader_page_turn_effect_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string-array name="ireader_page_turn_speeds">
+        <item>@string/ireader_page_turn_slow</item>
+        <item>@string/ireader_page_turn_normal</item>
+        <item>@string/ireader_page_turn_fast</item>
+    </string-array>
+    <string-array name="ireader_page_turn_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string-array name="ireader_page_turn_refresh_intervals">
+        <item>@string/ireader_page_turn_refresh_follow_system</item>
+        <item>Every page turn</item>
+        <item>Every 5 page turns</item>
+        <item>Every 10 page turns</item>
+        <item>Every 20 page turns</item>
+        <item>Every 30 page turns</item>
+        <item>Every 50 page turns</item>
+    </string-array>
+    <string-array name="ireader_page_turn_refresh_interval_values" translatable="false">
+        <item>-2</item>
+        <item>1</item>
+        <item>5</item>
+        <item>10</item>
+        <item>20</item>
+        <item>30</item>
+        <item>50</item>
+    </string-array>
+</resources>

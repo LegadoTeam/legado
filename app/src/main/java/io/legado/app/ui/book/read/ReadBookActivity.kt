@@ -296,6 +296,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
     private var readerOverflowPopup: PopupAction? = null
     override val isInitFinish: Boolean get() = viewModel.isInitFinish
+    override val allowNativePageTurnEffect: Boolean
+        get() = isInitFinish && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+            !paragraphModeActive && !menuLayoutIsVisible
     override val isScroll: Boolean get() = binding.readView.isScroll
     private val isAutoPage get() = binding.readView.isAutoPage
     override var isShowingSearchResult = false
@@ -741,6 +744,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         ReadBook.paragraphReaderVisibleSession = 0L
         paragraphReaderSession = 0L
         super.onPause()
+        binding.readView.cancelPendingNativePageTurn()
         binding.readView.cancelTouchGestures()
         autoPageStop()
         backupJob?.cancel()

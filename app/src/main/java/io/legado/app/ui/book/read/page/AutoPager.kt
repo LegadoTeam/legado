@@ -4,9 +4,11 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.SystemClock
 import androidx.core.graphics.withClip
+import io.legado.app.constant.PageAnim
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.entities.PageDirection
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.canvasrecorder.recordIfNeeded
@@ -19,7 +21,7 @@ class AutoPager(private val readView: ReadView) : Runnable {
     var isRunning = false
         private set
     private var isPausing = false
-    private var isEInkMode = false
+    private var instantPageTurns = false
     private var scrollOffsetRemain = 0.0
     private var scrollOffset = 0
     private var lastTimeMillis = 0L
@@ -29,10 +31,10 @@ class AutoPager(private val readView: ReadView) : Runnable {
 
     fun start() {
         isRunning = true
-        isEInkMode = AppConfig.isEInkMode
+        instantPageTurns = useInstantPageTurns()
         readView.curPage.upSelectAble(false)
-        if (isEInkMode) {
-            readView.postDelayed(this, ReadBookConfig.autoReadSpeed * 1000L)
+        if (instantPageTurns) {
+            scheduleNextPage()
         } else {
             paint.color = ThemeStore.accentColor
             lastTimeMillis = SystemClock.uptimeMillis()
@@ -46,7 +48,7 @@ class AutoPager(private val readView: ReadView) : Runnable {
         }
         isRunning = false
         isPausing = false
-        isEInkMode = false
+        instantPageTurns = false
         readView.removeCallbacks(this)
         readView.curPage.upSelectAble(AppConfig.textSelectAble)
         readView.invalidate()
@@ -67,8 +69,9 @@ class AutoPager(private val readView: ReadView) : Runnable {
             return
         }
         isPausing = false
-        if (isEInkMode) {
-            readView.postDelayed(this, ReadBookConfig.autoReadSpeed * 1000L)
+        instantPageTurns = useInstantPageTurns()
+        if (instantPageTurns) {
+            scheduleNextPage()
         } else {
             lastTimeMillis = SystemClock.uptimeMillis()
             readView.invalidate()
@@ -76,14 +79,17 @@ class AutoPager(private val readView: ReadView) : Runnable {
     }
 
     fun reset() {
-        if (isEInkMode) {
-            readView.removeCallbacks(this)
-            readView.postDelayed(this, ReadBookConfig.autoReadSpeed * 1000L)
+        readView.removeCallbacks(this)
+        instantPageTurns = useInstantPageTurns()
+        lastTimeMillis = SystemClock.uptimeMillis()
+        progress = 0
+        scrollOffsetRemain = 0.0
+        scrollOffset = 0
+        canvasRecorder.invalidate()
+        if (instantPageTurns) {
+            scheduleNextPage()
         } else {
-            progress = 0
-            scrollOffsetRemain = 0.0
-            scrollOffset = 0
-            canvasRecorder.invalidate()
+            paint.color = ThemeStore.accentColor
         }
     }
 
@@ -93,7 +99,7 @@ class AutoPager(private val readView: ReadView) : Runnable {
     }
 
     fun onDraw(canvas: Canvas) {
-        if (!isRunning || isEInkMode) {
+        if (!isRunning || instantPageTurns) {
             return
         }
 
@@ -124,7 +130,7 @@ class AutoPager(private val readView: ReadView) : Runnable {
     }
 
     fun computeOffset() {
-        if (!isRunning || isPausing || isEInkMode) {
+        if (!isRunning || isPausing || instantPageTurns) {
             return
         }
 
@@ -160,6 +166,17 @@ class AutoPager(private val readView: ReadView) : Runnable {
         if (!readView.fillPage(PageDirection.NEXT)) {
             stop()
         } else {
+            // fillPage also invokes onPageChange -> reset; retain one timer, not two.
+            scheduleNextPage()
+        }
+    }
+
+    private fun useInstantPageTurns(): Boolean =
+        AppConfig.isEInkMode || ReadBook.pageAnim() == PageAnim.ireaderPageAnim
+
+    private fun scheduleNextPage() {
+        readView.removeCallbacks(this)
+        if (isRunning && !isPausing && instantPageTurns) {
             readView.postDelayed(this, ReadBookConfig.autoReadSpeed * 1000L)
         }
     }
