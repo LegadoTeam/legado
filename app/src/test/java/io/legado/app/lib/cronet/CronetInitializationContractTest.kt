@@ -25,6 +25,7 @@ class CronetInitializationContractTest {
 
         assertTrue(helper.indexOf("try {") < helper.indexOf("CronetLoader.preDownload()"))
         assertTrue(helper.contains("ExperimentalCronetEngine.Builder(appCtx)"))
+        assertTrue(helper.contains("setLibraryLoader(CronetLoader)"))
         assertTrue(helper.contains("catch (e: Throwable)"))
         assertTrue(helper.contains("cronetEngineFailure = e"))
         assertTrue(helper.contains("CronetUnavailableException"))

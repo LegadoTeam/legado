@@ -27,8 +27,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
 import org.chromium.base.ContextUtils
+import org.chromium.net.ExperimentalCronetEngine
 import org.chromium.net.impl.CronetUrlRequestContext
-import org.chromium.net.impl.CronetLibraryLoader
 import org.chromium.net.X509Util
 import org.json.JSONObject
 import java.io.File
@@ -133,7 +133,12 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             val abiDir = installed.parentFile!!
             try {
                 Os.chmod(abiDir.absolutePath, 0)
-                val failure = runCatching { CronetLibraryLoader.loadLibrary() }.exceptionOrNull()
+                val failure = runCatching {
+                    ExperimentalCronetEngine.Builder(targetContext)
+                        .setLibraryLoader(CronetLoader)
+                        .build()
+                        .shutdown()
+                }.exceptionOrNull()
                 check(failure is UnsatisfiedLinkError) { "Expected an actual failed native load, got $failure" }
                 check(File("/proc/self/maps").readLines().none { it.contains(nativeName) }) {
                     "Failure case unexpectedly loaded Cronet"
@@ -240,9 +245,8 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                 File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
             RssImageRuntimeRegression.verify(this)
             val rssVideo = RssVideoRuntimeRegression.verify(this)
-            return "$version; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
+            return "$version; rssVideo=$rssVideo; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
                 "webDav=authenticated,encoded-paths,cronet-first,on-off-on; " +
-                "rssVideo=$rssVideo; " +
                 "firstInstallFailures=$firstInstallFailures; " +
                 "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +
                 "nativeBytes=${native.length()}; nativeMtime=${native.lastModified()}; nativeFile=$native"

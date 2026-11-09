@@ -17,8 +17,8 @@ buildscript {
     dependencies { classpath 'org.ow2.asm:asm-tree:9.8' }
 }
 
-// Version-pinned adaptation. Keep the checked-in official JAR byte-for-byte intact.
-// Cronet 152's public setLibraryLoader() is a no-op; reconnect its actual load site instead.
+// Version-pinned load-state fix. Keep the checked-in official JAR byte-for-byte intact.
+// Cronet 152 already routes the official custom LibraryLoader to this load site.
 def original = file('cronetlib/cronet_impl_native_java.jar')
 def adapted = layout.buildDirectory.file('cronet-dynamic/cronet_impl_native_java.jar')
 def adaptCronetLoader = tasks.register('adaptCronetLoader') {
@@ -52,22 +52,6 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
                                 it.opcode == Opcodes.PUTSTATIC && it.name == 'sLibAlreadyLoaded' }
                         assert calls.size() == 3 && flag.size() == 1
                         assert flag[0].previous.opcode == Opcodes.ICONST_1
-                        // Keep the AOSP branch unchanged; redirect only the two standalone Cronet names.
-                        calls.drop(1).each { call ->
-                            def route = new InsnList()
-                            // Discard the original lambda receiver, retaining the library name.
-                            route.add(new InsnNode(Opcodes.SWAP))
-                            route.add(new InsnNode(Opcodes.POP))
-                            route.add(new FieldInsnNode(Opcodes.GETSTATIC,
-                                    'io/legado/app/lib/cronet/CronetLoader', 'INSTANCE',
-                                    'Lio/legado/app/lib/cronet/CronetLoader;'))
-                            route.add(new InsnNode(Opcodes.SWAP))
-                            route.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL,
-                                    'io/legado/app/lib/cronet/CronetLoader', 'loadLibrary',
-                                    '(Ljava/lang/String;)V', false))
-                            method.instructions.insertBefore(call, route)
-                            method.instructions.remove(call)
-                        }
                         // A failed download/load must not tell normal initialization that loading succeeded.
                         method.instructions.remove(flag[0].previous)
                         method.instructions.remove(flag[0])
@@ -89,7 +73,7 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
                 }
             }
         }
-        logger.lifecycle('Cronet 152: adapted only Java library loading; official native/JNI initialization unchanged')
+        logger.lifecycle('Cronet 152: fixed failed-load state; official custom loader and JNI initialization unchanged')
     }
 }
 ext.dynamicCronetJar = files(adapted).builtBy(adaptCronetLoader)
