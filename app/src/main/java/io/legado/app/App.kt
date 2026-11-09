@@ -92,10 +92,10 @@ class App : Application() {
             LogUtils.init(this@App)
             LogUtils.d("App", "onCreate")
             LogUtils.logDeviceInfo()
-            //预下载Cronet so
+            //预热 APK 内置的 Cronet
             if (AppConfig.isCronet) {
-                runCatching { Cronet.preDownload() }
-                    .onFailure { AppLog.put("预下载Cronet失败", it) }
+                runCatching { Cronet.warmUp() }
+                    .onFailure { AppLog.put("预热Cronet失败", it) }
             }
             createNotificationChannels()
             LiveEventBus.config()

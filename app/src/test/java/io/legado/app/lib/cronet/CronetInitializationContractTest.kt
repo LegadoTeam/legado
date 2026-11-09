@@ -21,9 +21,8 @@ class CronetInitializationContractTest {
         val app = readProjectFile("app/src/main/java/io/legado/app/App.kt")
         val config = readProjectFile("app/src/main/java/io/legado/app/help/config/AppConfig.kt")
         val httpHelper = readProjectFile("app/src/main/java/io/legado/app/help/http/HttpHelper.kt")
-        val loader = readProjectFile("app/src/main/java/io/legado/app/lib/cronet/CronetLoader.kt")
 
-        assertTrue(helper.indexOf("try {") < helper.indexOf("CronetLoader.preDownload()"))
+        assertTrue(helper.indexOf("try {") < helper.indexOf("ExperimentalCronetEngine.Builder(appCtx)"))
         assertTrue(helper.contains("ExperimentalCronetEngine.Builder(appCtx)"))
         assertTrue(helper.contains("catch (e: Throwable)"))
         assertTrue(helper.contains("cronetEngineFailure = e"))
@@ -44,12 +43,10 @@ class CronetInitializationContractTest {
         assertTrue(interceptor.contains("catch (e: Throwable)"))
         assertTrue(coroutineInterceptor.contains("getCronetEngineOrNull()"))
         assertTrue(coroutineInterceptor.contains("catch (e: Throwable)"))
-        assertTrue(app.contains("runCatching { Cronet.preDownload() }"))
-        assertTrue(loader.contains("downloadState.awaitCompletion()"))
-        assertTrue(loader.contains("downloadState.awaitCompletion()\n                if (install())"))
+        assertTrue(app.contains("runCatching { Cronet.warmUp() }"))
         assertTrue(config.contains("val isCronet: Boolean"))
         assertTrue(config.contains("get() = appCtx.getPrefBoolean(PreferKey.cronet)"))
-        assertTrue(httpHelper.contains("if (AppConfig.isCronet)"))
+        assertFalse(httpHelper.contains("if (AppConfig.isCronet)"))
     }
 
     @Test
@@ -65,6 +62,6 @@ class CronetInitializationContractTest {
             it.parentFile
         }.map {
             File(it, path)
-        }.first { it.isFile }.readText()
+        }.first { it.isFile }.readText().replace("\r\n", "\n")
     }
 }

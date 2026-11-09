@@ -270,7 +270,7 @@ class OtherConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.cronet -> if (appCtx.getPrefBoolean(PreferKey.cronet)) {
-                Cronet.preDownload()
+                Cronet.warmUp()
             }
 
             PreferKey.processText -> sharedPreferences?.let {

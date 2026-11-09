@@ -1,9 +1,8 @@
 name: Update Cronet
 
 on:
-  schedule:
-    # 周一北京时间9点（UTC 1:00）
-    - cron: "0 1 * * 1"
+  # Keep 152 pinned while newer official natives require API 24 (the app supports 23).
+  # Deliberate upgrades remain available through workflow_dispatch and runtime review.
   workflow_dispatch:
 
 jobs:
