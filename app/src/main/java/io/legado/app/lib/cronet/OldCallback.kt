@@ -21,15 +21,13 @@ class OldCallback(originalRequest: Request, mCall: Call, readTimeoutMillis: Int)
         val timeOutMs: Long = mCall.timeout().timeoutNanos() / 1000000
         urlRequest.start()
         startCheckCancelJob(urlRequest)
-        val responseReady = if (timeOutMs > 0) {
+        if (timeOutMs > 0) {
             mResponseCondition.block(timeOutMs)
         } else {
             mResponseCondition.block()
-            true
         }
-        // onResponseStarted opens the condition before the streaming body is consumed.
-        // Only an actual timed-out wait is a timeout; isDone is expected to be false here.
-        if (!responseReady) {
+        //ConditionVariable 正常open或者超时open后，检查urlRequest是否完成
+        if (!urlRequest.isDone) {
             urlRequest.cancel()
             mException = IOException("Cronet timeout after wait " + timeOutMs + "ms")
         }

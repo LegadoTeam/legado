@@ -13,7 +13,6 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.EventListener
 import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Protocol
 import okhttp3.Request
@@ -201,14 +200,12 @@ abstract class AbsCallBack(
     override fun onCanceled(request: UrlRequest?, info: UrlResponseInfo?) {
         if (followRedirect) {
             followRedirect = false
-            val newRequest = if (enableCookieJar) {
-                CookieManager.loadRequest(redirectRequest!!)
+            if (enableCookieJar) {
+                val newRequest = CookieManager.loadRequest(redirectRequest!!)
+                buildRequest(newRequest, this)?.start()
             } else {
-                redirectRequest!!
+                buildRequest(redirectRequest!!, this)?.start()
             }
-            // Subsequent redirects must inherit this hop, including removed credentials/body.
-            originalRequest = newRequest
-            buildRequest(newRequest, this)?.start()
             return
         }
         canceled.set(true)
@@ -415,14 +412,7 @@ abstract class AbsCallBack(
                 }
             }
 
-            val previousUrl = userResponse.request.url
-            val nextUrl = newLocationUrl.toHttpUrl()
-            if (previousUrl.host != nextUrl.host || previousUrl.port != nextUrl.port
-                || previousUrl.scheme != nextUrl.scheme
-            ) {
-                requestBuilder.removeHeader("Authorization")
-            }
-            return requestBuilder.url(nextUrl).build()
+            return requestBuilder.url(newLocationUrl).build()
         }
 
         private fun toResponse(

@@ -72,7 +72,6 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
 
     @Volatile
     private var cacheInstall = false
-    private val installRetry = AtomicBoolean(false)
 
     init {
         soUrl = ("https://storage.googleapis.com/chromium-cronet/android/"
@@ -107,23 +106,6 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         }
         cacheInstall = soFile.exists()
         return cacheInstall
-    }
-
-    /** Retry one failed dynamic library install in the current process. */
-    internal fun installWithRetry(): Boolean {
-        if (install()) {
-            installRetry.set(false)
-            return true
-        }
-        if (!installRetry.compareAndSet(false, true)) {
-            return install()
-        }
-        preDownload()
-        val installed = install()
-        if (installed) {
-            installRetry.set(false)
-        }
-        return installed
     }
 
 
@@ -170,11 +152,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         } catch (e: Throwable) {
             //如果找不到，则从远程下载
             //删除历史文件
-            // Keep only this process ABI/version after a previous component upgrade.
-            soFile.parentFile?.parentFile?.walkBottomUp()?.forEach { file ->
-                if (file.isFile && file != soFile) file.delete()
-                if (file.isDirectory && file != soFile.parentFile) file.delete()
-            }
+            deleteHistoryFile(soFile.parentFile, soFile)
             //md5 = getUrlMd5(md5Url)
             DebugLog.d(javaClass.simpleName, "soMD5:$md5")
             if (md5.length != 32 || soUrl.isEmpty()) {

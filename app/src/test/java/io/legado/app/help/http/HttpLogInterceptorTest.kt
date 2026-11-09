@@ -103,7 +103,7 @@ class HttpLogInterceptorTest {
             .resolve("io/legado/app/help/http/HttpHelper.kt")
             .readText()
         val logger = source.indexOf("builder.addInterceptor(HttpLogInterceptor())")
-        val cronet = source.indexOf("Cronet.interceptor?.let")
+        val cronet = source.indexOf("if (AppConfig.isCronet)")
         val decompressor = source.indexOf("builder.addInterceptor(DecompressInterceptor)")
 
         assertTrue(logger >= 0)

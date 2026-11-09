@@ -47,14 +47,9 @@ class CronetInitializationContractTest {
         assertTrue(app.contains("runCatching { Cronet.preDownload() }"))
         assertTrue(loader.contains("downloadState.awaitCompletion()"))
         assertTrue(loader.contains("downloadState.awaitCompletion()\n                if (install())"))
-        assertTrue(loader.contains("internal fun installWithRetry()"))
-        val retry = loader.substringAfter("internal fun installWithRetry()")
-        assertTrue(retry.indexOf("preDownload()") < retry.indexOf("val installed = install()"))
-        assertTrue(retry.contains("compareAndSet(false, true)"))
-        assertTrue(helper.contains("CronetLoader.installWithRetry()"))
         assertTrue(config.contains("val isCronet: Boolean"))
         assertTrue(config.contains("get() = appCtx.getPrefBoolean(PreferKey.cronet)"))
-        assertFalse(httpHelper.contains("if (AppConfig.isCronet)"))
+        assertTrue(httpHelper.contains("if (AppConfig.isCronet)"))
     }
 
     @Test
@@ -70,6 +65,6 @@ class CronetInitializationContractTest {
             it.parentFile
         }.map {
             File(it, path)
-        }.first { it.isFile }.readText().replace("\r\n", "\n")
+        }.first { it.isFile }.readText()
     }
 }
