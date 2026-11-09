@@ -243,7 +243,9 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                 "componentBytes=${storage.sumOf { it.length() }}\nnativeMtime=${native.lastModified()}\n" +
                 "nativeFile=${native.canonicalPath}\n" +
                 File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
-            return "$version; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
+            RssImageRuntimeRegression.verify(this)
+            val rssVideo = RssVideoRuntimeRegression.verify(this)
+            return "$version; rssVideo=$rssVideo; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
                 "webDav=authenticated,encoded-paths,cronet-first,on-off-on; " +
                 "firstInstallFailures=$firstInstallFailures; " +
                 "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +

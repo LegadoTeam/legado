@@ -6,7 +6,7 @@ fixture_dir="$(mktemp -d)"
 fixture_pid=""
 cleanup() {
   adb logcat -d > app/build/cronet-runtime/logcat.txt || true
-  adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime app/build/cronet-runtime/device || true
+  adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime app/build/cronet-runtime/rss || true
   if [[ -n "$fixture_pid" ]]; then kill "$fixture_pid" 2>/dev/null || true; fi
   adb reverse --remove tcp:19443 || true
   adb reverse --remove tcp:19444 || true
@@ -31,6 +31,11 @@ openssl x509 -req -in "$fixture_dir/server.csr" -CA "$fixture_dir/ca.pem" \
   -extfile "$fixture_dir/server.ext" -out "$fixture_dir/server.pem" 2>/dev/null
 openssl x509 -in "$fixture_dir/ca.pem" -outform DER -out "$fixture_dir/ca.der"
 fixture_ca="$(base64 -w0 "$fixture_dir/ca.der")"
+# Generated locally in CI: no third-party video or production asset is needed.
+ffmpeg -hide_banner -loglevel error -f lavfi -i 'testsrc2=size=320x240:rate=24' \
+  -t 60 -an -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -g 24 \
+  -b:v 1200k -minrate 1200k -maxrate 1200k -bufsize 2400k \
+  -x264-params 'nal-hrd=cbr:force-cfr=1' -movflags +faststart "$fixture_dir/rss-seek.mp4"
 node .github/scripts/cronet-webdav-fixture.cjs "$fixture_dir/server.key" \
   "$fixture_dir/server.pem" "$fixture_dir/ready" \
   > app/build/cronet-runtime/webdav-server.jsonl 2>&1 &
@@ -65,6 +70,7 @@ PY
 adb install -r -t "${apks[0]}"
 adb shell pm clear com.legado.app.release
 adb shell mkdir -p /sdcard/Android/data/com.legado.app.release/files
+adb push "$fixture_dir/rss-seek.mp4" /sdcard/Android/data/com.legado.app.release/files/rss-seek.mp4
 adb logcat -c
 timeout 300 adb shell am instrument -w -r -e fixtureCa "$fixture_ca" \
   com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
