@@ -14,6 +14,7 @@ plugins {
     alias libs.plugins.google.services
 }
 apply from: 'download.gradle'
+apply from: 'cronet-loader.gradle'
 
 static def releaseTime() {
     return new Date().format("yyMMddHH", TimeZone.getTimeZone("GMT+8"))
@@ -177,8 +178,6 @@ android {
         jniLibs {
             // These dependencies already ship stripped; skip redundant strip attempts.
             keepDebugSymbols += [
-                    // Preserve the upstream Cronet binaries verified against cronet.json.
-                    "**/libcronet.${CronetVersion}.so",
                     '**/libandroidx.graphics.path.so',
                     '**/libarchive-jni.so',
                     '**/libdatastore_shared_counter.so',
@@ -191,7 +190,6 @@ android {
     }
 
     sourceSets {
-        main.jniLibs.srcDir(layout.buildDirectory.dir('generated/cronetJni'))
         // Adds exported schema location as test app assets.
         androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
     }
@@ -313,7 +311,9 @@ dependencies {
     //网络
     implementation(libs.okhttp)
     implementation(libs.brotli.dec)
-    implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar']))
+    implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar'],
+            exclude: ['cronet_impl_native_java.jar']))
+    implementation(dynamicCronetJar)
 
     implementation(libs.protobuf.javalite)
 
