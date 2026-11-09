@@ -30,7 +30,7 @@ val cronetEngine: ExperimentalCronetEngine? by lazy {
     try {
         CronetLoader.preDownload()
         val builder = ExperimentalCronetEngine.Builder(appCtx).apply {
-            // Cronet 152 loads through the version-pinned Java adaptation in cronet-loader.gradle.
+            setLibraryLoader(CronetLoader)
             setStoragePath(appCtx.externalCache.absolutePath)//设置缓存路径
             enableHttpCache(HTTP_CACHE_DISK, (1024 * 1024 * 50).toLong())//设置50M的磁盘缓存
             enableQuic(true)//设置支持http/3
