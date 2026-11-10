@@ -127,6 +127,7 @@ internal class PdfZoom(private val view: ReadView) {
             lastX = event.x
             lastY = event.y
             if (owned) {
+                view.cancelPendingNativePageTurn()
                 view.cancelNonPdfGestures()
                 view.pageDelegate?.apply { isCancel = true; abortAnim() }
                 view.autoPager.pause()
@@ -135,6 +136,7 @@ internal class PdfZoom(private val view: ReadView) {
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
             owned = true
             multiplePointers = true
+            view.cancelPendingNativePageTurn()
             view.cancelNonPdfGestures()
             view.pageDelegate?.apply { isCancel = true; abortAnim() }
             view.autoPager.pause()

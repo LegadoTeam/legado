@@ -21,6 +21,7 @@ import io.legado.app.constant.PageAnim
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.lib.eink.IReaderPageTurnEffect
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.service.BaseReadAloudService
@@ -28,6 +29,7 @@ import io.legado.app.ui.book.read.ContentEditDialog
 import io.legado.app.ui.book.read.page.api.DataSource
 import io.legado.app.ui.book.read.page.delegate.CoverPageDelegate
 import io.legado.app.ui.book.read.page.delegate.HorizontalPageDelegate
+import io.legado.app.ui.book.read.page.delegate.IReaderPageDelegate
 import io.legado.app.ui.book.read.page.delegate.NoAnimPageDelegate
 import io.legado.app.ui.book.read.page.delegate.PageDelegate
 import io.legado.app.ui.book.read.page.delegate.ScrollPageDelegate
@@ -153,6 +155,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private val isPageDragging: Boolean get() = pressDown && pageDelegate?.isMoved == true
     private var isMove = false
     private val readPositionVersion = ReadPositionVersion()
+    private val nativePageTurn = IReaderPageTurnSession(
+        this, ::nativePageTurnPosition, ::nativePageTurnFrame, ::isNativePageTurnEnabled,
+        readPositionVersion::snapshot,
+    )
 
     //起始点
     var startX: Float = 0f
@@ -256,6 +262,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        cancelPendingNativePageTurn()
         setRect9x()
         prevPage.x = -w.toFloat()
         pageDelegate?.setViewSize(w, h)
@@ -269,6 +276,36 @@ class ReadView(context: Context, attrs: AttributeSet) :
         super.dispatchDraw(canvas)
         pageDelegate?.onDraw(canvas)
         autoPager.onDraw(canvas)
+        if (isNativePageTurnConfigured()) {
+            nativePageTurn.frameDrawn()
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        warmUpNativePageTurn()
+    }
+
+    private fun warmUpNativePageTurn() {
+        if (!isInEditMode && isNativePageTurnConfigured()) {
+            nativePageTurn.warmUp()
+        }
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        if (!hasWindowFocus) cancelPendingNativePageTurn()
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (hasWindowFocus) warmUpNativePageTurn()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        if (visibility != View.VISIBLE) cancelPendingNativePageTurn()
+        super.onWindowVisibilityChanged(visibility)
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelPendingNativePageTurn()
+        super.onDetachedFromWindow()
     }
 
     override fun computeScroll() {
@@ -362,6 +399,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                     if (pullBookmarkState != PullBookmarkGestureState.NONE ||
                         state != PullBookmarkGestureState.NONE
                     ) {
+                        cancelPendingNativePageTurn()
                         pullBookmarkState = if (state == PullBookmarkGestureState.NONE) {
                             PullBookmarkGestureState.PULLING
                         } else {
@@ -477,6 +515,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         ) {
             return false
         }
+        cancelPendingNativePageTurn()
         removeCallbacks(longPressRunnable)
         resetPullBookmarkGesture()
         pageDelegate?.abortAnim()
@@ -810,6 +849,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 点击
      */
     private fun click(action: Int) {
+        if (action != 1 && action != 2) cancelPendingNativePageTurn()
         when (action) {
             0 -> {
                 pageDelegate?.dismissSnackBar()
@@ -905,6 +945,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 销毁事件
      */
     fun onDestroy() {
+        cancelPendingNativePageTurn()
         curPage.closePdfRenderer()
         cancelTouchGestures()
         dismissTextMagnifier()
@@ -928,7 +969,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     fun fillPage(direction: PageDirection): Boolean {
         if (replacePreview != null) return false
-        return when (direction) {
+        val nativeRotation = if (isNativePageTurnConfigured()) nativePageTurn.beforeTurn() else null
+        val pageChanged = when (direction) {
             PageDirection.PREV -> {
                 pageFactory.moveToPrev(true)
             }
@@ -939,12 +981,55 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
             else -> false
         }
+        if (pageChanged) {
+            if (nativeRotation != null) {
+                nativePageTurn.request(direction == PageDirection.NEXT, nativeRotation)
+            } else {
+                cancelPendingNativePageTurn()
+            }
+        }
+        return pageChanged
+    }
+
+    private fun nativePageTurnPosition(): NativePageTurnGate.Position? = ReadBook.book?.let {
+        NativePageTurnGate.Position(it.bookUrl, ReadBook.durChapterIndex, ReadBook.durChapterPos)
+    }
+
+    /** Only a real current-page binding may consume the pending display effect. */
+    private fun nativePageTurnFrame(): NativePageTurnGate.Frame? {
+        val book = ReadBook.book ?: return null
+        val chapter = ReadBook.curTextChapter ?: return null
+        val page = curPage.textPage
+        if (replacePreview != null || !chapter.hasBodyContent || page.isMsgPage ||
+            !page.isCompleted || page.lines.isEmpty() || page.textChapter !== chapter ||
+            page.chapterIndex != ReadBook.durChapterIndex || page.index != ReadBook.durPageIndex
+        ) return null
+        return NativePageTurnGate.Frame(
+            book.bookUrl, page.chapterIndex, page.index, page.chapterPosition,
+        )
+    }
+
+    private fun isNativePageTurnConfigured(): Boolean =
+        ReadBook.pageAnim() == PageAnim.ireaderPageAnim && !isScroll
+
+    private fun isNativePageTurnEnabled(): Boolean = isAttachedToWindow && isShown &&
+        hasWindowFocus() && isNativePageTurnConfigured() && !isTextSelected &&
+        // A consumed held touch after an instant turn is not a running page animation.
+        (!isPageDragging || pageDelegate?.isRunning != true) &&
+        replacePreview == null && replacePreviewGestureState == ReplacePreviewGestureState.IDLE &&
+        pullBookmarkState == PullBookmarkGestureState.NONE && curPage.translationY == 0f &&
+        !pdfZoom.isInteracting && !pageFactory.isRefreshingResources &&
+        callBack.allowNativePageTurnEffect && IReaderPageTurnEffect.isAvailable()
+
+    fun cancelPendingNativePageTurn() {
+        nativePageTurn.cancel()
     }
 
     /**
      * 更新翻页动画
      */
     fun upPageAnim(upRecorder: Boolean = false) {
+        nativePageTurn.reset()
         val scroll = ReadBook.pageAnim() == PageAnim.scrollPageAnim
         if (pageDelegate != null) updateScrollReadPosition(preserveText = isScroll != scroll)
         isScroll = scroll
@@ -968,6 +1053,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 pageDelegate = ScrollPageDelegate(this)
             }
 
+            PageAnim.ireaderPageAnim -> if (pageDelegate !is IReaderPageDelegate) {
+                pageDelegate = IReaderPageDelegate(this)
+            }
+
             else -> if (pageDelegate !is NoAnimPageDelegate) {
                 pageDelegate = NoAnimPageDelegate(this)
             }
@@ -984,6 +1073,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
             curPage.setAutoPager(null)
         }
         curPage.setIsScroll(isScroll)
+        if (autoPager.isRunning) {
+            autoPager.reset()
+            invalidate()
+        }
     }
 
     /**
@@ -1244,6 +1337,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
     interface CallBack {
         val isInitFinish: Boolean
+        val allowNativePageTurnEffect: Boolean get() = true
         fun showActionMenu()
         fun screenOffTimerStart()
         fun showTextActionMenu()

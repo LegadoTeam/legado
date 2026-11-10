@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ireader_page_turn">掌阅原生翻页动效</string>
+    <string name="ireader_page_turn_option">掌阅原生</string>
+    <string name="ireader_page_turn_not_selected">请在“翻页动画”中选择“掌阅原生”以使用这些设置。</string>
+    <string name="ireader_page_turn_effect">动效</string>
+    <string name="ireader_page_turn_ripple">水波纹</string>
+    <string name="ireader_page_turn_waterfall">瀑布</string>
+    <string name="ireader_page_turn_speed">动效速度</string>
+    <string name="ireader_page_turn_slow">慢</string>
+    <string name="ireader_page_turn_normal">标准</string>
+    <string name="ireader_page_turn_fast">快</string>
+    <string name="ireader_page_turn_reverse">反转动效方向</string>
+    <string name="ireader_page_turn_reverse_summary">动效方向与翻页方向相反时使用</string>
+    <string name="ireader_page_turn_reverse_landscape">校正横屏方向</string>
+    <string name="ireader_page_turn_reverse_landscape_summary">仅反转横屏时的动效方向</string>
+    <string name="ireader_page_turn_refresh_interval">应用全刷间隔</string>
+    <string name="ireader_page_turn_refresh_interval_summary">默认由系统管理，按需额外清除残影。</string>
+    <string name="ireader_page_turn_refresh_follow_system">由系统管理</string>
+    <string name="ireader_page_turn_mode_unsupported">请将设备屏幕模式切换为高清、快速或智能。</string>
+    <string-array name="ireader_page_turn_refresh_intervals">
+        <item>@string/ireader_page_turn_refresh_follow_system</item>
+        <item>每次翻页</item>
+        <item>每5次翻页</item>
+        <item>每10次翻页</item>
+        <item>每20次翻页</item>
+        <item>每30次翻页</item>
+        <item>每50次翻页</item>
+    </string-array>
+    <string name="ireader_page_turn_unavailable">当前设备未提供兼容的掌阅显示接口。</string>
+    <string name="ireader_page_turn_failed">动效调用失败，本次使用已回退为普通翻页。重启应用后可再次尝试。</string>
+    <string name="ireader_page_turn_diagnostics">复制动效诊断</string>
+</resources>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <io.legado.app.lib.prefs.Preference
+        android:key="iReaderPageTurnStatus"
+        android:title="@string/ireader_page_turn"
+        android:selectable="false"
+        app:isPreferenceVisible="false"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.NameListPreference
+        android:key="iReaderPageTurnEffect"
+        android:defaultValue="1"
+        android:title="@string/ireader_page_turn_effect"
+        android:entries="@array/ireader_page_turn_effects"
+        android:entryValues="@array/ireader_page_turn_effect_values"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.NameListPreference
+        android:key="iReaderPageTurnSpeed"
+        android:defaultValue="1"
+        android:title="@string/ireader_page_turn_speed"
+        android:entries="@array/ireader_page_turn_speeds"
+        android:entryValues="@array/ireader_page_turn_values"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="iReaderPageTurnReverse"
+        android:defaultValue="false"
+        android:title="@string/ireader_page_turn_reverse"
+        android:summary="@string/ireader_page_turn_reverse_summary"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="iReaderPageTurnReverseLandscape"
+        android:defaultValue="false"
+        android:title="@string/ireader_page_turn_reverse_landscape"
+        android:summary="@string/ireader_page_turn_reverse_landscape_summary"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.NameListPreference
+        android:key="iReaderPageTurnRefreshInterval"
+        android:defaultValue="-2"
+        android:title="@string/ireader_page_turn_refresh_interval"
+        android:summary="@string/ireader_page_turn_refresh_interval_summary"
+        android:entries="@array/ireader_page_turn_refresh_intervals"
+        android:entryValues="@array/ireader_page_turn_refresh_interval_values"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.Preference
+        android:key="iReaderPageTurnDiagnostics"
+        android:title="@string/ireader_page_turn_diagnostics"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+</androidx.preference.PreferenceScreen>

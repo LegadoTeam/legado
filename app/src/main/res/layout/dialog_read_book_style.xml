@@ -262,6 +262,19 @@
             android:text="@string/page_anim_none"
             app:isBottomBackground="true" />
 
+        <io.legado.app.lib.theme.view.ThemeRadioNoButton
+            android:id="@+id/rb_ireader_anim"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            android:button="@null"
+            android:gravity="center"
+            android:padding="5dp"
+            android:singleLine="true"
+            android:text="@string/ireader_page_turn_option"
+            android:visibility="gone"
+            app:isBottomBackground="true" />
+
     </RadioGroup>
 
     <View

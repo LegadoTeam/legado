@@ -448,6 +448,35 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val noAnimScrollPage: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.noAnimScrollPage, false)
 
+    // ListPreference persists strings. Read both strings and numbers so imported
+    // preferences cannot crash rendering or accidentally enable an unknown mode.
+    var iReaderPageTurnEffect: Int
+        get() = readIReaderPageTurnChoice(
+            appCtx.defaultSharedPreferences, PreferKey.iReaderPageTurnEffect, 1, 1..2,
+        )
+        set(value) = appCtx.putPrefString(
+            PreferKey.iReaderPageTurnEffect, (value.takeIf { it in 1..2 } ?: 1).toString(),
+        )
+
+    var iReaderPageTurnSpeed: Int
+        get() = readIReaderPageTurnChoice(appCtx.defaultSharedPreferences, PreferKey.iReaderPageTurnSpeed, 1)
+        set(value) = appCtx.putPrefString(PreferKey.iReaderPageTurnSpeed, value.coerceIn(0, 2).toString())
+
+    /** -2 delegates cleaning to the system; positive values explicitly add local page cleaning. */
+    var iReaderPageTurnRefreshInterval: Int
+        get() = readIReaderPageTurnRefreshInterval(appCtx.defaultSharedPreferences)
+        set(value) = appCtx.putPrefString(
+            PreferKey.iReaderPageTurnRefreshInterval, normalizeIReaderRefreshInterval(value).toString(),
+        )
+
+    var iReaderPageTurnReverse: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.iReaderPageTurnReverse, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.iReaderPageTurnReverse, value)
+
+    var iReaderPageTurnReverseLandscape: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.iReaderPageTurnReverseLandscape, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.iReaderPageTurnReverseLandscape, value)
+
     const val defaultSpeechRate = 5
 
     var ttsSpeechRate: Int

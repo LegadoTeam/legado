@@ -6,18 +6,20 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.core.view.get
+import androidx.core.view.isVisible
 import com.github.liuyueyi.quick.transfer.constants.TransType
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.EventBus
+import io.legado.app.constant.PageAnim
 import io.legado.app.databinding.DialogReadBookStyleBinding
 import io.legado.app.databinding.ItemReadStyleBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.lib.eink.IReaderPageTurnEffect
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
@@ -27,7 +29,6 @@ import io.legado.app.ui.font.FontSelectDialog
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
-import io.legado.app.utils.getIndexById
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -40,6 +41,14 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
     private val callBack get() = activity as? ReadBookActivity
     private lateinit var styleAdapter: StyleAdapter
     private var updatingPageAnim = false
+    private val pageAnimOptions = mapOf(
+        R.id.rb_anim0 to PageAnim.coverPageAnim,
+        R.id.rb_anim1 to PageAnim.slidePageAnim,
+        R.id.rb_simulation_anim to PageAnim.simulationPageAnim,
+        R.id.rb_scroll_anim to PageAnim.scrollPageAnim,
+        R.id.rb_no_anim to PageAnim.noAnim,
+        R.id.rb_ireader_anim to PageAnim.ireaderPageAnim,
+    )
 
     override fun onStart() {
         super.onStart()
@@ -108,6 +117,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
     }
 
     private fun initViewEvent() = binding.run {
+        rbIreaderAnim.setOnClickListener { showNativePageTurnConfig() }
         chineseConverter.onChanged {
             ChineseUtils.unLoad(*TransType.entries.toTypedArray())
             postEvent(EventBus.UP_CONFIG, arrayListOf(5))
@@ -136,10 +146,12 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         }
         rgPageAnim.setOnCheckedChangeListener { _, checkedId ->
             if (updatingPageAnim) return@setOnCheckedChangeListener
+            val animation = pageAnimOptions[checkedId] ?: return@setOnCheckedChangeListener
             ReadBook.book?.setPageAnim(-1)
-            ReadBookConfig.pageAnim = binding.rgPageAnim.getIndexById(checkedId)
+            ReadBookConfig.pageAnim = animation
             callBack?.upPageAnim()
             ReadBook.loadContent(false)
+            updatePageAnimView()
         }
         cbShareLayout.onCheckedChangeListener = { _, isChecked ->
             val oldPageAnim = ReadBook.pageAnim()
@@ -166,6 +178,11 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         }
     }
 
+    private fun showNativePageTurnConfig() {
+        dismissAllowingStateLoss()
+        (activity as? ReadBookActivity)?.showDialogFragment(IReaderPageTurnDialog())
+    }
+
     private fun changeBgTextConfig(index: Int) {
         val oldIndex = ReadBookConfig.styleSelect
         if (index != oldIndex) {
@@ -189,20 +206,25 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         return true
     }
 
-    private fun upView() = binding.run {
-        textFontWeightConverter.upUi(ReadBookConfig.textBold)
-        // Reflect the selected preset without replaying radio-button change callbacks.
-        // Those callbacks can apply new padding while the old scroll page is still bound.
+    private fun updatePageAnimView() = binding.run {
+        // Reflect configuration without replaying the listener that reloads page content.
         updatingPageAnim = true
         try {
-            ReadBook.pageAnim().let {
-                if (it >= 0 && it < rgPageAnim.childCount) {
-                    rgPageAnim.check(rgPageAnim[it].id)
-                }
-            }
+            val animation = ReadBook.pageAnim()
+            val nativeSelected = animation == PageAnim.ireaderPageAnim
+            val nativeAvailable = IReaderPageTurnEffect.isAvailable()
+            rbIreaderAnim.isVisible = nativeAvailable || nativeSelected
+            rbIreaderAnim.isEnabled = nativeAvailable || nativeSelected
+            val checkedId = pageAnimOptions.entries.firstOrNull { it.value == animation }?.key
+            if (checkedId != null) rgPageAnim.check(checkedId) else rgPageAnim.clearCheck()
         } finally {
             updatingPageAnim = false
         }
+    }
+
+    private fun upView() = binding.run {
+        textFontWeightConverter.upUi(ReadBookConfig.textBold)
+        updatePageAnimView()
         ReadBookConfig.let {
             dsbTextSize.progress = it.textSize - 5
             dsbTextLetterSpacing.progress = (it.letterSpacing * 100).toInt() + 50

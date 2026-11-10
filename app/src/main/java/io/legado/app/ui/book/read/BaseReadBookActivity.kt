@@ -18,6 +18,7 @@ import androidx.core.view.updateLayoutParams
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppConst.charsets
+import io.legado.app.constant.PageAnim
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ActivityBookReadBinding
@@ -31,6 +32,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.lib.eink.IReaderPageTurnEffect
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.model.CacheBook
@@ -40,6 +42,7 @@ import io.legado.app.ui.book.read.config.BgTextConfigDialog
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.PaddingConfigDialog
 import io.legado.app.ui.book.read.config.PageKeyDialog
+import io.legado.app.ui.book.read.config.IReaderPageTurnDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.FileDoc
@@ -375,16 +378,22 @@ abstract class BaseReadBookActivity :
     }
 
     fun showPageAnimConfig(success: () -> Unit) {
-        val items = arrayListOf<String>()
-        items.add(getString(R.string.btn_default_s))
-        items.add(getString(R.string.page_anim_cover))
-        items.add(getString(R.string.page_anim_slide))
-        items.add(getString(R.string.page_anim_simulation))
-        items.add(getString(R.string.page_anim_scroll))
-        items.add(getString(R.string.page_anim_none))
-        selector(R.string.page_anim, items) { _, i ->
-            ReadBook.book?.setPageAnim(i - 1)
+        val options = arrayListOf(
+            -1 to R.string.btn_default_s,
+            PageAnim.coverPageAnim to R.string.page_anim_cover,
+            PageAnim.slidePageAnim to R.string.page_anim_slide,
+            PageAnim.simulationPageAnim to R.string.page_anim_simulation,
+            PageAnim.scrollPageAnim to R.string.page_anim_scroll,
+            PageAnim.noAnim to R.string.page_anim_none,
+        )
+        if (IReaderPageTurnEffect.isAvailable() || ReadBook.pageAnim() == PageAnim.ireaderPageAnim) {
+            options.add(PageAnim.ireaderPageAnim to R.string.ireader_page_turn_option)
+        }
+        selector(R.string.page_anim, options.map { getString(it.second) }) { _, index ->
+            val animation = options[index].first
+            ReadBook.book?.setPageAnim(animation)
             success()
+            if (animation == PageAnim.ireaderPageAnim) showDialogFragment(IReaderPageTurnDialog())
         }
     }
 
