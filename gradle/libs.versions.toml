@@ -8,7 +8,7 @@ colorpicker = "1.1.0"
 constraintlayout = "2.2.1"
 core = "1.18.0"
 flexbox = "3.0.0"
-fragment = "1.8.9"
+fragment = "1.9.1"
 documentfile = "1.1.0"
 
 libarchive = "1.1.6"
